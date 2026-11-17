@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -42,6 +43,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
     test('PM: Calendar-Vorlage speichern, reload, publish; Vertrieb adoptiert', async ({
         page,
     }) => {
+        test.setTimeout(120_000);
         await login(page, 'pm@example.com');
         await page.goto('/standardangebote/neu');
         await expect(
@@ -52,6 +54,11 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             'E2E Calendar Vorlage März 2026',
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+
+        await ensureWizardInventorySelected(page);
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeVisible({ timeout: 30_000 });
 
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
@@ -74,6 +81,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -113,6 +121,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -125,6 +134,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
     });
 
     test('Average-Regression im Vorlagenmodus', async ({ page }) => {
+        test.setTimeout(90_000);
         await login(page, 'pm@example.com');
         await page.goto('/standardangebote/neu');
         await page
@@ -132,9 +142,11 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             .fill('E2E Average Regression');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
+        await ensureWizardInventorySelected(page);
+
         await expect(
             page.locator('[data-test="calculation-method-radio-0-average"]'),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 30_000 });
         await page
             .locator('[data-test="calculation-method-radio-0-average"]')
             .check();
@@ -153,6 +165,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             page.locator('[data-test="standard-offer-title"]'),
         ).toHaveValue('E2E Average Regression');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-average"]'),
         ).toBeChecked();
@@ -161,12 +174,17 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
     test('Negativ: Calendar-Zelle mit Spotanzahl 0 wird verständlich abgewiesen', async ({
         page,
     }) => {
+        test.setTimeout(90_000);
         await login(page, 'pm@example.com');
         await page.goto('/standardangebote/neu');
         await page
             .locator('[data-test="standard-offer-title"]')
             .fill('E2E Calendar Negativ');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeVisible({ timeout: 30_000 });
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();

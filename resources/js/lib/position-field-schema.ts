@@ -34,12 +34,14 @@ export function shouldApplyPositionSchemaResponse(
 }
 
 export function positionNeedsFieldSchema(position: {
-    advertising_medium_id: number;
+    advertising_medium_id: number | null;
     schema_fingerprint?: string | null;
     field_schema?: unknown;
 }): boolean {
+    const mediumId = position.advertising_medium_id;
     return (
-        position.advertising_medium_id > 0 &&
+        mediumId !== null &&
+        mediumId > 0 &&
         (position.schema_fingerprint === null ||
             position.schema_fingerprint === undefined ||
             position.schema_fingerprint === '' ||

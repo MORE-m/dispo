@@ -1,4 +1,5 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * DF-3.3a2α isolierte Suite: globale Zuweisung eines freien Feldsets wird im
@@ -216,6 +217,7 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
 
         // Sichtbar vor dem Speichern: Positionsfeld am vorhandenen Werbeelement.
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page
                 .locator('[data-test^="calculation-custom-position-fields-"]')

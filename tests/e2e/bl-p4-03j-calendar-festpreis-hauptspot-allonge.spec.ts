@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -44,14 +45,6 @@ async function ensureWeekContainsDate(page: Page, date: string) {
     await expect(header).toBeVisible();
 }
 
-async function selectInventory(page: Page, name: string) {
-    const expand = page.locator('[data-test="position-inventory-expand-0"]');
-    if (await expand.isVisible()) {
-        await expand.click();
-    }
-    await page.getByRole('button', { name, exact: true }).click();
-}
-
 async function activateComponentsWithAllonge(page: Page) {
     await page.locator('[data-test="spot-components-activate-0"]').click();
     await expect(
@@ -68,7 +61,7 @@ async function setupCalendarFestpreisComponents(
     fixedPriceNn: string,
 ) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await selectInventory(page, inventoryName);
+    await ensureWizardInventorySelected(page, 0, { label: inventoryName });
 
     await page
         .locator('[data-test="calculation-method-radio-0-calendar"]')
@@ -148,6 +141,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -205,6 +199,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -277,6 +272,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -334,6 +330,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();

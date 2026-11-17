@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Response } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -170,7 +171,9 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
             'E2E Calendar Tandem normal März 2026',
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-        await selectInventory(page, 'Radio Hamburg Tandem');
+        await ensureWizardInventorySelected(page, 0, {
+            label: 'Radio Hamburg Tandem',
+        });
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();
@@ -199,6 +202,7 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -227,6 +231,7 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -254,7 +259,9 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
             'E2E Calendar Tridem Festpreis März 2026',
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-        await selectInventory(page, 'Radio Hamburg Tridem');
+        await ensureWizardInventorySelected(page, 0, {
+            label: 'Radio Hamburg Tridem',
+        });
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();
@@ -284,6 +291,7 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
         ).toBeChecked();
@@ -318,6 +326,7 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
         ).toBeChecked();
@@ -358,7 +367,9 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-        await selectInventory(page, 'Radio Hamburg Tandem');
+        await ensureWizardInventorySelected(page, 0, {
+            label: 'Radio Hamburg Tandem',
+        });
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();
@@ -435,6 +446,7 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();

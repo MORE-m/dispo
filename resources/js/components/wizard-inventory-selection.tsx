@@ -15,7 +15,8 @@ export type WizardInventoryOption = {
 type WizardInventorySelectionProps = {
     positionIndex: number;
     inventories: WizardInventoryOption[];
-    selectedInventoryId: number;
+    /** `null` = noch keine Auswahl (PO-CALC-DISPO-UX-1: frisches Werbeelement). */
+    selectedInventoryId: number | null;
     canEdit: boolean;
     /** Inventare, die für neue Positionen kein wählbares Medium haben. */
     unplannableInventoryIds: ReadonlySet<number>;
@@ -37,16 +38,19 @@ export function WizardInventorySelection({
     onSelectInventory,
 }: WizardInventorySelectionProps) {
     const listId = useId();
-    const selected = inventories.find(
-        (item) => item.id === selectedInventoryId,
+    const selected =
+        selectedInventoryId === null
+            ? undefined
+            : inventories.find((item) => item.id === selectedInventoryId);
+    const [expanded, setExpanded] = useState(
+        () => selectedInventoryId === null || selected === undefined,
     );
-    const [expanded, setExpanded] = useState(() => selected === undefined);
 
     useEffect(() => {
-        if (selected === undefined) {
+        if (selectedInventoryId === null || selected === undefined) {
             setExpanded(true);
         }
-    }, [selected]);
+    }, [selected, selectedInventoryId]);
 
     const selectedLabel = selected
         ? catalogLabel(selected.name, selected.is_active)
@@ -206,14 +210,19 @@ export function WizardInventorySelection({
             <select
                 className="sr-only"
                 data-test={`position-inventory-${positionIndex}`}
-                value={selectedInventoryId}
+                value={selectedInventoryId ?? ''}
                 disabled={!canEdit}
                 tabIndex={-1}
                 aria-hidden="true"
                 onChange={(event) => {
-                    selectInventory(Number(event.target.value));
+                    const raw = event.target.value;
+                    if (raw === '') {
+                        return;
+                    }
+                    selectInventory(Number(raw));
                 }}
             >
+                <option value="">Kein Inventar gewählt</option>
                 {inventories.map((item) => (
                     <option
                         key={item.id}
