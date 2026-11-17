@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -53,6 +54,8 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
+        await ensureWizardInventorySelected(page);
+
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();
@@ -74,6 +77,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -113,6 +117,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -131,6 +136,8 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             .locator('[data-test="standard-offer-title"]')
             .fill('E2E Average Regression');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+
+        await ensureWizardInventorySelected(page);
 
         await expect(
             page.locator('[data-test="calculation-method-radio-0-average"]'),
@@ -153,6 +160,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             page.locator('[data-test="standard-offer-title"]'),
         ).toHaveValue('E2E Average Regression');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-average"]'),
         ).toBeChecked();
@@ -167,6 +175,7 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             .locator('[data-test="standard-offer-title"]')
             .fill('E2E Calendar Negativ');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();

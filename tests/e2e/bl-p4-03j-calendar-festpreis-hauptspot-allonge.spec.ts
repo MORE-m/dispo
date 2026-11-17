@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -68,6 +69,7 @@ async function setupCalendarFestpreisComponents(
     fixedPriceNn: string,
 ) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await selectInventory(page, inventoryName);
 
     await page
@@ -148,6 +150,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -205,6 +208,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -277,6 +281,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();
@@ -334,6 +339,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
             timeout: 30_000,
         });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
         ).toBeChecked();

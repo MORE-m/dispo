@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * BL-P5-02a: Spotproduktion an Spot Classic × Average (PO-BLP502-1).
@@ -36,6 +37,7 @@ async function openNewCalculationStepTwo(page: Page, customer: string) {
     await page.locator('[data-test="crm-customer-search"]').fill(customer);
     await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
 }
 
 async function selectSpotInventory(page: Page, index: number, code: string) {
@@ -160,6 +162,7 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
         ).toHaveValue(/300/);
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page
             .getByRole('button', { name: 'Werbeelement hinzufügen' })
             .click();
@@ -236,6 +239,7 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
         const calcUrl = page.url();
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await selectSpotInventory(page, 0, 'SPC');
         await waitForPreview(page);
         await page.getByRole('button', { name: '3. Konditionen' }).click();
@@ -248,6 +252,7 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         // Pin bleibt auf SPA (keine Teilmutation).
         await expect(page.locator('body')).toContainText(
             'Produktion Testsender A',
@@ -382,6 +387,7 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
         await waitForPreview(page);
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
             .check();
