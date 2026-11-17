@@ -46,5 +46,6 @@ ohne die Entscheidung zu ersetzen.
 | [PO-GOLIVE-CUT-1-DEC](PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung | **Akzeptiert für Projektpriorisierung**; Fachparameter bleiben Umsetzungsvoraussetzungen |
 | [PO-OA-BUDGET-V2](PO-OA-BUDGET-V2.md) | OA-/Free-/Mixed-Budget vollständig V2; V1 Spot-only | **Akzeptiert / verbindlich** (15.11.2026; Docs-only) |
 | [PO-V1-CLOSURE-1](PO-V1-CLOSURE-1-backlog-status.md) | V1-Backlogstatus gegen released Capabilities | **Akzeptiert / Docs-only** (15.11.2026; keine neue Fachscope-Entscheidung) |
+| [PO-CALC-DISPO-UX-1](PO-CALC-DISPO-UX-1.md) | Calc→Dispo UX: operative Felder + Wizard-Werbeelemente | **Akzeptiert** (17.11.2026; PR1 Wizard-UX) |
 | [PO-SPOT-SURCHARGE-1 Auftrag](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Erst/Letzt auf `main` (PR #160) | umgesetzt |
 | [PO-SPOT-SINGLE-1 Auftrag](../readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md) | Single-Spot +50 % / MAT-003 | auf `main` (PR #161) |

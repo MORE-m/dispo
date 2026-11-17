@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const monday = '2026-09-14';
 const hour8 = 8;
@@ -21,6 +22,7 @@ async function openNewCalculationStepTwo(page: Page) {
     await page.locator('[data-test="crm-customer-search"]').fill('Kalenderplaner E2E GmbH');
     await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
 }
 
 async function waitForCalculationPreview(page: Page) {

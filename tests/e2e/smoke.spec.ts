@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 async function loginAsSales(page: Page) {
     await page.goto('/login');
@@ -116,6 +117,7 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await page.goto('/kalkulationen/neu');
 
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-end-0-0"]').selectOption('9');
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.locator('[data-test="position-length-seconds-0"]').fill('30');
@@ -469,6 +471,7 @@ test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({
     await page.goto('/kalkulationen/neu');
 
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="position-length-seconds-0"]').fill('30');
     await page.locator('[data-test="range-start-0-0"]').selectOption('8');
     await page.locator('[data-test="range-end-0-0"]').selectOption('12');
@@ -624,6 +627,7 @@ test('Neue Kalkulation startet ohne AE und zeigt keinen AE-Abzug', async ({
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await waitForCalculationPreview(page);
 

@@ -130,11 +130,24 @@ export function BudgetElementsStep({
                         className={wizardCardClass}
                         data-test={`budget-element-${index}`}
                     >
-                        <CardHeader className={wizardCardHeaderClass}>
+                        <CardHeader
+                            className={`${wizardCardHeaderClass} flex flex-row flex-wrap items-center justify-between gap-2`}
+                        >
                             <CardTitle className={wizardCardTitleClass}>
                                 Werbeelement {index + 1}
                                 {inventory ? ` · ${inventory.name}` : ''}
                             </CardTitle>
+                            {elements.length > 1 && canEdit ? (
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    data-test={`budget-element-remove-${index}`}
+                                    onClick={() => removeElement(index)}
+                                >
+                                    Entfernen
+                                </Button>
+                            ) : null}
                         </CardHeader>
                         <CardContent
                             className={`${wizardCardContentClass} space-y-4`}
@@ -207,17 +220,6 @@ export function BudgetElementsStep({
                                     })
                                 }
                             />
-
-                            {elements.length > 1 && canEdit ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeElement(index)}
-                                >
-                                    Werbeelement entfernen
-                                </Button>
-                            ) : null}
                         </CardContent>
                     </Card>
                 );

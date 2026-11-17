@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { adoptFreitext } from './helpers/crm-wizard-picker';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * BL-P2-03a Browser-Belege (isoliert Port 8060 / SQLite).
@@ -52,6 +53,7 @@ async function uploadAndApply(page: Page, csvPath: string) {
 
 async function fillMinimalSpotsAndSave(page: Page) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Speichern', exact: true }).click();
@@ -118,6 +120,7 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         });
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-spots-0-0"]').fill('10');
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
 
@@ -384,6 +387,7 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         });
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-spots-0-0"]').fill('5');
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
 

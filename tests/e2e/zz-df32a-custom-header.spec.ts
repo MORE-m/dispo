@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * DF-3.2a Browser-Smoke auf der separaten E2E-SQLite (database/e2e.sqlite).
@@ -224,6 +225,7 @@ test('DF-3.2a Custom-Header: Admin → Calc Pflicht → Dispo Capture read-only'
 
     await page.locator(`[data-test="calc-custom-${bothKey}"]`).fill(bothValue);
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     // PO-32b-1: Calc-Create wird nicht durch leere Custom-Pflichtfelder blockiert

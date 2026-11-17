@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * DF-3.2b isolierte Mehrpositions-Smoke-Suite.
@@ -154,6 +155,7 @@ test('DF-3.2b Position-Custom: zwei Positionen, Capture und native Dispo-Felder'
 
     await page.goto('/kalkulationen/neu');
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
 
     await expect(
         page.locator('[data-test^="calculation-custom-position-fields-"]').first(),

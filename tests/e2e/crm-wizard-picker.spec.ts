@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { adoptFreitext, selectAccountHit } from './helpers/crm-wizard-picker';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * CRM-Wizard-Picker Browser-Belege (isoliert Port 8064 / SQLite).
@@ -52,6 +53,7 @@ async function uploadAndApply(page: Page, csvPath: string) {
 
 async function fillMinimalSpotsAndSave(page: Page) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await saveAndWaitForPickerSync(page);
@@ -226,6 +228,7 @@ test.describe('CRM Wizard Picker', () => {
         await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-spots-0-0"]').fill('5');
         await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await page.waitForTimeout(1500);

@@ -135,6 +135,13 @@ import {
     isFreePosition,
 } from '@/lib/free-position-wizard';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
+import {
+    createEmptyManualPositionDraft,
+    createManualPositionDraftForInventory,
+    createNextManualPositionDraft,
+    hasManualInventorySelection,
+    hasManualPositionIds,
+} from '@/lib/wizard-manual-position';
 import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
 import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
 import {
@@ -266,10 +273,11 @@ type FieldSchema = {
 type PositionDraft = {
     id?: number | null;
     client_key: string;
-    inventory_id: number;
+    /** `null` = noch keine Inventarwahl (PO-CALC-DISPO-UX-1). */
+    inventory_id: number | null;
     inventory_name?: string | null;
     inventory_code?: string | null;
-    advertising_medium_id: number;
+    advertising_medium_id: number | null;
     /** DF-3.3a2β: Fingerprint des positionsbezogenen Effektiv-Schemas. */
     schema_fingerprint?: string | null;
     /** DF-3.3a2β: Positions-Schema (Effektiv bzw. Live je Medium). */
@@ -777,6 +785,10 @@ function withForcedProfileComponentsIfNeeded(
     catalog: Catalog,
     componentProfiles: ComponentProfilesProp,
 ): PositionDraft {
+    if (position.advertising_medium_id === null) {
+        return position;
+    }
+
     const profile = profileForMedium(catalog, position.advertising_medium_id);
     if (!isForcedProfile(profile) || position.components.length > 0) {
         return position;
@@ -802,9 +814,17 @@ function catalogLabel(name: string, isActive: boolean): string {
 }
 
 function positionInventoryName(
-    position: { inventory_id: number; inventory_name?: string | null },
+    position: {
+        inventory_id: number | null;
+        inventory_name?: string | null;
+    },
     catalog: Catalog,
 ): string {
+    if (position.inventory_id === null) {
+        const frozenEmpty = (position.inventory_name ?? '').trim();
+        return frozenEmpty !== '' ? frozenEmpty : 'Kein Inventar gewählt';
+    }
+
     const frozen = (position.inventory_name ?? '').trim();
     if (frozen !== '') {
         const live = catalog.inventories.find(
@@ -861,109 +881,34 @@ function methodOptionsForTemplate(
     };
 }
 
-function firstValidPosition(
+/** PO-CALC-DISPO-UX-1: frisches manuelles Werbeelement ohne Inventar-Default. */
+function emptyManualPosition(catalog: Catalog): PositionDraft {
+    return createEmptyManualPositionDraft(catalog) as PositionDraft;
+}
+
+function manualPositionForInventory(
     catalog: Catalog,
+    inventoryId: number,
     oaTkpWizardCapability = false,
 ): PositionDraft | null {
-    // 1) regulär released/bookable  2) sonst planned TKP unter Capability
-    const preferredMedium =
-        catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
-        (oaTkpWizardCapability
-            ? (catalog.media.find((item) =>
-                  isSelectableForCalculationWizardPosition(
-                      item,
-                      oaTkpWizardCapability,
-                  ),
-              ) ?? null)
-            : null);
+    const seed = createManualPositionDraftForInventory(
+        catalog,
+        inventoryId,
+        oaTkpWizardCapability,
+    );
+    return seed ? (seed as PositionDraft) : null;
+}
 
-    if (!preferredMedium) {
-        return null;
-    }
-
-    for (const inventory of catalog.inventories.filter(
-        (item) => item.is_active,
-    )) {
-        const rule = ruleFor(catalog, inventory.id, preferredMedium.id);
-        if (!rule || !rule.is_active) {
-            continue;
-        }
-
-        const methodState = initMethodStateForNewPosition(
-            preferredMedium.calculation_method_options,
-        );
-        const year = defaultPriceYear(catalog, inventory.id);
-
-        return {
-            client_key: newClientKey(),
-            inventory_id: inventory.id,
-            inventory_name: inventory.name,
-            inventory_code: inventory.code,
-            advertising_medium_id: preferredMedium.id,
-            ...methodState,
-            length_seconds:
-                rule.default_length_seconds ??
-                preferredMedium.default_length_seconds,
-            components: [],
-            component_calculation_strategy: null,
-            position_discount_percent: '0',
-            ae_percent: '0',
-            plan_rows: [],
-            ...initialTimingFieldsForMethod(methodState.calculation_method_key),
-            position_discounts: [],
-            period_open: true,
-            flight_period_start: '',
-            flight_period_end: '',
-            custom_fields: {},
-            custom_choice_fields: {},
-            custom_choice_touched: {},
-            custom_choice_meta: {},
-            price_year: year,
-            original_price_year: year,
-            saved_inventory_id: null,
-            saved_advertising_medium_id: null,
-            saved_price_year: null,
-            original_price_list_id: expectedPriceListIdForYear(
-                catalog,
-                inventory.id,
-                year,
-            ),
-            expected_price_list_id: expectedPriceListIdForYear(
-                catalog,
-                inventory.id,
-                year,
-            ),
-            price_list_version:
-                resolveDisplayedPriceYearOptions(
-                    catalog,
-                    inventory.id,
-                    year,
-                ).find((option) => option.year === year)?.version ?? null,
-            price_list_status:
-                resolveDisplayedPriceYearOptions(
-                    catalog,
-                    inventory.id,
-                    year,
-                ).find((option) => option.year === year)?.status ?? null,
-            original_price_list_version:
-                resolveDisplayedPriceYearOptions(
-                    catalog,
-                    inventory.id,
-                    year,
-                ).find((option) => option.year === year)?.version ?? null,
-            original_price_list_status:
-                resolveDisplayedPriceYearOptions(
-                    catalog,
-                    inventory.id,
-                    year,
-                ).find((option) => option.year === year)?.status ?? null,
-            ...defaultPricingSettlementDraft(),
-            ...emptyOaTkpDraftFields(year),
-            ...emptyFreePositionDraftFields(),
-        };
-    }
-
-    return null;
+function nextManualPosition(
+    previous: PositionDraft | null | undefined,
+    catalog: Catalog,
+    oaTkpWizardCapability = false,
+): PositionDraft {
+    return createNextManualPositionDraft(
+        previous,
+        catalog,
+        oaTkpWizardCapability,
+    ) as PositionDraft;
 }
 
 function draftDiscounts(
@@ -1560,11 +1505,19 @@ export default function CalculationWizard({
             return [];
         }
 
-        const first = firstValidPosition(catalog, oaTkpCapabilityEnabled);
-        return first
+        const hasCatalogForManual =
+            catalog.inventories.some((item) => item.is_active) &&
+            catalog.media.some((item) =>
+                isSelectableForCalculationWizardPosition(
+                    item,
+                    oaTkpCapabilityEnabled,
+                ),
+            );
+
+        return hasCatalogForManual
             ? [
                   withForcedProfileComponentsIfNeeded(
-                      first,
+                      emptyManualPosition(catalog),
                       catalog,
                       component_profiles,
                   ),
@@ -1646,6 +1599,10 @@ export default function CalculationWizard({
             let loadError: string | null = null;
 
             for (const position of missing) {
+                if (position.advertising_medium_id === null) {
+                    continue;
+                }
+
                 const generation = nextSchemaFetchGeneration(
                     schemaFetchPendingRef.current.get(position.client_key)
                         ?.generation,
@@ -1914,6 +1871,18 @@ export default function CalculationWizard({
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
+                      // PO-CALC-DISPO-UX-1: Unvollständige Positionen (ohne Inventar/Werbemittel)
+                      // werden mit null-IDs durchgereicht; save() blockiert sie clientseitig vorab.
+                      if (!hasManualPositionIds(position)) {
+                          return {
+                              id: position.id,
+                              client_key: position.client_key,
+                              inventory_id: position.inventory_id,
+                              advertising_medium_id:
+                                  position.advertising_medium_id,
+                          };
+                      }
+
                       const dynamicFieldValues = {
                           period_open: position.period_open,
                           position_flight_period:
@@ -2213,8 +2182,12 @@ export default function CalculationWizard({
             busy ||
             proposalLoading ||
             (!isBudgetSetup &&
-                (draftBlocksOaTkpPreview(positions) ||
-                    draftBlocksFreePositionPreview(positions))),
+                (draftBlocksOaTkpPreview(
+                    positions.filter(hasManualPositionIds),
+                ) ||
+                    draftBlocksFreePositionPreview(
+                        positions.filter(hasManualPositionIds),
+                    ))),
     });
     const hasTkpPositions = draftHasTkpPositions(positions);
     const tkpSaveBlocked = isOaTkpSaveBlocked({
@@ -2297,6 +2270,38 @@ export default function CalculationWizard({
         if (allowedMediaFor(inventoryId).length === 0) {
             return false;
         }
+
+        // Erste Inventarwahl: vollständige Position neu aufbauen (kein Rebind von leerem Zustand).
+        if (!hasManualInventorySelection(current)) {
+            const created = manualPositionForInventory(
+                catalog,
+                inventoryId,
+                oaTkpCapabilityEnabled,
+            );
+            if (!created) {
+                return false;
+            }
+            if (usesRegularPlanningEditorView && planningMode === 'budget') {
+                setBudgetProposalManual(true);
+            }
+            setPositions((prev) =>
+                prev.map((item, itemIndex) =>
+                    itemIndex === index
+                        ? withForcedProfileComponentsIfNeeded(
+                              {
+                                  ...created,
+                                  id: item.id,
+                                  client_key: item.client_key,
+                              },
+                              catalog,
+                              component_profiles,
+                          )
+                        : item,
+                ),
+            );
+            return true;
+        }
+
         updatePosition(index, { inventory_id: inventoryId });
         return true;
     }
@@ -2312,9 +2317,18 @@ export default function CalculationWizard({
             return medium?.id ?? null;
         }
 
-        if (patch.inventory_id !== undefined) {
+        if (
+            patch.inventory_id !== undefined &&
+            patch.inventory_id !== null &&
+            item.inventory_id !== null &&
+            item.advertising_medium_id !== null
+        ) {
             const rebound = rebindPositionOnInventoryChange(
-                item,
+                {
+                    ...item,
+                    inventory_id: item.inventory_id,
+                    advertising_medium_id: item.advertising_medium_id,
+                },
                 patch.inventory_id,
                 catalog,
                 allowedMediaFor(patch.inventory_id),
@@ -2403,9 +2417,18 @@ export default function CalculationWizard({
                     };
                 }
 
-                if (patch.inventory_id !== undefined) {
+                if (
+                    patch.inventory_id !== undefined &&
+                    patch.inventory_id !== null &&
+                    item.inventory_id !== null &&
+                    item.advertising_medium_id !== null
+                ) {
                     const rebound = rebindPositionOnInventoryChange(
-                        item,
+                        {
+                            ...item,
+                            inventory_id: item.inventory_id,
+                            advertising_medium_id: item.advertising_medium_id,
+                        },
                         patch.inventory_id,
                         catalog,
                         allowedMediaFor(patch.inventory_id),
@@ -2429,22 +2452,34 @@ export default function CalculationWizard({
                         field_schema: null,
                     };
 
+                    const nextMediumId = next.advertising_medium_id;
+                    const nextInventoryId = next.inventory_id;
+
+                    if (nextMediumId === null || nextInventoryId === null) {
+                        return item;
+                    }
+
+                    const itemWithIds = {
+                        ...item,
+                        inventory_id: item.inventory_id,
+                        advertising_medium_id: item.advertising_medium_id,
+                    };
+
                     // BL-P4-03k / BL-P5-01a: Inventarwechsel kann Medium ändern
                     // (Tandem↔Tridem, Spot→Trailer). Komponenten/Länge neu binden;
                     // Methode/Timing behalten, wenn auf dem neuen Medium noch wählbar.
                     if (
-                        next.advertising_medium_id !==
-                            item.advertising_medium_id ||
-                        isSwfLengthMedium(catalog, next.advertising_medium_id)
+                        nextMediumId !== item.advertising_medium_id ||
+                        isSwfLengthMedium(catalog, nextMediumId)
                     ) {
                         const componentState =
                             resolveComponentsAfterMediumChange(
-                                item,
-                                next.advertising_medium_id,
+                                itemWithIds,
+                                nextMediumId,
                                 catalog,
                                 component_profiles,
                                 componentStashRef.current,
-                                next.inventory_id,
+                                nextInventoryId,
                             );
                         next = {
                             ...next,
@@ -2457,7 +2492,7 @@ export default function CalculationWizard({
                         if (
                             !mediumSupportsFixedPriceSettlement(
                                 catalog,
-                                next.advertising_medium_id,
+                                nextMediumId,
                             )
                         ) {
                             next = {
@@ -2526,9 +2561,19 @@ export default function CalculationWizard({
                         (candidate) =>
                             candidate.id === patch.advertising_medium_id,
                     );
-                    if (!medium) {
+                    if (
+                        !medium ||
+                        item.inventory_id === null ||
+                        item.advertising_medium_id === null
+                    ) {
                         return item;
                     }
+
+                    const itemWithIds = {
+                        ...item,
+                        inventory_id: item.inventory_id,
+                        advertising_medium_id: item.advertising_medium_id,
+                    };
 
                     const methodState = methodStateAfterMediumIdChange(
                         item.advertising_medium_id,
@@ -2546,7 +2591,7 @@ export default function CalculationWizard({
                     );
 
                     const componentState = resolveComponentsAfterMediumChange(
-                        item,
+                        itemWithIds,
                         medium.id,
                         catalog,
                         component_profiles,
@@ -2615,6 +2660,13 @@ export default function CalculationWizard({
     }
 
     function save() {
+        if (!isBudgetSetup && !positions.every(hasManualPositionIds)) {
+            setSaveError(
+                'Speichern nicht möglich: Bitte wählen Sie für jedes Werbeelement ein Inventar und ein Werbemittel aus.',
+            );
+            return;
+        }
+
         if (tkpSaveBlocked) {
             setSaveError(
                 'TKP befindet sich noch in der Vorschauphase. Speichern wird mit der späteren Produktfreigabe aktiviert.',
@@ -3382,19 +3434,15 @@ export default function CalculationWizard({
                                                             0 &&
                                                         hasActiveCatalog
                                                     ) {
-                                                        const first =
-                                                            firstValidPosition(
-                                                                catalog,
-                                                            );
-                                                        if (first) {
-                                                            setPositions([
-                                                                withForcedProfileComponentsIfNeeded(
-                                                                    first,
+                                                        setPositions([
+                                                            withForcedProfileComponentsIfNeeded(
+                                                                emptyManualPosition(
                                                                     catalog,
-                                                                    component_profiles,
                                                                 ),
-                                                            ]);
-                                                        }
+                                                                catalog,
+                                                                component_profiles,
+                                                            ),
+                                                        ]);
                                                     }
                                                 }}
                                             >
@@ -3930,9 +3978,7 @@ export default function CalculationWizard({
                                                     className={wizardCardClass}
                                                 >
                                                     <CardHeader
-                                                        className={
-                                                            wizardCardHeaderClass
-                                                        }
+                                                        className={`${wizardCardHeaderClass} flex flex-row flex-wrap items-center justify-between gap-2`}
                                                     >
                                                         <CardTitle
                                                             id={`pos-${index}`}
@@ -3943,6 +3989,22 @@ export default function CalculationWizard({
                                                             Werbeelement{' '}
                                                             {index + 1}
                                                         </CardTitle>
+                                                        {canEdit &&
+                                                        positions.length > 1 ? (
+                                                            <Button
+                                                                type="button"
+                                                                variant="destructive"
+                                                                size="sm"
+                                                                data-test={`position-remove-${index}`}
+                                                                onClick={() =>
+                                                                    removePosition(
+                                                                        index,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Entfernen
+                                                            </Button>
+                                                        ) : null}
                                                     </CardHeader>
                                                     <CardContent
                                                         className={`${wizardCardContentClass} space-y-6`}
@@ -3974,232 +4036,365 @@ export default function CalculationWizard({
                                                             }
                                                         />
 
-                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            <FormField
-                                                                label="Werbemittel"
-                                                                htmlFor={`medium-${index}`}
+                                                        {!hasManualPositionIds(
+                                                            position,
+                                                        ) ? (
+                                                            <p
+                                                                className="text-muted-foreground text-sm"
+                                                                data-test={`position-inventory-required-${index}`}
                                                             >
-                                                                <select
-                                                                    id={`medium-${index}`}
-                                                                    data-test={`position-medium-${index}`}
-                                                                    className={
-                                                                        formSelectClass
-                                                                    }
-                                                                    value={
-                                                                        position.advertising_medium_id
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                advertising_medium_id:
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    ),
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {(() => {
-                                                                        const allowed =
-                                                                            allowedMediaFor(
-                                                                                position.inventory_id,
-                                                                            );
-                                                                        const current =
-                                                                            catalog.media.find(
-                                                                                (
-                                                                                    medium,
-                                                                                ) =>
-                                                                                    medium.id ===
-                                                                                    position.advertising_medium_id,
-                                                                            );
-                                                                        const options =
-                                                                            current &&
-                                                                            !allowed.some(
-                                                                                (
-                                                                                    medium,
-                                                                                ) =>
-                                                                                    medium.id ===
-                                                                                    current.id,
-                                                                            )
-                                                                                ? [
-                                                                                      current,
-                                                                                      ...allowed,
-                                                                                  ]
-                                                                                : allowed;
-
-                                                                        return options.map(
-                                                                            (
-                                                                                medium,
-                                                                            ) => (
-                                                                                <option
-                                                                                    key={
-                                                                                        medium.id
-                                                                                    }
-                                                                                    value={
-                                                                                        medium.id
-                                                                                    }
-                                                                                >
-                                                                                    {catalogLabel(
-                                                                                        medium.name,
-                                                                                        medium.is_active,
-                                                                                    )}
-                                                                                </option>
-                                                                            ),
-                                                                        );
-                                                                    })()}
-                                                                </select>
-                                                            </FormField>
-                                                            {/* NATIVE-3: Länge/Allonge/Preisjahr gehören nicht zur Freien Preisposition. */}
-                                                            {!isFreePosition(
-                                                                position,
-                                                            ) ? (
-                                                                <>
-                                                                    {position
-                                                                        .components
-                                                                        .length ===
-                                                                    0 ? (
-                                                                        <FormField
-                                                                            label="Länge (Sekunden)"
-                                                                            htmlFor={`length-${index}`}
-                                                                            hint={spotLengthSpt010Hint(
-                                                                                position.length_seconds,
-                                                                                catalog.media.find(
-                                                                                    (
-                                                                                        item,
-                                                                                    ) =>
-                                                                                        item.id ===
-                                                                                        position.advertising_medium_id,
-                                                                                )
-                                                                                    ?.code,
-                                                                            )}
-                                                                        >
-                                                                            <Input
-                                                                                id={`length-${index}`}
-                                                                                data-test={`position-length-seconds-${index}`}
-                                                                                type="number"
-                                                                                min={
-                                                                                    1
-                                                                                }
-                                                                                value={
-                                                                                    position.length_seconds
-                                                                                }
-                                                                                disabled={
-                                                                                    !canEdit
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        {
-                                                                                            length_seconds:
-                                                                                                Number(
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                ),
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </FormField>
-                                                                    ) : (
-                                                                        <p
-                                                                            className="text-muted-foreground text-sm"
-                                                                            data-test={`position-length-from-components-${index}`}
-                                                                        >
-                                                                            Länge
-                                                                            aus
-                                                                            Komponenten:{' '}
-                                                                            {totalComponentLength(
-                                                                                position.components,
-                                                                            )}
-                                                                            s
-                                                                        </p>
-                                                                    )}
-                                                                    {allongeConfigurationHint(
-                                                                        catalog,
-                                                                        position,
-                                                                    )?.tone ===
-                                                                    'block' ? (
-                                                                        <p
-                                                                            className="text-sm text-amber-800"
-                                                                            data-test={`allonge-unconfirmed-${index}`}
-                                                                        >
-                                                                            {
-                                                                                allongeConfigurationHint(
-                                                                                    catalog,
-                                                                                    position,
-                                                                                )
-                                                                                    ?.text
-                                                                            }
-                                                                        </p>
-                                                                    ) : null}
-                                                                    {allongeConfigurationHint(
-                                                                        catalog,
-                                                                        position,
-                                                                    )?.tone ===
-                                                                    'snapshot' ? (
-                                                                        <p
-                                                                            className="text-muted-foreground text-sm"
-                                                                            data-test={`allonge-snapshot-note-${index}`}
-                                                                        >
-                                                                            {
-                                                                                allongeConfigurationHint(
-                                                                                    catalog,
-                                                                                    position,
-                                                                                )
-                                                                                    ?.text
-                                                                            }
-                                                                        </p>
-                                                                    ) : null}
+                                                                Bitte zuerst ein
+                                                                Inventar wählen.
+                                                                Danach werden
+                                                                Werbemittel und
+                                                                Konditionen
+                                                                freigeschaltet.
+                                                            </p>
+                                                        ) : (
+                                                            <>
+                                                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                                     <FormField
-                                                                        label="Preisjahr"
-                                                                        htmlFor={`price-year-${index}`}
-                                                                        hint={
-                                                                            priceYearDirty(
-                                                                                position.original_price_year,
-                                                                                position.price_year,
-                                                                            )
-                                                                                ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
-                                                                                : position.price_list_status ===
-                                                                                    'archived'
-                                                                                  ? 'Historische Preisliste (unverändert gepinnt).'
-                                                                                  : undefined
-                                                                        }
+                                                                        label="Werbemittel"
+                                                                        htmlFor={`medium-${index}`}
                                                                     >
                                                                         <select
-                                                                            id={`price-year-${index}`}
-                                                                            data-test={`position-price-year-${index}`}
+                                                                            id={`medium-${index}`}
+                                                                            data-test={`position-medium-${index}`}
                                                                             className={
                                                                                 formSelectClass
                                                                             }
                                                                             value={
-                                                                                position.price_year
+                                                                                position.advertising_medium_id ??
+                                                                                ''
                                                                             }
                                                                             disabled={
                                                                                 !canEdit
                                                                             }
                                                                             onChange={(
                                                                                 event,
-                                                                            ) => {
-                                                                                const year =
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
+                                                                            ) =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        advertising_medium_id:
+                                                                                            Number(
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            ),
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            {(() => {
+                                                                                const allowed =
+                                                                                    allowedMediaFor(
+                                                                                        position.inventory_id,
                                                                                     );
-                                                                                const originalPin: OriginalPriceListPin | null =
+                                                                                const current =
+                                                                                    catalog.media.find(
+                                                                                        (
+                                                                                            medium,
+                                                                                        ) =>
+                                                                                            medium.id ===
+                                                                                            position.advertising_medium_id,
+                                                                                    );
+                                                                                const options =
+                                                                                    current &&
+                                                                                    !allowed.some(
+                                                                                        (
+                                                                                            medium,
+                                                                                        ) =>
+                                                                                            medium.id ===
+                                                                                            current.id,
+                                                                                    )
+                                                                                        ? [
+                                                                                              current,
+                                                                                              ...allowed,
+                                                                                          ]
+                                                                                        : allowed;
+
+                                                                                return options.map(
+                                                                                    (
+                                                                                        medium,
+                                                                                    ) => (
+                                                                                        <option
+                                                                                            key={
+                                                                                                medium.id
+                                                                                            }
+                                                                                            value={
+                                                                                                medium.id
+                                                                                            }
+                                                                                        >
+                                                                                            {catalogLabel(
+                                                                                                medium.name,
+                                                                                                medium.is_active,
+                                                                                            )}
+                                                                                        </option>
+                                                                                    ),
+                                                                                );
+                                                                            })()}
+                                                                        </select>
+                                                                    </FormField>
+                                                                    {/* NATIVE-3: Länge/Allonge/Preisjahr gehören nicht zur Freien Preisposition. */}
+                                                                    {!isFreePosition(
+                                                                        position,
+                                                                    ) ? (
+                                                                        <>
+                                                                            {position
+                                                                                .components
+                                                                                .length ===
+                                                                            0 ? (
+                                                                                <FormField
+                                                                                    label="Länge (Sekunden)"
+                                                                                    htmlFor={`length-${index}`}
+                                                                                    hint={spotLengthSpt010Hint(
+                                                                                        position.length_seconds,
+                                                                                        catalog.media.find(
+                                                                                            (
+                                                                                                item,
+                                                                                            ) =>
+                                                                                                item.id ===
+                                                                                                position.advertising_medium_id,
+                                                                                        )
+                                                                                            ?.code,
+                                                                                    )}
+                                                                                >
+                                                                                    <Input
+                                                                                        id={`length-${index}`}
+                                                                                        data-test={`position-length-seconds-${index}`}
+                                                                                        type="number"
+                                                                                        min={
+                                                                                            1
+                                                                                        }
+                                                                                        value={
+                                                                                            position.length_seconds
+                                                                                        }
+                                                                                        disabled={
+                                                                                            !canEdit
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            updatePosition(
+                                                                                                index,
+                                                                                                {
+                                                                                                    length_seconds:
+                                                                                                        Number(
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                        ),
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </FormField>
+                                                                            ) : (
+                                                                                <p
+                                                                                    className="text-muted-foreground text-sm"
+                                                                                    data-test={`position-length-from-components-${index}`}
+                                                                                >
+                                                                                    Länge
+                                                                                    aus
+                                                                                    Komponenten:{' '}
+                                                                                    {totalComponentLength(
+                                                                                        position.components,
+                                                                                    )}
+                                                                                    s
+                                                                                </p>
+                                                                            )}
+                                                                            {allongeConfigurationHint(
+                                                                                catalog,
+                                                                                position,
+                                                                            )
+                                                                                ?.tone ===
+                                                                            'block' ? (
+                                                                                <p
+                                                                                    className="text-sm text-amber-800"
+                                                                                    data-test={`allonge-unconfirmed-${index}`}
+                                                                                >
+                                                                                    {
+                                                                                        allongeConfigurationHint(
+                                                                                            catalog,
+                                                                                            position,
+                                                                                        )
+                                                                                            ?.text
+                                                                                    }
+                                                                                </p>
+                                                                            ) : null}
+                                                                            {allongeConfigurationHint(
+                                                                                catalog,
+                                                                                position,
+                                                                            )
+                                                                                ?.tone ===
+                                                                            'snapshot' ? (
+                                                                                <p
+                                                                                    className="text-muted-foreground text-sm"
+                                                                                    data-test={`allonge-snapshot-note-${index}`}
+                                                                                >
+                                                                                    {
+                                                                                        allongeConfigurationHint(
+                                                                                            catalog,
+                                                                                            position,
+                                                                                        )
+                                                                                            ?.text
+                                                                                    }
+                                                                                </p>
+                                                                            ) : null}
+                                                                            <FormField
+                                                                                label="Preisjahr"
+                                                                                htmlFor={`price-year-${index}`}
+                                                                                hint={
+                                                                                    priceYearDirty(
+                                                                                        position.original_price_year,
+                                                                                        position.price_year,
+                                                                                    )
+                                                                                        ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
+                                                                                        : position.price_list_status ===
+                                                                                            'archived'
+                                                                                          ? 'Historische Preisliste (unverändert gepinnt).'
+                                                                                          : undefined
+                                                                                }
+                                                                            >
+                                                                                <select
+                                                                                    id={`price-year-${index}`}
+                                                                                    data-test={`position-price-year-${index}`}
+                                                                                    className={
+                                                                                        formSelectClass
+                                                                                    }
+                                                                                    value={
+                                                                                        position.price_year
+                                                                                    }
+                                                                                    disabled={
+                                                                                        !canEdit
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        event,
+                                                                                    ) => {
+                                                                                        const year =
+                                                                                            Number(
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            );
+                                                                                        const originalPin: OriginalPriceListPin | null =
+                                                                                            position.original_price_year !==
+                                                                                            null
+                                                                                                ? {
+                                                                                                      year: position.original_price_year,
+                                                                                                      price_list_id:
+                                                                                                          position.original_price_list_id,
+                                                                                                      version:
+                                                                                                          position.original_price_list_version,
+                                                                                                      status: position.original_price_list_status,
+                                                                                                  }
+                                                                                                : null;
+
+                                                                                        if (
+                                                                                            originalPin &&
+                                                                                            year ===
+                                                                                                originalPin.year
+                                                                                        ) {
+                                                                                            updatePosition(
+                                                                                                index,
+                                                                                                restoreOriginalPriceListPin(
+                                                                                                    originalPin,
+                                                                                                ),
+                                                                                            );
+                                                                                            return;
+                                                                                        }
+
+                                                                                        const option =
+                                                                                            resolveDisplayedPriceYearOptions(
+                                                                                                catalog,
+                                                                                                position.inventory_id,
+                                                                                                year,
+                                                                                                originalPin,
+                                                                                            ).find(
+                                                                                                (
+                                                                                                    row,
+                                                                                                ) =>
+                                                                                                    row.year ===
+                                                                                                    year,
+                                                                                            );
+
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                price_year:
+                                                                                                    year,
+                                                                                                expected_price_list_id:
+                                                                                                    option?.price_list_id ??
+                                                                                                    expectedPriceListIdForYear(
+                                                                                                        catalog,
+                                                                                                        position.inventory_id,
+                                                                                                        year,
+                                                                                                    ),
+                                                                                                price_list_version:
+                                                                                                    option?.version ??
+                                                                                                    null,
+                                                                                                price_list_status:
+                                                                                                    option?.status ??
+                                                                                                    null,
+                                                                                            },
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    {resolveDisplayedPriceYearOptions(
+                                                                                        catalog,
+                                                                                        position.inventory_id,
+                                                                                        position.price_year,
+                                                                                        position.original_price_year !==
+                                                                                            null
+                                                                                            ? {
+                                                                                                  year: position.original_price_year,
+                                                                                                  price_list_id:
+                                                                                                      position.original_price_list_id,
+                                                                                                  version:
+                                                                                                      position.original_price_list_version,
+                                                                                                  status: position.original_price_list_status,
+                                                                                              }
+                                                                                            : null,
+                                                                                    ).map(
+                                                                                        (
+                                                                                            option,
+                                                                                        ) => (
+                                                                                            <option
+                                                                                                key={
+                                                                                                    option.year
+                                                                                                }
+                                                                                                value={
+                                                                                                    option.year
+                                                                                                }
+                                                                                                disabled={
+                                                                                                    !option.available &&
+                                                                                                    option.year !==
+                                                                                                        position.original_price_year
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    option.year
+                                                                                                }
+                                                                                                {option.version
+                                                                                                    ? ` · ${option.version}`
+                                                                                                    : option.available
+                                                                                                      ? ''
+                                                                                                      : ' · keine aktive Liste'}
+                                                                                                {option.status ===
+                                                                                                'archived'
+                                                                                                    ? ' · historisch'
+                                                                                                    : ''}
+                                                                                            </option>
+                                                                                        ),
+                                                                                    )}
+                                                                                </select>
+                                                                                {!resolveDisplayedPriceYearOptions(
+                                                                                    catalog,
+                                                                                    position.inventory_id,
+                                                                                    position.price_year,
                                                                                     position.original_price_year !==
-                                                                                    null
+                                                                                        null
                                                                                         ? {
                                                                                               year: position.original_price_year,
                                                                                               price_list_id:
@@ -4208,499 +4403,42 @@ export default function CalculationWizard({
                                                                                                   position.original_price_list_version,
                                                                                               status: position.original_price_list_status,
                                                                                           }
-                                                                                        : null;
-
-                                                                                if (
-                                                                                    originalPin &&
-                                                                                    year ===
-                                                                                        originalPin.year
-                                                                                ) {
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        restoreOriginalPriceListPin(
-                                                                                            originalPin,
-                                                                                        ),
-                                                                                    );
-                                                                                    return;
-                                                                                }
-
-                                                                                const option =
-                                                                                    resolveDisplayedPriceYearOptions(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        year,
-                                                                                        originalPin,
-                                                                                    ).find(
-                                                                                        (
-                                                                                            row,
-                                                                                        ) =>
-                                                                                            row.year ===
-                                                                                            year,
-                                                                                    );
-
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        price_year:
-                                                                                            year,
-                                                                                        expected_price_list_id:
-                                                                                            option?.price_list_id ??
-                                                                                            expectedPriceListIdForYear(
-                                                                                                catalog,
-                                                                                                position.inventory_id,
-                                                                                                year,
-                                                                                            ),
-                                                                                        price_list_version:
-                                                                                            option?.version ??
-                                                                                            null,
-                                                                                        price_list_status:
-                                                                                            option?.status ??
-                                                                                            null,
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            {resolveDisplayedPriceYearOptions(
-                                                                                catalog,
-                                                                                position.inventory_id,
-                                                                                position.price_year,
-                                                                                position.original_price_year !==
-                                                                                    null
-                                                                                    ? {
-                                                                                          year: position.original_price_year,
-                                                                                          price_list_id:
-                                                                                              position.original_price_list_id,
-                                                                                          version:
-                                                                                              position.original_price_list_version,
-                                                                                          status: position.original_price_list_status,
-                                                                                      }
-                                                                                    : null,
-                                                                            ).map(
-                                                                                (
-                                                                                    option,
-                                                                                ) => (
-                                                                                    <option
-                                                                                        key={
-                                                                                            option.year
-                                                                                        }
-                                                                                        value={
-                                                                                            option.year
-                                                                                        }
-                                                                                        disabled={
-                                                                                            !option.available &&
-                                                                                            option.year !==
-                                                                                                position.original_price_year
-                                                                                        }
+                                                                                        : null,
+                                                                                ).find(
+                                                                                    (
+                                                                                        option,
+                                                                                    ) =>
+                                                                                        option.year ===
+                                                                                            position.price_year &&
+                                                                                        option.available,
+                                                                                ) &&
+                                                                                position.price_list_status !==
+                                                                                    'archived' &&
+                                                                                !(
+                                                                                    position.original_price_year ===
+                                                                                        position.price_year &&
+                                                                                    position.original_price_list_id !==
+                                                                                        null
+                                                                                ) ? (
+                                                                                    <p
+                                                                                        className="text-destructive mt-1 text-xs"
+                                                                                        data-test={`position-price-year-missing-${index}`}
                                                                                     >
-                                                                                        {
-                                                                                            option.year
-                                                                                        }
-                                                                                        {option.version
-                                                                                            ? ` · ${option.version}`
-                                                                                            : option.available
-                                                                                              ? ''
-                                                                                              : ' · keine aktive Liste'}
-                                                                                        {option.status ===
-                                                                                        'archived'
-                                                                                            ? ' · historisch'
-                                                                                            : ''}
-                                                                                    </option>
-                                                                                ),
-                                                                            )}
-                                                                        </select>
-                                                                        {!resolveDisplayedPriceYearOptions(
-                                                                            catalog,
-                                                                            position.inventory_id,
-                                                                            position.price_year,
-                                                                            position.original_price_year !==
-                                                                                null
-                                                                                ? {
-                                                                                      year: position.original_price_year,
-                                                                                      price_list_id:
-                                                                                          position.original_price_list_id,
-                                                                                      version:
-                                                                                          position.original_price_list_version,
-                                                                                      status: position.original_price_list_status,
-                                                                                  }
-                                                                                : null,
-                                                                        ).find(
-                                                                            (
-                                                                                option,
-                                                                            ) =>
-                                                                                option.year ===
-                                                                                    position.price_year &&
-                                                                                option.available,
-                                                                        ) &&
-                                                                        position.price_list_status !==
-                                                                            'archived' &&
-                                                                        !(
-                                                                            position.original_price_year ===
-                                                                                position.price_year &&
-                                                                            position.original_price_list_id !==
-                                                                                null
-                                                                        ) ? (
-                                                                            <p
-                                                                                className="text-destructive mt-1 text-xs"
-                                                                                data-test={`position-price-year-missing-${index}`}
-                                                                            >
-                                                                                Für
-                                                                                dieses
-                                                                                Jahr
-                                                                                liegt
-                                                                                keine
-                                                                                aktive
-                                                                                Preisliste
-                                                                                vor.
-                                                                            </p>
-                                                                        ) : null}
-                                                                    </FormField>
-                                                                </>
-                                                            ) : null}
-                                                            {positionRuntime.isFieldVisible(
-                                                                'period_open',
-                                                            ) ? (
-                                                                <FormField
-                                                                    label={
-                                                                        (positionFields.find(
-                                                                            (
-                                                                                field,
-                                                                            ) =>
-                                                                                field.key ===
-                                                                                'period_open',
-                                                                        )
-                                                                            ?.label ??
-                                                                            'Zeitraum offen') +
-                                                                        (positionRuntime.isFieldRequired(
-                                                                            'period_open',
-                                                                        )
-                                                                            ? ' *'
-                                                                            : '')
-                                                                    }
-                                                                    htmlFor={`period-open-${index}`}
-                                                                    hint={
-                                                                        positionFields.find(
-                                                                            (
-                                                                                field,
-                                                                            ) =>
-                                                                                field.key ===
-                                                                                'period_open',
-                                                                        )
-                                                                            ?.help_text ??
-                                                                        undefined
-                                                                    }
-                                                                >
-                                                                    <Checkbox
-                                                                        id={`period-open-${index}`}
-                                                                        data-test={`period-open-${index}`}
-                                                                        checked={
-                                                                            position.period_open
-                                                                        }
-                                                                        disabled={
-                                                                            !canEdit ||
-                                                                            rulesIntegrityError !==
-                                                                                null
-                                                                        }
-                                                                        onCheckedChange={(
-                                                                            checked,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    period_open:
-                                                                                        checked ===
-                                                                                        true,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </FormField>
-                                                            ) : null}
-                                                        </div>
-
-                                                        <CalculationMethodSelector
-                                                            positionIndex={
-                                                                index
-                                                            }
-                                                            legendLabel="Berechnungsbasis für Mediabrutto"
-                                                            options={methodOptionsForTemplate(
-                                                                methodOptionsForMedium(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                ),
-                                                                isStandardOffer,
-                                                                standardOffer?.allowed_spot_methods,
-                                                            )}
-                                                            state={{
-                                                                calculation_method_key:
-                                                                    position.calculation_method_key,
-                                                                calculation_method_name:
-                                                                    position.calculation_method_name,
-                                                                historical_calculation_method_key:
-                                                                    position.historical_calculation_method_key,
-                                                                historical_calculation_method_name:
-                                                                    position.historical_calculation_method_name,
-                                                            }}
-                                                            disabled={!canEdit}
-                                                            error={
-                                                                fieldErrors[
-                                                                    `positions.${index}.calculation_method_key`
-                                                                ]?.[0]
-                                                            }
-                                                            onSelectLiveKey={(
-                                                                key,
-                                                            ) => {
-                                                                if (
-                                                                    isStandardOffer &&
-                                                                    !(
-                                                                        standardOffer?.allowed_spot_methods ?? [
-                                                                            'average',
-                                                                            'calendar',
-                                                                        ]
-                                                                    ).includes(
-                                                                        key,
-                                                                    )
-                                                                ) {
-                                                                    return;
-                                                                }
-                                                                const next =
-                                                                    selectLiveCalculationMethod(
-                                                                        {
-                                                                            calculation_method_key:
-                                                                                position.calculation_method_key,
-                                                                            calculation_method_name:
-                                                                                position.calculation_method_name,
-                                                                            historical_calculation_method_key:
-                                                                                position.historical_calculation_method_key,
-                                                                            historical_calculation_method_name:
-                                                                                position.historical_calculation_method_name,
-                                                                        },
-                                                                        methodOptionsForTemplate(
-                                                                            methodOptionsForMedium(
-                                                                                catalog,
-                                                                                position.advertising_medium_id,
-                                                                            ),
-                                                                            isStandardOffer,
-                                                                            standardOffer?.allowed_spot_methods,
-                                                                        ),
-                                                                        key,
-                                                                    );
-                                                                updatePosition(
-                                                                    index,
-                                                                    {
-                                                                        ...next,
-                                                                        ...initialTimingFieldsForMethod(
-                                                                            key,
-                                                                        ),
-                                                                        ...oaTkpDraftPatchOnMethodSelect(
-                                                                            key,
-                                                                            position.price_year,
-                                                                        ),
-                                                                        ...freePositionDraftPatchOnMethodSelect(
-                                                                            position,
-                                                                            key,
-                                                                            position.price_year,
-                                                                        ),
-                                                                    },
-                                                                );
-                                                            }}
-                                                            onRestoreHistorical={() =>
-                                                                updatePosition(
-                                                                    index,
-                                                                    restoreHistoricalCalculationMethod(
-                                                                        {
-                                                                            calculation_method_key:
-                                                                                position.calculation_method_key,
-                                                                            calculation_method_name:
-                                                                                position.calculation_method_name,
-                                                                            historical_calculation_method_key:
-                                                                                position.historical_calculation_method_key,
-                                                                            historical_calculation_method_name:
-                                                                                position.historical_calculation_method_name,
-                                                                        },
-                                                                    ),
-                                                                )
-                                                            }
-                                                        />
-
-                                                        {isTkpPosition(
-                                                            position,
-                                                        ) ? (
-                                                            <OaTkpPositionEditor
-                                                                positionIndex={
-                                                                    index
-                                                                }
-                                                                position={
-                                                                    position
-                                                                }
-                                                                targetings={
-                                                                    catalog.oa_targetings ??
-                                                                    []
-                                                                }
-                                                                currentPriceYear={requireCurrentPriceYear(
-                                                                    catalog,
-                                                                )}
-                                                                nextPriceYear={requireNextPriceYear(
-                                                                    catalog,
-                                                                )}
-                                                                methodResult={
-                                                                    totals
-                                                                        ?.positions?.[
-                                                                        index
-                                                                    ]
-                                                                        ?.method_result
-                                                                        ?.tkp ??
-                                                                    null
-                                                                }
-                                                                mediaGross={
-                                                                    totals
-                                                                        ?.positions?.[
-                                                                        index
-                                                                    ]
-                                                                        ?.media_gross
-                                                                }
-                                                                fieldErrors={
-                                                                    fieldErrors
-                                                                }
-                                                                canEdit={
-                                                                    canEdit
-                                                                }
-                                                                showActivePickers={
-                                                                    oaTkpPreviewSurfaceAllowed
-                                                                }
-                                                                onChange={(
-                                                                    patch,
-                                                                ) =>
-                                                                    updatePosition(
-                                                                        index,
-                                                                        patch,
-                                                                    )
-                                                                }
-                                                            />
-                                                        ) : null}
-
-                                                        {isFreePosition(
-                                                            position,
-                                                        ) ? (
-                                                            <FreePositionEditor
-                                                                positionIndex={
-                                                                    index
-                                                                }
-                                                                position={
-                                                                    position
-                                                                }
-                                                                mediaGross={
-                                                                    totals
-                                                                        ?.positions?.[
-                                                                        index
-                                                                    ]
-                                                                        ?.media_gross
-                                                                }
-                                                                fieldErrors={
-                                                                    fieldErrors
-                                                                }
-                                                                canEdit={
-                                                                    canEdit
-                                                                }
-                                                                onChange={(
-                                                                    patch,
-                                                                ) =>
-                                                                    updatePosition(
-                                                                        index,
-                                                                        patch,
-                                                                    )
-                                                                }
-                                                            />
-                                                        ) : null}
-
-                                                        {!isTkpPosition(
-                                                            position,
-                                                        ) &&
-                                                        !isFreePosition(
-                                                            position,
-                                                        ) ? (
-                                                            <>
-                                                                <PricingSettlementSection
-                                                                    positionIndex={
-                                                                        index
-                                                                    }
-                                                                    mode={
-                                                                        position.pricing_settlement_mode
-                                                                    }
-                                                                    fixedPriceNnInput={
-                                                                        position.fixed_price_nn_input
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    hideFixedPrice={
-                                                                        !mediumSupportsFixedPriceSettlement(
-                                                                            catalog,
-                                                                            position.advertising_medium_id,
-                                                                        )
-                                                                    }
-                                                                    showFixedPriceValidation={
-                                                                        settlementValidationTouched[
-                                                                            index
-                                                                        ] ===
-                                                                        true
-                                                                    }
-                                                                    fieldError={
-                                                                        fieldErrors[
-                                                                            `positions.${index}.fixed_price_nn`
-                                                                        ]?.[0] ??
-                                                                        fieldErrors[
-                                                                            `positions.${index}.pricing_settlement_mode`
-                                                                        ]?.[0]
-                                                                    }
-                                                                    onModeChange={(
-                                                                        pricing_settlement_mode,
-                                                                    ) => {
-                                                                        if (
-                                                                            pricing_settlement_mode ===
-                                                                            'fixed_price'
-                                                                        ) {
-                                                                            setSettlementValidationTouched(
-                                                                                (
-                                                                                    current,
-                                                                                ) => ({
-                                                                                    ...current,
-                                                                                    [index]: true,
-                                                                                }),
-                                                                            );
-                                                                        }
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                pricing_settlement_mode,
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                    onFixedPriceInputChange={(
-                                                                        fixed_price_nn_input,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                fixed_price_nn_input,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-
-                                                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                                    {rulesIntegrityError ? (
-                                                                        <p
-                                                                            className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
-                                                                            data-test={`calculation-rules-integrity-${position.client_key}`}
-                                                                            role="alert"
-                                                                        >
-                                                                            {
-                                                                                rulesIntegrityError
-                                                                            }
-                                                                        </p>
+                                                                                        Für
+                                                                                        dieses
+                                                                                        Jahr
+                                                                                        liegt
+                                                                                        keine
+                                                                                        aktive
+                                                                                        Preisliste
+                                                                                        vor.
+                                                                                    </p>
+                                                                                ) : null}
+                                                                            </FormField>
+                                                                        </>
                                                                     ) : null}
                                                                     {positionRuntime.isFieldVisible(
-                                                                        'position_flight_period',
+                                                                        'period_open',
                                                                     ) ? (
                                                                         <FormField
                                                                             label={
@@ -4709,602 +4447,931 @@ export default function CalculationWizard({
                                                                                         field,
                                                                                     ) =>
                                                                                         field.key ===
-                                                                                        'position_flight_period',
+                                                                                        'period_open',
                                                                                 )
                                                                                     ?.label ??
-                                                                                    'Flugzeitraum') +
+                                                                                    'Zeitraum offen') +
                                                                                 (positionRuntime.isFieldRequired(
-                                                                                    'position_flight_period',
+                                                                                    'period_open',
                                                                                 )
                                                                                     ? ' *'
                                                                                     : '')
                                                                             }
-                                                                            htmlFor={`flight-start-${index}`}
+                                                                            htmlFor={`period-open-${index}`}
                                                                             hint={
                                                                                 positionFields.find(
                                                                                     (
                                                                                         field,
                                                                                     ) =>
                                                                                         field.key ===
-                                                                                        'position_flight_period',
+                                                                                        'period_open',
                                                                                 )
                                                                                     ?.help_text ??
                                                                                 undefined
                                                                             }
                                                                         >
-                                                                            <div className="grid grid-cols-2 gap-2">
-                                                                                <Input
-                                                                                    id={`flight-start-${index}`}
-                                                                                    type="date"
-                                                                                    value={
-                                                                                        position.flight_period_start
-                                                                                    }
-                                                                                    disabled={
-                                                                                        !canEdit ||
-                                                                                        rulesIntegrityError !==
-                                                                                            null
-                                                                                    }
-                                                                                    data-test={`flight-period-start-${index}`}
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                flight_period_start:
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                                <Input
-                                                                                    id={`flight-end-${index}`}
-                                                                                    type="date"
-                                                                                    value={
-                                                                                        position.flight_period_end
-                                                                                    }
-                                                                                    disabled={
-                                                                                        !canEdit ||
-                                                                                        rulesIntegrityError !==
-                                                                                            null
-                                                                                    }
-                                                                                    data-test={`flight-period-end-${index}`}
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                flight_period_end:
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                            </div>
+                                                                            <Checkbox
+                                                                                id={`period-open-${index}`}
+                                                                                data-test={`period-open-${index}`}
+                                                                                checked={
+                                                                                    position.period_open
+                                                                                }
+                                                                                disabled={
+                                                                                    !canEdit ||
+                                                                                    rulesIntegrityError !==
+                                                                                        null
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            period_open:
+                                                                                                checked ===
+                                                                                                true,
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
                                                                         </FormField>
-                                                                    ) : null}
-                                                                    {visiblePositionTextFields.length >
-                                                                        0 ||
-                                                                    visiblePositionChoiceFields.length >
-                                                                        0 ? (
-                                                                        <div
-                                                                            className="space-y-3 sm:col-span-2"
-                                                                            data-test={`calculation-custom-position-fields-${position.client_key}`}
-                                                                        >
-                                                                            <h3 className="text-sm font-semibold">
-                                                                                Weitere
-                                                                                Angaben
-                                                                            </h3>
-                                                                            <SchemaTextFields
-                                                                                fields={
-                                                                                    visiblePositionTextFields
-                                                                                }
-                                                                                values={
-                                                                                    position.custom_fields
-                                                                                }
-                                                                                errors={
-                                                                                    fieldErrors
-                                                                                }
-                                                                                errorKeyPrefixes={[
-                                                                                    `positions.${index}.dynamic_field_values`,
-                                                                                ]}
-                                                                                disabled={
-                                                                                    !canEdit ||
-                                                                                    rulesIntegrityError !==
-                                                                                        null
-                                                                                }
-                                                                                idPrefix={`calc-pos-custom-${position.client_key}`}
-                                                                                onChange={(
-                                                                                    key,
-                                                                                    value,
-                                                                                ) =>
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        {
-                                                                                            custom_fields:
-                                                                                                {
-                                                                                                    ...position.custom_fields,
-                                                                                                    [key]: value,
-                                                                                                },
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                            <SchemaChoiceFields
-                                                                                fields={
-                                                                                    visiblePositionChoiceFields
-                                                                                }
-                                                                                values={
-                                                                                    position.custom_choice_fields
-                                                                                }
-                                                                                errors={
-                                                                                    fieldErrors
-                                                                                }
-                                                                                errorKeyPrefixes={[
-                                                                                    `positions.${index}.dynamic_field_values`,
-                                                                                ]}
-                                                                                disabled={
-                                                                                    !canEdit ||
-                                                                                    rulesIntegrityError !==
-                                                                                        null
-                                                                                }
-                                                                                idPrefix={`calc-pos-choice-${position.client_key}`}
-                                                                                onChange={(
-                                                                                    key,
-                                                                                    value,
-                                                                                ) =>
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        {
-                                                                                            custom_choice_fields:
-                                                                                                {
-                                                                                                    ...position.custom_choice_fields,
-                                                                                                    [key]: value,
-                                                                                                },
-                                                                                            custom_choice_touched:
-                                                                                                {
-                                                                                                    ...position.custom_choice_touched,
-                                                                                                    [key]: true,
-                                                                                                },
-                                                                                            custom_choice_meta:
-                                                                                                {
-                                                                                                    ...position.custom_choice_meta,
-                                                                                                    [key]: {
-                                                                                                        initPayloadSafe: true,
-                                                                                                        issue: null,
-                                                                                                    },
-                                                                                                },
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                    ) : null}
-                                                                    {canEdit &&
-                                                                    positions.length >
-                                                                        1 ? (
-                                                                        <div className="flex items-end">
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                onClick={() =>
-                                                                                    removePosition(
-                                                                                        index,
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                Entfernen
-                                                                            </Button>
-                                                                        </div>
                                                                     ) : null}
                                                                 </div>
 
-                                                                {(() => {
-                                                                    // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
-                                                                    // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
-                                                                    const positionProfile =
-                                                                        profileForMedium(
-                                                                            catalog,
-                                                                            position.advertising_medium_id,
-                                                                        );
-                                                                    const forcedProfile =
-                                                                        isForcedProfile(
-                                                                            positionProfile,
-                                                                        );
-                                                                    const profileMeta =
-                                                                        positionProfile
-                                                                            ? component_profiles[
-                                                                                  positionProfile
-                                                                              ]
-                                                                            : undefined;
-
-                                                                    const showForcedProfileUi =
-                                                                        forcedProfile;
-                                                                    const showOptionalComponentsUi =
-                                                                        !forcedProfile &&
-                                                                        position
-                                                                            .components
-                                                                            .length >
-                                                                            0;
-
-                                                                    return (
-                                                                        <div className="space-y-2">
-                                                                            {!forcedProfile &&
-                                                                            mediumSupportsSpotComponents(
-                                                                                catalog,
-                                                                                position.advertising_medium_id,
-                                                                            ) &&
-                                                                            position
-                                                                                .components
-                                                                                .length ===
-                                                                                0 &&
-                                                                            canEdit ? (
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="outline"
-                                                                                    size="sm"
-                                                                                    data-test={`spot-components-activate-${index}`}
-                                                                                    onClick={() => {
-                                                                                        const rule =
-                                                                                            ruleFor(
-                                                                                                catalog,
-                                                                                                position.inventory_id,
-                                                                                                position.advertising_medium_id,
-                                                                                            );
-                                                                                        const next =
-                                                                                            activateComponentsFromLength(
-                                                                                                position.length_seconds,
-                                                                                            );
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                components:
-                                                                                                    next,
-                                                                                                length_seconds:
-                                                                                                    totalComponentLength(
-                                                                                                        next,
-                                                                                                    ),
-                                                                                                component_calculation_strategy:
-                                                                                                    position.component_calculation_strategy ??
-                                                                                                    resolveStrategyFromRule(
-                                                                                                        rule?.component_calculation_strategy,
-                                                                                                    ),
-                                                                                            },
-                                                                                        );
-                                                                                    }}
-                                                                                >
-                                                                                    Spot-Komponenten
-                                                                                    aktivieren
-                                                                                </Button>
-                                                                            ) : null}
-                                                                            {showForcedProfileUi ||
-                                                                            showOptionalComponentsUi ? (
-                                                                                <SpotComponentsSection
-                                                                                    positionIndex={
-                                                                                        index
-                                                                                    }
-                                                                                    profile={
-                                                                                        showForcedProfileUi
-                                                                                            ? positionProfile
-                                                                                            : null
-                                                                                    }
-                                                                                    profileLabel={
-                                                                                        showForcedProfileUi
-                                                                                            ? profileMeta?.label
-                                                                                            : undefined
-                                                                                    }
-                                                                                    profileMeta={
-                                                                                        showForcedProfileUi &&
-                                                                                        profileMeta
-                                                                                            ? {
-                                                                                                  unit_label:
-                                                                                                      profileMeta.unit_label,
-                                                                                                  unit_count:
-                                                                                                      profileMeta.unit_count,
-                                                                                                  slots: profileMeta.slots,
-                                                                                              }
-                                                                                            : undefined
-                                                                                    }
-                                                                                    unitCount={positionUnitCount(
-                                                                                        position,
-                                                                                    )}
-                                                                                    components={
-                                                                                        position.components
-                                                                                    }
-                                                                                    strategy={
-                                                                                        position.component_calculation_strategy ??
-                                                                                        'shared_total_length'
-                                                                                    }
-                                                                                    canEdit={
-                                                                                        canEdit
-                                                                                    }
-                                                                                    positionMediaGross={
-                                                                                        displayTotals
-                                                                                            ?.positions?.[
-                                                                                            index
-                                                                                        ]
-                                                                                            ?.media_gross
-                                                                                    }
-                                                                                    componentResults={
-                                                                                        displayTotals
-                                                                                            ?.positions?.[
-                                                                                            index
-                                                                                        ]
-                                                                                            ?.components
-                                                                                    }
-                                                                                    lengthIndex={
-                                                                                        displayTotals
-                                                                                            ?.positions?.[
-                                                                                            index
-                                                                                        ]
-                                                                                            ?.length_index
-                                                                                    }
-                                                                                    errors={
-                                                                                        fieldErrors
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        components,
-                                                                                    ) =>
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                components,
-                                                                                                length_seconds:
-                                                                                                    totalComponentLength(
-                                                                                                        components,
-                                                                                                    ),
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                    onDeactivate={() =>
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                components:
-                                                                                                    [],
-                                                                                                component_calculation_strategy:
-                                                                                                    null,
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                            ) : null}
-                                                                        </div>
-                                                                    );
-                                                                })()}
-
-                                                                {(() => {
-                                                                    const positionProfile =
-                                                                        profileForMedium(
-                                                                            catalog,
-                                                                            position.advertising_medium_id,
-                                                                        );
-                                                                    const profileMeta =
-                                                                        positionProfile
-                                                                            ? component_profiles[
-                                                                                  positionProfile
-                                                                              ]
-                                                                            : undefined;
-
-                                                                    if (
-                                                                        !profileMeta
-                                                                    ) {
-                                                                        return null;
+                                                                <CalculationMethodSelector
+                                                                    positionIndex={
+                                                                        index
                                                                     }
-
-                                                                    return (
-                                                                        <p
-                                                                            className="text-muted-foreground text-xs"
-                                                                            data-test={`spot-units-hint-${index}`}
-                                                                        >
-                                                                            {
-                                                                                profileMeta.unit_label
-                                                                            }{' '}
-                                                                            (Spot-Anzahlen
-                                                                            unten
-                                                                            entsprechen{' '}
-                                                                            {
-                                                                                profileMeta.unit_label
-                                                                            }
+                                                                    legendLabel="Berechnungsbasis für Mediabrutto"
+                                                                    options={methodOptionsForTemplate(
+                                                                        methodOptionsForMedium(
+                                                                            catalog,
+                                                                            position.advertising_medium_id,
+                                                                        ),
+                                                                        isStandardOffer,
+                                                                        standardOffer?.allowed_spot_methods,
+                                                                    )}
+                                                                    state={{
+                                                                        calculation_method_key:
+                                                                            position.calculation_method_key,
+                                                                        calculation_method_name:
+                                                                            position.calculation_method_name,
+                                                                        historical_calculation_method_key:
+                                                                            position.historical_calculation_method_key,
+                                                                        historical_calculation_method_name:
+                                                                            position.historical_calculation_method_name,
+                                                                    }}
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    error={
+                                                                        fieldErrors[
+                                                                            `positions.${index}.calculation_method_key`
+                                                                        ]?.[0]
+                                                                    }
+                                                                    onSelectLiveKey={(
+                                                                        key,
+                                                                    ) => {
+                                                                        if (
+                                                                            isStandardOffer &&
+                                                                            !(
+                                                                                standardOffer?.allowed_spot_methods ?? [
+                                                                                    'average',
+                                                                                    'calendar',
+                                                                                ]
+                                                                            ).includes(
+                                                                                key,
                                                                             )
-                                                                        </p>
-                                                                    );
-                                                                })()}
+                                                                        ) {
+                                                                            return;
+                                                                        }
+                                                                        const next =
+                                                                            selectLiveCalculationMethod(
+                                                                                {
+                                                                                    calculation_method_key:
+                                                                                        position.calculation_method_key,
+                                                                                    calculation_method_name:
+                                                                                        position.calculation_method_name,
+                                                                                    historical_calculation_method_key:
+                                                                                        position.historical_calculation_method_key,
+                                                                                    historical_calculation_method_name:
+                                                                                        position.historical_calculation_method_name,
+                                                                                },
+                                                                                methodOptionsForTemplate(
+                                                                                    methodOptionsForMedium(
+                                                                                        catalog,
+                                                                                        position.advertising_medium_id,
+                                                                                    ),
+                                                                                    isStandardOffer,
+                                                                                    standardOffer?.allowed_spot_methods,
+                                                                                ),
+                                                                                key,
+                                                                            );
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                ...next,
+                                                                                ...initialTimingFieldsForMethod(
+                                                                                    key,
+                                                                                ),
+                                                                                ...oaTkpDraftPatchOnMethodSelect(
+                                                                                    key,
+                                                                                    position.price_year,
+                                                                                ),
+                                                                                ...freePositionDraftPatchOnMethodSelect(
+                                                                                    position,
+                                                                                    key,
+                                                                                    position.price_year,
+                                                                                ),
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    onRestoreHistorical={() =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            restoreHistoricalCalculationMethod(
+                                                                                {
+                                                                                    calculation_method_key:
+                                                                                        position.calculation_method_key,
+                                                                                    calculation_method_name:
+                                                                                        position.calculation_method_name,
+                                                                                    historical_calculation_method_key:
+                                                                                        position.historical_calculation_method_key,
+                                                                                    historical_calculation_method_name:
+                                                                                        position.historical_calculation_method_name,
+                                                                                },
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                />
 
-                                                                {isCalendarCalculationMethod(
-                                                                    position.calculation_method_key,
+                                                                {isTkpPosition(
+                                                                    position,
                                                                 ) ? (
-                                                                    <SpotCalendarPlanner
+                                                                    <OaTkpPositionEditor
                                                                         positionIndex={
                                                                             index
                                                                         }
-                                                                        entries={
-                                                                            position.planner_entries
+                                                                        position={
+                                                                            position
                                                                         }
-                                                                        canEdit={
-                                                                            canEdit
+                                                                        targetings={
+                                                                            catalog.oa_targetings ??
+                                                                            []
                                                                         }
-                                                                        fieldErrors={
-                                                                            fieldErrors
-                                                                        }
-                                                                        entryTotals={
-                                                                            displayTotals
-                                                                                ?.positions[
+                                                                        currentPriceYear={requireCurrentPriceYear(
+                                                                            catalog,
+                                                                        )}
+                                                                        nextPriceYear={requireNextPriceYear(
+                                                                            catalog,
+                                                                        )}
+                                                                        methodResult={
+                                                                            totals
+                                                                                ?.positions?.[
                                                                                 index
                                                                             ]
-                                                                                ?.planner_entries
+                                                                                ?.method_result
+                                                                                ?.tkp ??
+                                                                            null
                                                                         }
-                                                                        positionMediaGross={
-                                                                            displayTotals
-                                                                                ?.positions[
+                                                                        mediaGross={
+                                                                            totals
+                                                                                ?.positions?.[
                                                                                 index
                                                                             ]
                                                                                 ?.media_gross
                                                                         }
-                                                                        priceListHours={
-                                                                            catalog
-                                                                                .price_list_hours_by_id?.[
-                                                                                String(
-                                                                                    position.expected_price_list_id ??
-                                                                                        '',
-                                                                                )
-                                                                            ] ??
-                                                                            []
-                                                                        }
-                                                                        priceYear={
-                                                                            position.price_year
-                                                                        }
-                                                                        onChange={(
-                                                                            planner_entries,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    planner_entries,
-                                                                                    total_spot_count:
-                                                                                        totalPlannerSpotCount(
-                                                                                            planner_entries,
-                                                                                        ),
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                ) : (
-                                                                    <PriceTimeRanges
-                                                                        positionIndex={
-                                                                            index
-                                                                        }
-                                                                        ranges={
-                                                                            position.time_ranges
-                                                                        }
-                                                                        dayGroups={
-                                                                            dayGroups
+                                                                        fieldErrors={
+                                                                            fieldErrors
                                                                         }
                                                                         canEdit={
                                                                             canEdit
                                                                         }
-                                                                        fieldErrors={
-                                                                            fieldErrors
-                                                                        }
-                                                                        rangeTotals={
-                                                                            displayTotals
-                                                                                ?.positions[
-                                                                                index
-                                                                            ]
-                                                                                ?.time_ranges
-                                                                        }
-                                                                        legacyTotalSpotCount={
-                                                                            position.needs_spot_redistribution
-                                                                                ? position.total_spot_count
-                                                                                : null
-                                                                        }
-                                                                        needsRedistribution={
-                                                                            position.needs_spot_redistribution
+                                                                        showActivePickers={
+                                                                            oaTkpPreviewSurfaceAllowed
                                                                         }
                                                                         onChange={(
-                                                                            time_ranges,
+                                                                            patch,
                                                                         ) =>
                                                                             updatePosition(
                                                                                 index,
-                                                                                {
-                                                                                    time_ranges,
-                                                                                    total_spot_count:
-                                                                                        totalSpotCount(
-                                                                                            time_ranges,
-                                                                                        ),
-                                                                                },
+                                                                                patch,
                                                                             )
                                                                         }
                                                                     />
-                                                                )}
+                                                                ) : null}
 
-                                                                {displayTotals
-                                                                    ?.positions[
-                                                                    index
-                                                                ] &&
-                                                                !previewLoading ? (
-                                                                    <PositionPriceSummary
+                                                                {isFreePosition(
+                                                                    position,
+                                                                ) ? (
+                                                                    <FreePositionEditor
                                                                         positionIndex={
                                                                             index
                                                                         }
-                                                                        averageSecondPrice={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .average_second_price
+                                                                        position={
+                                                                            position
                                                                         }
                                                                         mediaGross={
-                                                                            displayTotals
-                                                                                .positions[
+                                                                            totals
+                                                                                ?.positions?.[
                                                                                 index
                                                                             ]
-                                                                                .media_gross
+                                                                                ?.media_gross
                                                                         }
-                                                                        nnInvest={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .nn_invest
+                                                                        fieldErrors={
+                                                                            fieldErrors
                                                                         }
-                                                                        pricingSettlementMode={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .pricing_settlement_mode
+                                                                        canEdit={
+                                                                            canEdit
                                                                         }
-                                                                        effectivePayFactorPercent={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .effective_pay_factor_percent
+                                                                        onChange={(
+                                                                            patch,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                patch,
+                                                                            )
                                                                         }
-                                                                        effectiveDiscountPercent={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .effective_discount_percent
-                                                                        }
-                                                                        effectiveDiscountBeforeAePercent={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .effective_discount_before_ae_percent
-                                                                        }
-                                                                        aeAmount={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .ae_amount
-                                                                        }
-                                                                        afterOrderDiscount={
-                                                                            displayTotals
-                                                                                .positions[
-                                                                                index
-                                                                            ]
-                                                                                .after_order_discount
-                                                                        }
-                                                                    />
-                                                                ) : previewLoading ? (
-                                                                    <LoadingState
-                                                                        label="Berechnet"
-                                                                        data-test="preview-loading"
                                                                     />
                                                                 ) : null}
+
+                                                                {!isTkpPosition(
+                                                                    position,
+                                                                ) &&
+                                                                !isFreePosition(
+                                                                    position,
+                                                                ) ? (
+                                                                    <>
+                                                                        <PricingSettlementSection
+                                                                            positionIndex={
+                                                                                index
+                                                                            }
+                                                                            mode={
+                                                                                position.pricing_settlement_mode
+                                                                            }
+                                                                            fixedPriceNnInput={
+                                                                                position.fixed_price_nn_input
+                                                                            }
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            hideFixedPrice={
+                                                                                !mediumSupportsFixedPriceSettlement(
+                                                                                    catalog,
+                                                                                    position.advertising_medium_id,
+                                                                                )
+                                                                            }
+                                                                            showFixedPriceValidation={
+                                                                                settlementValidationTouched[
+                                                                                    index
+                                                                                ] ===
+                                                                                true
+                                                                            }
+                                                                            fieldError={
+                                                                                fieldErrors[
+                                                                                    `positions.${index}.fixed_price_nn`
+                                                                                ]?.[0] ??
+                                                                                fieldErrors[
+                                                                                    `positions.${index}.pricing_settlement_mode`
+                                                                                ]?.[0]
+                                                                            }
+                                                                            onModeChange={(
+                                                                                pricing_settlement_mode,
+                                                                            ) => {
+                                                                                if (
+                                                                                    pricing_settlement_mode ===
+                                                                                    'fixed_price'
+                                                                                ) {
+                                                                                    setSettlementValidationTouched(
+                                                                                        (
+                                                                                            current,
+                                                                                        ) => ({
+                                                                                            ...current,
+                                                                                            [index]: true,
+                                                                                        }),
+                                                                                    );
+                                                                                }
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        pricing_settlement_mode,
+                                                                                    },
+                                                                                );
+                                                                            }}
+                                                                            onFixedPriceInputChange={(
+                                                                                fixed_price_nn_input,
+                                                                            ) =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        fixed_price_nn_input,
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        />
+
+                                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                                            {rulesIntegrityError ? (
+                                                                                <p
+                                                                                    className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
+                                                                                    data-test={`calculation-rules-integrity-${position.client_key}`}
+                                                                                    role="alert"
+                                                                                >
+                                                                                    {
+                                                                                        rulesIntegrityError
+                                                                                    }
+                                                                                </p>
+                                                                            ) : null}
+                                                                            {positionRuntime.isFieldVisible(
+                                                                                'position_flight_period',
+                                                                            ) ? (
+                                                                                <FormField
+                                                                                    label={
+                                                                                        (positionFields.find(
+                                                                                            (
+                                                                                                field,
+                                                                                            ) =>
+                                                                                                field.key ===
+                                                                                                'position_flight_period',
+                                                                                        )
+                                                                                            ?.label ??
+                                                                                            'Flugzeitraum') +
+                                                                                        (positionRuntime.isFieldRequired(
+                                                                                            'position_flight_period',
+                                                                                        )
+                                                                                            ? ' *'
+                                                                                            : '')
+                                                                                    }
+                                                                                    htmlFor={`flight-start-${index}`}
+                                                                                    hint={
+                                                                                        positionFields.find(
+                                                                                            (
+                                                                                                field,
+                                                                                            ) =>
+                                                                                                field.key ===
+                                                                                                'position_flight_period',
+                                                                                        )
+                                                                                            ?.help_text ??
+                                                                                        undefined
+                                                                                    }
+                                                                                >
+                                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                                        <Input
+                                                                                            id={`flight-start-${index}`}
+                                                                                            type="date"
+                                                                                            value={
+                                                                                                position.flight_period_start
+                                                                                            }
+                                                                                            disabled={
+                                                                                                !canEdit ||
+                                                                                                rulesIntegrityError !==
+                                                                                                    null
+                                                                                            }
+                                                                                            data-test={`flight-period-start-${index}`}
+                                                                                            onChange={(
+                                                                                                event,
+                                                                                            ) =>
+                                                                                                updatePosition(
+                                                                                                    index,
+                                                                                                    {
+                                                                                                        flight_period_start:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        />
+                                                                                        <Input
+                                                                                            id={`flight-end-${index}`}
+                                                                                            type="date"
+                                                                                            value={
+                                                                                                position.flight_period_end
+                                                                                            }
+                                                                                            disabled={
+                                                                                                !canEdit ||
+                                                                                                rulesIntegrityError !==
+                                                                                                    null
+                                                                                            }
+                                                                                            data-test={`flight-period-end-${index}`}
+                                                                                            onChange={(
+                                                                                                event,
+                                                                                            ) =>
+                                                                                                updatePosition(
+                                                                                                    index,
+                                                                                                    {
+                                                                                                        flight_period_end:
+                                                                                                            event
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        />
+                                                                                    </div>
+                                                                                </FormField>
+                                                                            ) : null}
+                                                                            {visiblePositionTextFields.length >
+                                                                                0 ||
+                                                                            visiblePositionChoiceFields.length >
+                                                                                0 ? (
+                                                                                <div
+                                                                                    className="space-y-3 sm:col-span-2"
+                                                                                    data-test={`calculation-custom-position-fields-${position.client_key}`}
+                                                                                >
+                                                                                    <h3 className="text-sm font-semibold">
+                                                                                        Weitere
+                                                                                        Angaben
+                                                                                    </h3>
+                                                                                    <SchemaTextFields
+                                                                                        fields={
+                                                                                            visiblePositionTextFields
+                                                                                        }
+                                                                                        values={
+                                                                                            position.custom_fields
+                                                                                        }
+                                                                                        errors={
+                                                                                            fieldErrors
+                                                                                        }
+                                                                                        errorKeyPrefixes={[
+                                                                                            `positions.${index}.dynamic_field_values`,
+                                                                                        ]}
+                                                                                        disabled={
+                                                                                            !canEdit ||
+                                                                                            rulesIntegrityError !==
+                                                                                                null
+                                                                                        }
+                                                                                        idPrefix={`calc-pos-custom-${position.client_key}`}
+                                                                                        onChange={(
+                                                                                            key,
+                                                                                            value,
+                                                                                        ) =>
+                                                                                            updatePosition(
+                                                                                                index,
+                                                                                                {
+                                                                                                    custom_fields:
+                                                                                                        {
+                                                                                                            ...position.custom_fields,
+                                                                                                            [key]: value,
+                                                                                                        },
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                    <SchemaChoiceFields
+                                                                                        fields={
+                                                                                            visiblePositionChoiceFields
+                                                                                        }
+                                                                                        values={
+                                                                                            position.custom_choice_fields
+                                                                                        }
+                                                                                        errors={
+                                                                                            fieldErrors
+                                                                                        }
+                                                                                        errorKeyPrefixes={[
+                                                                                            `positions.${index}.dynamic_field_values`,
+                                                                                        ]}
+                                                                                        disabled={
+                                                                                            !canEdit ||
+                                                                                            rulesIntegrityError !==
+                                                                                                null
+                                                                                        }
+                                                                                        idPrefix={`calc-pos-choice-${position.client_key}`}
+                                                                                        onChange={(
+                                                                                            key,
+                                                                                            value,
+                                                                                        ) =>
+                                                                                            updatePosition(
+                                                                                                index,
+                                                                                                {
+                                                                                                    custom_choice_fields:
+                                                                                                        {
+                                                                                                            ...position.custom_choice_fields,
+                                                                                                            [key]: value,
+                                                                                                        },
+                                                                                                    custom_choice_touched:
+                                                                                                        {
+                                                                                                            ...position.custom_choice_touched,
+                                                                                                            [key]: true,
+                                                                                                        },
+                                                                                                    custom_choice_meta:
+                                                                                                        {
+                                                                                                            ...position.custom_choice_meta,
+                                                                                                            [key]: {
+                                                                                                                initPayloadSafe: true,
+                                                                                                                issue: null,
+                                                                                                            },
+                                                                                                        },
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </div>
+                                                                            ) : null}
+                                                                        </div>
+
+                                                                        {(() => {
+                                                                            // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                                            // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
+                                                                            const positionProfile =
+                                                                                profileForMedium(
+                                                                                    catalog,
+                                                                                    position.advertising_medium_id,
+                                                                                );
+                                                                            const forcedProfile =
+                                                                                isForcedProfile(
+                                                                                    positionProfile,
+                                                                                );
+                                                                            const profileMeta =
+                                                                                positionProfile
+                                                                                    ? component_profiles[
+                                                                                          positionProfile
+                                                                                      ]
+                                                                                    : undefined;
+
+                                                                            const showForcedProfileUi =
+                                                                                forcedProfile;
+                                                                            const showOptionalComponentsUi =
+                                                                                !forcedProfile &&
+                                                                                position
+                                                                                    .components
+                                                                                    .length >
+                                                                                    0;
+
+                                                                            return (
+                                                                                <div className="space-y-2">
+                                                                                    {!forcedProfile &&
+                                                                                    mediumSupportsSpotComponents(
+                                                                                        catalog,
+                                                                                        position.advertising_medium_id,
+                                                                                    ) &&
+                                                                                    position
+                                                                                        .components
+                                                                                        .length ===
+                                                                                        0 &&
+                                                                                    canEdit ? (
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="outline"
+                                                                                            size="sm"
+                                                                                            data-test={`spot-components-activate-${index}`}
+                                                                                            onClick={() => {
+                                                                                                const rule =
+                                                                                                    ruleFor(
+                                                                                                        catalog,
+                                                                                                        position.inventory_id,
+                                                                                                        position.advertising_medium_id,
+                                                                                                    );
+                                                                                                const next =
+                                                                                                    activateComponentsFromLength(
+                                                                                                        position.length_seconds,
+                                                                                                    );
+                                                                                                updatePosition(
+                                                                                                    index,
+                                                                                                    {
+                                                                                                        components:
+                                                                                                            next,
+                                                                                                        length_seconds:
+                                                                                                            totalComponentLength(
+                                                                                                                next,
+                                                                                                            ),
+                                                                                                        component_calculation_strategy:
+                                                                                                            position.component_calculation_strategy ??
+                                                                                                            resolveStrategyFromRule(
+                                                                                                                rule?.component_calculation_strategy,
+                                                                                                            ),
+                                                                                                    },
+                                                                                                );
+                                                                                            }}
+                                                                                        >
+                                                                                            Spot-Komponenten
+                                                                                            aktivieren
+                                                                                        </Button>
+                                                                                    ) : null}
+                                                                                    {showForcedProfileUi ||
+                                                                                    showOptionalComponentsUi ? (
+                                                                                        <SpotComponentsSection
+                                                                                            positionIndex={
+                                                                                                index
+                                                                                            }
+                                                                                            profile={
+                                                                                                showForcedProfileUi
+                                                                                                    ? positionProfile
+                                                                                                    : null
+                                                                                            }
+                                                                                            profileLabel={
+                                                                                                showForcedProfileUi
+                                                                                                    ? profileMeta?.label
+                                                                                                    : undefined
+                                                                                            }
+                                                                                            profileMeta={
+                                                                                                showForcedProfileUi &&
+                                                                                                profileMeta
+                                                                                                    ? {
+                                                                                                          unit_label:
+                                                                                                              profileMeta.unit_label,
+                                                                                                          unit_count:
+                                                                                                              profileMeta.unit_count,
+                                                                                                          slots: profileMeta.slots,
+                                                                                                      }
+                                                                                                    : undefined
+                                                                                            }
+                                                                                            unitCount={positionUnitCount(
+                                                                                                position,
+                                                                                            )}
+                                                                                            components={
+                                                                                                position.components
+                                                                                            }
+                                                                                            strategy={
+                                                                                                position.component_calculation_strategy ??
+                                                                                                'shared_total_length'
+                                                                                            }
+                                                                                            canEdit={
+                                                                                                canEdit
+                                                                                            }
+                                                                                            positionMediaGross={
+                                                                                                displayTotals
+                                                                                                    ?.positions?.[
+                                                                                                    index
+                                                                                                ]
+                                                                                                    ?.media_gross
+                                                                                            }
+                                                                                            componentResults={
+                                                                                                displayTotals
+                                                                                                    ?.positions?.[
+                                                                                                    index
+                                                                                                ]
+                                                                                                    ?.components
+                                                                                            }
+                                                                                            lengthIndex={
+                                                                                                displayTotals
+                                                                                                    ?.positions?.[
+                                                                                                    index
+                                                                                                ]
+                                                                                                    ?.length_index
+                                                                                            }
+                                                                                            errors={
+                                                                                                fieldErrors
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                components,
+                                                                                            ) =>
+                                                                                                updatePosition(
+                                                                                                    index,
+                                                                                                    {
+                                                                                                        components,
+                                                                                                        length_seconds:
+                                                                                                            totalComponentLength(
+                                                                                                                components,
+                                                                                                            ),
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                            onDeactivate={() =>
+                                                                                                updatePosition(
+                                                                                                    index,
+                                                                                                    {
+                                                                                                        components:
+                                                                                                            [],
+                                                                                                        component_calculation_strategy:
+                                                                                                            null,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        />
+                                                                                    ) : null}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+
+                                                                        {(() => {
+                                                                            const positionProfile =
+                                                                                profileForMedium(
+                                                                                    catalog,
+                                                                                    position.advertising_medium_id,
+                                                                                );
+                                                                            const profileMeta =
+                                                                                positionProfile
+                                                                                    ? component_profiles[
+                                                                                          positionProfile
+                                                                                      ]
+                                                                                    : undefined;
+
+                                                                            if (
+                                                                                !profileMeta
+                                                                            ) {
+                                                                                return null;
+                                                                            }
+
+                                                                            return (
+                                                                                <p
+                                                                                    className="text-muted-foreground text-xs"
+                                                                                    data-test={`spot-units-hint-${index}`}
+                                                                                >
+                                                                                    {
+                                                                                        profileMeta.unit_label
+                                                                                    }{' '}
+                                                                                    (Spot-Anzahlen
+                                                                                    unten
+                                                                                    entsprechen{' '}
+                                                                                    {
+                                                                                        profileMeta.unit_label
+                                                                                    }
+                                                                                    )
+                                                                                </p>
+                                                                            );
+                                                                        })()}
+
+                                                                        {isCalendarCalculationMethod(
+                                                                            position.calculation_method_key,
+                                                                        ) ? (
+                                                                            <SpotCalendarPlanner
+                                                                                positionIndex={
+                                                                                    index
+                                                                                }
+                                                                                entries={
+                                                                                    position.planner_entries
+                                                                                }
+                                                                                canEdit={
+                                                                                    canEdit
+                                                                                }
+                                                                                fieldErrors={
+                                                                                    fieldErrors
+                                                                                }
+                                                                                entryTotals={
+                                                                                    displayTotals
+                                                                                        ?.positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.planner_entries
+                                                                                }
+                                                                                positionMediaGross={
+                                                                                    displayTotals
+                                                                                        ?.positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.media_gross
+                                                                                }
+                                                                                priceListHours={
+                                                                                    catalog
+                                                                                        .price_list_hours_by_id?.[
+                                                                                        String(
+                                                                                            position.expected_price_list_id ??
+                                                                                                '',
+                                                                                        )
+                                                                                    ] ??
+                                                                                    []
+                                                                                }
+                                                                                priceYear={
+                                                                                    position.price_year
+                                                                                }
+                                                                                onChange={(
+                                                                                    planner_entries,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            planner_entries,
+                                                                                            total_spot_count:
+                                                                                                totalPlannerSpotCount(
+                                                                                                    planner_entries,
+                                                                                                ),
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        ) : (
+                                                                            <PriceTimeRanges
+                                                                                positionIndex={
+                                                                                    index
+                                                                                }
+                                                                                ranges={
+                                                                                    position.time_ranges
+                                                                                }
+                                                                                dayGroups={
+                                                                                    dayGroups
+                                                                                }
+                                                                                canEdit={
+                                                                                    canEdit
+                                                                                }
+                                                                                fieldErrors={
+                                                                                    fieldErrors
+                                                                                }
+                                                                                rangeTotals={
+                                                                                    displayTotals
+                                                                                        ?.positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        ?.time_ranges
+                                                                                }
+                                                                                legacyTotalSpotCount={
+                                                                                    position.needs_spot_redistribution
+                                                                                        ? position.total_spot_count
+                                                                                        : null
+                                                                                }
+                                                                                needsRedistribution={
+                                                                                    position.needs_spot_redistribution
+                                                                                }
+                                                                                onChange={(
+                                                                                    time_ranges,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            time_ranges,
+                                                                                            total_spot_count:
+                                                                                                totalSpotCount(
+                                                                                                    time_ranges,
+                                                                                                ),
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        )}
+
+                                                                        {displayTotals
+                                                                            ?.positions[
+                                                                            index
+                                                                        ] &&
+                                                                        !previewLoading ? (
+                                                                            <PositionPriceSummary
+                                                                                positionIndex={
+                                                                                    index
+                                                                                }
+                                                                                averageSecondPrice={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .average_second_price
+                                                                                }
+                                                                                mediaGross={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .media_gross
+                                                                                }
+                                                                                nnInvest={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .nn_invest
+                                                                                }
+                                                                                pricingSettlementMode={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .pricing_settlement_mode
+                                                                                }
+                                                                                effectivePayFactorPercent={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .effective_pay_factor_percent
+                                                                                }
+                                                                                effectiveDiscountPercent={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .effective_discount_percent
+                                                                                }
+                                                                                effectiveDiscountBeforeAePercent={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .effective_discount_before_ae_percent
+                                                                                }
+                                                                                aeAmount={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .ae_amount
+                                                                                }
+                                                                                afterOrderDiscount={
+                                                                                    displayTotals
+                                                                                        .positions[
+                                                                                        index
+                                                                                    ]
+                                                                                        .after_order_discount
+                                                                                }
+                                                                            />
+                                                                        ) : previewLoading ? (
+                                                                            <LoadingState
+                                                                                label="Berechnet"
+                                                                                data-test="preview-loading"
+                                                                            />
+                                                                        ) : null}
+                                                                    </>
+                                                                ) : null}
                                                             </>
-                                                        ) : null}
+                                                        )}
                                                     </CardContent>
                                                 </Card>
                                             </section>
@@ -5315,21 +5382,25 @@ export default function CalculationWizard({
                                             type="button"
                                             variant="outline"
                                             className="w-full border-dashed"
+                                            data-test="add-manual-position"
                                             onClick={() => {
-                                                const next = firstValidPosition(
+                                                const previous =
+                                                    positions[
+                                                        positions.length - 1
+                                                    ] ?? null;
+                                                const next = nextManualPosition(
+                                                    previous,
                                                     catalog,
                                                     oaTkpCapabilityEnabled,
                                                 );
-                                                if (next) {
-                                                    setPositions([
-                                                        ...positions,
-                                                        withForcedProfileComponentsIfNeeded(
-                                                            next,
-                                                            catalog,
-                                                            component_profiles,
-                                                        ),
-                                                    ]);
-                                                }
+                                                setPositions([
+                                                    ...positions,
+                                                    withForcedProfileComponentsIfNeeded(
+                                                        next,
+                                                        catalog,
+                                                        component_profiles,
+                                                    ),
+                                                ]);
                                             }}
                                         >
                                             Werbeelement hinzufügen
@@ -5382,6 +5453,12 @@ export default function CalculationWizard({
                             ) : (
                                 <div className="space-y-6">
                                     {positions.map((position, index) => {
+                                        // PO-CALC-DISPO-UX-1: Konditionen erst für vollständig
+                                        // ausgewählte Werbeelemente (Inventar + Werbemittel).
+                                        if (!hasManualPositionIds(position)) {
+                                            return null;
+                                        }
+
                                         const inventory =
                                             catalog.inventories.find(
                                                 (item) =>
@@ -6255,7 +6332,9 @@ export default function CalculationWizard({
                                 totals={summaryTotals}
                                 loading={canEdit && previewLoading}
                                 aeEnabled={aeEnabled}
-                                positions={positions}
+                                positions={positions.filter(
+                                    hasManualInventorySelection,
+                                )}
                                 inventories={catalog.inventories}
                             />
                         )}

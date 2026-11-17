@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectAccountHit } from './helpers/crm-wizard-picker';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 const e2eDb = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -272,6 +273,7 @@ test.describe('CRM Stammdaten-Suche und Prüflisten-Labels', () => {
             accountId!,
         );
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-spots-0-0"]').fill('10');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();

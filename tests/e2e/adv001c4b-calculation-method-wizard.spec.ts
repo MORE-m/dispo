@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * ADV-001c4b isolierte Suite: Wizard-Methodenauswahl und Medienfilter.
@@ -123,6 +124,7 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
 
         await expectLiveMethodChooser(page);
         await expect(
@@ -154,6 +156,7 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await page.locator('[data-test="crm-customer-search"]').fill('C4b Nav GmbH');
         await page.locator('[data-test="crm-customer-use-freitext"]').click();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
 
         await expectLiveMethodChooser(page);
         await expect(
@@ -197,6 +200,7 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
 
         const props = await readWizardPayload(page);
         const spotA = props.catalog.media.find(
@@ -340,6 +344,7 @@ echo $calc->id;
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
 
         const props = await readWizardPayload(page);
         const unbookable = props.catalog.media.filter(

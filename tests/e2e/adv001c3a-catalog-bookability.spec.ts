@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * ADV-001c3a isolierte Suite: Null-kind-Medien + Wizard-Buchbarkeit.
@@ -240,9 +241,7 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
 
         // Speichern als Admin (bereits eingeloggt) – Spot-Classic-Pfad bis Persistenz.
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-        await expect(
-            page.locator('[data-test="position-inventory-0"]'),
-        ).toBeVisible({ timeout: 15_000 });
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-spots-0-0"]').fill('10');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.locator('[data-test="wizard-save"]').click();

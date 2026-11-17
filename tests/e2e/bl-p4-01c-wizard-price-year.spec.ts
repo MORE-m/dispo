@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 /**
  * BL-P4-01c isolierte Suite: Preisjahrwahl im Kalkulationswizard (PO-PRI-YEAR-1).
@@ -119,6 +120,7 @@ test.describe.serial('BL-P4-01c Wizard-Preisjahrwahl', () => {
         await page.goto('/kalkulationen/neu');
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         const yearSelect = page.locator('[data-test="position-price-year-0"]');
         await expect(yearSelect).toBeVisible();
         const currentYear = await yearSelect.inputValue();
@@ -192,6 +194,7 @@ echo ($list?->id ?? 0).'|'.$year.'|'.$inventory->id;
         await loginAsSales(page);
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="position-price-year-0"]'),
         ).toHaveValue(String(year));
@@ -225,6 +228,7 @@ echo 'ok';
         // API-409 über Wizard-Update nach Speichern einer Position.
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-end-0-0"]').selectOption('9');
         await page.locator('[data-test="range-spots-0-0"]').fill('1');
         await page.locator('[data-test="position-length-seconds-0"]').fill('30');
@@ -322,6 +326,7 @@ echo json_encode([
         await loginAsSales(page);
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await ensureWizardInventorySelected(page);
         await page.locator('[data-test="range-end-0-0"]').selectOption('9');
         await page.locator('[data-test="range-spots-0-0"]').fill('1');
         await page.locator('[data-test="position-length-seconds-0"]').fill('30');

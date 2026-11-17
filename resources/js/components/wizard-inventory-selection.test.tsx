@@ -31,6 +31,33 @@ const inventories = [
 ];
 
 describe('WizardInventorySelection', () => {
+    it('starts expanded when no inventory is selected', () => {
+        const onSelect = vi.fn(() => true);
+        render(
+            <WizardInventorySelection
+                positionIndex={0}
+                inventories={inventories}
+                selectedInventoryId={null}
+                canEdit={true}
+                unplannableInventoryIds={new Set([3])}
+                catalogLabel={(name) => name}
+                onSelectInventory={onSelect}
+            />,
+        );
+
+        const picker = screen.getByTestId('position-inventory-picker-0');
+        expect(picker.getAttribute('data-expanded')).toBe('true');
+        expect(
+            screen.queryByTestId('position-inventory-collapsed-0'),
+        ).toBeNull();
+        expect(
+            screen.getByRole('button', { name: /Radio Hamburg/i }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: /ROCK ANTENNE Hamburg/i }),
+        ).toBeTruthy();
+    });
+
     it('collapses to the selected inventory and can expand again', () => {
         const onSelect = vi.fn(() => true);
         render(
