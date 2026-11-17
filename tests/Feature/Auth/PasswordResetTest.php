@@ -38,6 +38,31 @@ class PasswordResetTest extends TestCase
         Notification::assertSentTo($user, ResetPassword::class);
     }
 
+    public function test_reset_password_status_uses_german_translation(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $expected = 'Wir haben dir einen Link zum Zurücksetzen deines Passworts per E-Mail gesendet.';
+
+        $this->assertSame($expected, __('passwords.sent'));
+        $this->assertNotSame('passwords.sent', __('passwords.sent'));
+
+        $this->from(route('password.request'))
+            ->post(route('password.email'), ['email' => $user->email])
+            ->assertSessionHas('status', $expected)
+            ->assertRedirect(route('password.request'));
+
+        $this->get(route('password.request'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('auth/forgot-password')
+                ->where('status', $expected)
+                ->etc()
+            );
+    }
+
     public function test_reset_password_screen_can_be_rendered()
     {
         Notification::fake();

@@ -5,6 +5,7 @@ import { expect, type Page } from '@playwright/test';
  * Bestehende E2E-Flows rufen dies auf, bevor Positionsfelder bedient werden.
  *
  * Das native Select ist sr-only/aria-hidden – Sichtbarkeit daran nicht koppeln.
+ * Kein force-Click: Auswahl muss wie ein echter Nutzerklick greifen.
  */
 export async function ensureWizardInventorySelected(
     page: Page,
@@ -34,7 +35,8 @@ export async function ensureWizardInventorySelected(
             `[data-test="position-inventory-tile-${positionIndex}-${inventory.code}"]`,
         );
         if ((await tile.count()) > 0) {
-            await tile.click({ force: true });
+            await expect(tile).toBeEnabled({ timeout: 15_000 });
+            await tile.click();
             await expect(select).not.toHaveValue('', { timeout: 15_000 });
             return;
         }
