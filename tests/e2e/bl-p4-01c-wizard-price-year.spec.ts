@@ -211,6 +211,8 @@ echo 'ok';
 
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        // Frische Calc startet ohne Inventar-Default (PO-CALC-DISPO-UX-1).
+        await ensureWizardInventorySelected(page);
         await expect(
             page.locator('[data-test="position-price-year-missing-0"]'),
         ).toBeVisible();
