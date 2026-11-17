@@ -123,6 +123,7 @@ import {
     type OaTargetingCatalogRow,
     type OaTkpMethodResult,
 } from '@/lib/oa-tkp-wizard';
+import { shouldShowSpotPriceYearControls } from '@/lib/spot-price-year-visibility';
 import { OaTkpPositionEditor } from '@/components/oa-tkp-position-editor';
 import { FreePositionEditor } from '@/components/free-position-editor';
 import {
@@ -4161,6 +4162,10 @@ export default function CalculationWizard({
                                                                             }
                                                                         </p>
                                                                     ) : null}
+                                                                    {/* Spot-/SWF-Preisjahr: nicht im OA-TKP-/Free-Position-Kontext. */}
+                                                                    {shouldShowSpotPriceYearControls(
+                                                                        position,
+                                                                    ) ? (
                                                                     <FormField
                                                                         label="Preisjahr"
                                                                         htmlFor={`price-year-${index}`}
@@ -4354,6 +4359,7 @@ export default function CalculationWizard({
                                                                             </p>
                                                                         ) : null}
                                                                     </FormField>
+                                                                    ) : null}
                                                                 </>
                                                             ) : null}
                                                             {positionRuntime.isFieldVisible(
