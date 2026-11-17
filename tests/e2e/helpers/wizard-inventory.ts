@@ -1,16 +1,22 @@
 import { expect, type Page } from '@playwright/test';
 
+type InventoryChoice = {
+    code?: string;
+    label?: string;
+    /** Explizit: erste aktivierte Kachel wählen (kein stiller RH-Fallback). */
+    firstEnabled?: boolean;
+};
+
 /**
  * PO-CALC-DISPO-UX-1: Frische manuelle Positionen starten ohne Inventar.
  * Bestehende E2E-Flows rufen dies auf, bevor Positionsfelder bedient werden.
  *
- * Auswahl erfolgt über sichtbare Inventar-Kacheln (kein sr-only-Select).
- * Fehlende Optionen werden nicht stillschweigend übersprungen.
+ * Auswahl über sichtbare Inventar-Kacheln. Fehlende Treffer werfen klar.
  */
 export async function ensureWizardInventorySelected(
     page: Page,
     positionIndex = 0,
-    inventory: { code?: string; label?: string } = {
+    inventory: InventoryChoice = {
         code: 'RH',
         label: 'Radio Hamburg',
     },
@@ -27,6 +33,16 @@ export async function ensureWizardInventorySelected(
 
     const current = await select.inputValue();
     if (current !== '') {
+        return;
+    }
+
+    if (inventory.firstEnabled) {
+        const tiles = page.locator(
+            `[data-test^="position-inventory-tile-${positionIndex}-"]:not([disabled])`,
+        );
+        await expect(tiles.first()).toBeVisible({ timeout: 15_000 });
+        await tiles.first().click();
+        await expect(select).not.toHaveValue('', { timeout: 15_000 });
         return;
     }
 
@@ -59,7 +75,9 @@ export async function ensureWizardInventorySelected(
         `Kein Inventar für Werbeelement ${positionIndex + 1} wählbar` +
             (inventory.code || inventory.label
                 ? ` (gesucht: ${[inventory.code, inventory.label].filter(Boolean).join(' / ')})`
-                : '') +
+                : inventory.firstEnabled
+                  ? ' (firstEnabled)'
+                  : '') +
             '.',
     );
 }

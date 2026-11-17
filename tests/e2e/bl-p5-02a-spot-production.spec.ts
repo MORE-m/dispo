@@ -37,7 +37,7 @@ async function openNewCalculationStepTwo(page: Page, customer: string) {
     await page.locator('[data-test="crm-customer-search"]').fill(customer);
     await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await ensureWizardInventorySelected(page);
+    await ensureWizardInventorySelected(page, 0, { code: 'SPA' });
 }
 
 async function selectSpotInventory(page: Page, index: number, code: string) {
