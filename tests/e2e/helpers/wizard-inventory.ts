@@ -4,8 +4,8 @@ import { expect, type Page } from '@playwright/test';
  * PO-CALC-DISPO-UX-1: Frische manuelle Positionen starten ohne Inventar.
  * Bestehende E2E-Flows rufen dies auf, bevor Positionsfelder bedient werden.
  *
- * Das native Select ist sr-only/aria-hidden – Sichtbarkeit daran nicht koppeln.
- * Kein force-Click: Auswahl muss wie ein echter Nutzerklick greifen.
+ * Auswahl erfolgt über sichtbare Inventar-Kacheln (kein sr-only-Select).
+ * Fehlende Optionen werden nicht stillschweigend übersprungen.
  */
 export async function ensureWizardInventorySelected(
     page: Page,
@@ -43,12 +43,23 @@ export async function ensureWizardInventorySelected(
     }
 
     if (inventory.label) {
-        await select.selectOption({ label: inventory.label });
-        await expect(select).not.toHaveValue('', { timeout: 15_000 });
-        return;
+        const tileByName = page.getByRole('button', {
+            name: inventory.label,
+            exact: true,
+        });
+        if ((await tileByName.count()) > 0) {
+            await expect(tileByName.first()).toBeEnabled({ timeout: 15_000 });
+            await tileByName.first().click();
+            await expect(select).not.toHaveValue('', { timeout: 15_000 });
+            return;
+        }
     }
 
     throw new Error(
-        `Kein Inventar für Werbeelement ${positionIndex + 1} wählbar.`,
+        `Kein Inventar für Werbeelement ${positionIndex + 1} wählbar` +
+            (inventory.code || inventory.label
+                ? ` (gesucht: ${[inventory.code, inventory.label].filter(Boolean).join(' / ')})`
+                : '') +
+            '.',
     );
 }

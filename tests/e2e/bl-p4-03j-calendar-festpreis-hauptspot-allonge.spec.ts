@@ -45,14 +45,6 @@ async function ensureWeekContainsDate(page: Page, date: string) {
     await expect(header).toBeVisible();
 }
 
-async function selectInventory(page: Page, name: string) {
-    const expand = page.locator('[data-test="position-inventory-expand-0"]');
-    if (await expand.isVisible()) {
-        await expand.click();
-    }
-    await page.getByRole('button', { name, exact: true }).click();
-}
-
 async function activateComponentsWithAllonge(page: Page) {
     await page.locator('[data-test="spot-components-activate-0"]').click();
     await expect(
@@ -69,8 +61,7 @@ async function setupCalendarFestpreisComponents(
     fixedPriceNn: string,
 ) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await ensureWizardInventorySelected(page);
-    await selectInventory(page, inventoryName);
+    await ensureWizardInventorySelected(page, 0, { label: inventoryName });
 
     await page
         .locator('[data-test="calculation-method-radio-0-calendar"]')
