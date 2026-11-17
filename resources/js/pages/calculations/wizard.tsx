@@ -4166,45 +4166,111 @@ export default function CalculationWizard({
                                                                     {shouldShowSpotPriceYearControls(
                                                                         position,
                                                                     ) ? (
-                                                                    <FormField
-                                                                        label="Preisjahr"
-                                                                        htmlFor={`price-year-${index}`}
-                                                                        hint={
-                                                                            priceYearDirty(
-                                                                                position.original_price_year,
-                                                                                position.price_year,
-                                                                            )
-                                                                                ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
-                                                                                : position.price_list_status ===
-                                                                                    'archived'
-                                                                                  ? 'Historische Preisliste (unverändert gepinnt).'
-                                                                                  : undefined
-                                                                        }
-                                                                    >
-                                                                        <select
-                                                                            id={`price-year-${index}`}
-                                                                            data-test={`position-price-year-${index}`}
-                                                                            className={
-                                                                                formSelectClass
+                                                                        <FormField
+                                                                            label="Preisjahr"
+                                                                            htmlFor={`price-year-${index}`}
+                                                                            hint={
+                                                                                priceYearDirty(
+                                                                                    position.original_price_year,
+                                                                                    position.price_year,
+                                                                                )
+                                                                                    ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
+                                                                                    : position.price_list_status ===
+                                                                                        'archived'
+                                                                                      ? 'Historische Preisliste (unverändert gepinnt).'
+                                                                                      : undefined
                                                                             }
-                                                                            value={
-                                                                                position.price_year
-                                                                            }
-                                                                            disabled={
-                                                                                !canEdit
-                                                                            }
-                                                                            onChange={(
-                                                                                event,
-                                                                            ) => {
-                                                                                const year =
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
+                                                                        >
+                                                                            <select
+                                                                                id={`price-year-${index}`}
+                                                                                data-test={`position-price-year-${index}`}
+                                                                                className={
+                                                                                    formSelectClass
+                                                                                }
+                                                                                value={
+                                                                                    position.price_year
+                                                                                }
+                                                                                disabled={
+                                                                                    !canEdit
+                                                                                }
+                                                                                onChange={(
+                                                                                    event,
+                                                                                ) => {
+                                                                                    const year =
+                                                                                        Number(
+                                                                                            event
+                                                                                                .target
+                                                                                                .value,
+                                                                                        );
+                                                                                    const originalPin: OriginalPriceListPin | null =
+                                                                                        position.original_price_year !==
+                                                                                        null
+                                                                                            ? {
+                                                                                                  year: position.original_price_year,
+                                                                                                  price_list_id:
+                                                                                                      position.original_price_list_id,
+                                                                                                  version:
+                                                                                                      position.original_price_list_version,
+                                                                                                  status: position.original_price_list_status,
+                                                                                              }
+                                                                                            : null;
+
+                                                                                    if (
+                                                                                        originalPin &&
+                                                                                        year ===
+                                                                                            originalPin.year
+                                                                                    ) {
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            restoreOriginalPriceListPin(
+                                                                                                originalPin,
+                                                                                            ),
+                                                                                        );
+                                                                                        return;
+                                                                                    }
+
+                                                                                    const option =
+                                                                                        resolveDisplayedPriceYearOptions(
+                                                                                            catalog,
+                                                                                            position.inventory_id,
+                                                                                            year,
+                                                                                            originalPin,
+                                                                                        ).find(
+                                                                                            (
+                                                                                                row,
+                                                                                            ) =>
+                                                                                                row.year ===
+                                                                                                year,
+                                                                                        );
+
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            price_year:
+                                                                                                year,
+                                                                                            expected_price_list_id:
+                                                                                                option?.price_list_id ??
+                                                                                                expectedPriceListIdForYear(
+                                                                                                    catalog,
+                                                                                                    position.inventory_id,
+                                                                                                    year,
+                                                                                                ),
+                                                                                            price_list_version:
+                                                                                                option?.version ??
+                                                                                                null,
+                                                                                            price_list_status:
+                                                                                                option?.status ??
+                                                                                                null,
+                                                                                        },
                                                                                     );
-                                                                                const originalPin: OriginalPriceListPin | null =
+                                                                                }}
+                                                                            >
+                                                                                {resolveDisplayedPriceYearOptions(
+                                                                                    catalog,
+                                                                                    position.inventory_id,
+                                                                                    position.price_year,
                                                                                     position.original_price_year !==
-                                                                                    null
+                                                                                        null
                                                                                         ? {
                                                                                               year: position.original_price_year,
                                                                                               price_list_id:
@@ -4213,59 +4279,41 @@ export default function CalculationWizard({
                                                                                                   position.original_price_list_version,
                                                                                               status: position.original_price_list_status,
                                                                                           }
-                                                                                        : null;
-
-                                                                                if (
-                                                                                    originalPin &&
-                                                                                    year ===
-                                                                                        originalPin.year
-                                                                                ) {
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        restoreOriginalPriceListPin(
-                                                                                            originalPin,
-                                                                                        ),
-                                                                                    );
-                                                                                    return;
-                                                                                }
-
-                                                                                const option =
-                                                                                    resolveDisplayedPriceYearOptions(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        year,
-                                                                                        originalPin,
-                                                                                    ).find(
-                                                                                        (
-                                                                                            row,
-                                                                                        ) =>
-                                                                                            row.year ===
-                                                                                            year,
-                                                                                    );
-
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        price_year:
-                                                                                            year,
-                                                                                        expected_price_list_id:
-                                                                                            option?.price_list_id ??
-                                                                                            expectedPriceListIdForYear(
-                                                                                                catalog,
-                                                                                                position.inventory_id,
-                                                                                                year,
-                                                                                            ),
-                                                                                        price_list_version:
-                                                                                            option?.version ??
-                                                                                            null,
-                                                                                        price_list_status:
-                                                                                            option?.status ??
-                                                                                            null,
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            {resolveDisplayedPriceYearOptions(
+                                                                                        : null,
+                                                                                ).map(
+                                                                                    (
+                                                                                        option,
+                                                                                    ) => (
+                                                                                        <option
+                                                                                            key={
+                                                                                                option.year
+                                                                                            }
+                                                                                            value={
+                                                                                                option.year
+                                                                                            }
+                                                                                            disabled={
+                                                                                                !option.available &&
+                                                                                                option.year !==
+                                                                                                    position.original_price_year
+                                                                                            }
+                                                                                        >
+                                                                                            {
+                                                                                                option.year
+                                                                                            }
+                                                                                            {option.version
+                                                                                                ? ` · ${option.version}`
+                                                                                                : option.available
+                                                                                                  ? ''
+                                                                                                  : ' · keine aktive Liste'}
+                                                                                            {option.status ===
+                                                                                            'archived'
+                                                                                                ? ' · historisch'
+                                                                                                : ''}
+                                                                                        </option>
+                                                                                    ),
+                                                                                )}
+                                                                            </select>
+                                                                            {!resolveDisplayedPriceYearOptions(
                                                                                 catalog,
                                                                                 position.inventory_id,
                                                                                 position.price_year,
@@ -4280,85 +4328,37 @@ export default function CalculationWizard({
                                                                                           status: position.original_price_list_status,
                                                                                       }
                                                                                     : null,
-                                                                            ).map(
+                                                                            ).find(
                                                                                 (
                                                                                     option,
-                                                                                ) => (
-                                                                                    <option
-                                                                                        key={
-                                                                                            option.year
-                                                                                        }
-                                                                                        value={
-                                                                                            option.year
-                                                                                        }
-                                                                                        disabled={
-                                                                                            !option.available &&
-                                                                                            option.year !==
-                                                                                                position.original_price_year
-                                                                                        }
-                                                                                    >
-                                                                                        {
-                                                                                            option.year
-                                                                                        }
-                                                                                        {option.version
-                                                                                            ? ` · ${option.version}`
-                                                                                            : option.available
-                                                                                              ? ''
-                                                                                              : ' · keine aktive Liste'}
-                                                                                        {option.status ===
-                                                                                        'archived'
-                                                                                            ? ' · historisch'
-                                                                                            : ''}
-                                                                                    </option>
-                                                                                ),
-                                                                            )}
-                                                                        </select>
-                                                                        {!resolveDisplayedPriceYearOptions(
-                                                                            catalog,
-                                                                            position.inventory_id,
-                                                                            position.price_year,
-                                                                            position.original_price_year !==
-                                                                                null
-                                                                                ? {
-                                                                                      year: position.original_price_year,
-                                                                                      price_list_id:
-                                                                                          position.original_price_list_id,
-                                                                                      version:
-                                                                                          position.original_price_list_version,
-                                                                                      status: position.original_price_list_status,
-                                                                                  }
-                                                                                : null,
-                                                                        ).find(
-                                                                            (
-                                                                                option,
-                                                                            ) =>
-                                                                                option.year ===
+                                                                                ) =>
+                                                                                    option.year ===
+                                                                                        position.price_year &&
+                                                                                    option.available,
+                                                                            ) &&
+                                                                            position.price_list_status !==
+                                                                                'archived' &&
+                                                                            !(
+                                                                                position.original_price_year ===
                                                                                     position.price_year &&
-                                                                                option.available,
-                                                                        ) &&
-                                                                        position.price_list_status !==
-                                                                            'archived' &&
-                                                                        !(
-                                                                            position.original_price_year ===
-                                                                                position.price_year &&
-                                                                            position.original_price_list_id !==
-                                                                                null
-                                                                        ) ? (
-                                                                            <p
-                                                                                className="text-destructive mt-1 text-xs"
-                                                                                data-test={`position-price-year-missing-${index}`}
-                                                                            >
-                                                                                Für
-                                                                                dieses
-                                                                                Jahr
-                                                                                liegt
-                                                                                keine
-                                                                                aktive
-                                                                                Preisliste
-                                                                                vor.
-                                                                            </p>
-                                                                        ) : null}
-                                                                    </FormField>
+                                                                                position.original_price_list_id !==
+                                                                                    null
+                                                                            ) ? (
+                                                                                <p
+                                                                                    className="text-destructive mt-1 text-xs"
+                                                                                    data-test={`position-price-year-missing-${index}`}
+                                                                                >
+                                                                                    Für
+                                                                                    dieses
+                                                                                    Jahr
+                                                                                    liegt
+                                                                                    keine
+                                                                                    aktive
+                                                                                    Preisliste
+                                                                                    vor.
+                                                                                </p>
+                                                                            ) : null}
+                                                                        </FormField>
                                                                     ) : null}
                                                                 </>
                                                             ) : null}
