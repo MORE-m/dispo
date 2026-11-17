@@ -1233,8 +1233,7 @@ export default function DispoOrderShow({
         );
 
     const communicationEntries = order.communication ?? [];
-    const showCommunication =
-        communicationEntries.length > 0 || canAddComment;
+    const showCommunication = communicationEntries.length > 0 || canAddComment;
 
     const approvalActionProps = {
         orderId: order.id,
@@ -1245,8 +1244,7 @@ export default function DispoOrderShow({
         isCreator,
         status: order.status,
         requiresExceptionAcknowledgement,
-        customerConfirmationMode:
-            current?.customer_confirmation_mode ?? null,
+        customerConfirmationMode: current?.customer_confirmation_mode ?? null,
         customerConfirmationUpload:
             current?.customer_confirmation_upload ?? null,
     } as const;
@@ -1262,735 +1260,600 @@ export default function DispoOrderShow({
                         : 'max-w-5xl',
                 )}
                 data-test="dispo-order-show-layout"
-                data-layout={showCommunication ? 'with-communication' : 'single'}
+                data-layout={
+                    showCommunication ? 'with-communication' : 'single'
+                }
             >
                 <div
                     className="flex min-w-0 flex-col gap-6"
                     data-test="dispo-order-main-column"
                 >
-                <PageHeader
-                    title={order.number}
-                    description={pageDescription}
-                    actions={
-                        <DispoOrderStatusBadge
-                            status={order.status}
-                            label={order.status_label}
-                        />
-                    }
-                />
-                {flash.success ? (
-                    <SuccessState message={flash.success} />
-                ) : null}
-                {rulesIntegrityError ? (
-                    <p
-                        className="text-destructive text-sm"
-                        data-test="dispo-order-rules-integrity"
-                        role="alert"
-                    >
-                        {rulesIntegrityError}
-                    </p>
-                ) : null}
-
-                <DispoOrderApprovalActions
-                    {...approvalActionProps}
-                    mode="decision"
-                />
-
-                {order.positions.some(
-                    (position) =>
-                        isOaTkpDispoShowPosition(position) &&
-                        position.operational_flight_valid !== true,
-                ) &&
-                (canTransitionOperationalStatus ||
-                    order.status === 'disposed') ? (
-                    <p
-                        className="text-sm text-amber-900"
-                        data-test="dispo-order-oa-operational-flight-blocker-hint"
-                    >
-                        Vor „Disponiert“ und vor dem Abschluss muss für jede
-                        Online-Audio-TKP-Position ein verbindlicher
-                        Kampagnenzeitraum (operativ) festgelegt sein.
-                    </p>
-                ) : null}
-
-                <DispoOrderOperationalStatusActions
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    status={order.status}
-                    canTransition={canTransitionOperationalStatus}
-                    targets={operationalStatusTargets}
-                />
-
-                <DispoOrderCompletionSection
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    status={order.status}
-                    canComplete={canComplete}
-                    canForceComplete={canForceComplete}
-                    readiness={completionReadiness}
-                    summary={completionSummary}
-                />
-
-                <DispoOrderCompletedReopenSection
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    canReopenCompleted={canReopenCompleted}
-                />
-
-                <DispoOrderCancellationSection
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    status={order.status}
-                    canCancel={canCancel}
-                    summary={cancellationSummary}
-                />
-
-                <DispoOrderSalesInquiryActions
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    canAsk={canAskSalesInquiry}
-                    canAnswer={canAnswerSalesInquiry}
-                    openInquiry={openSalesInquiry}
-                />
-
-                <DispoOrderSpotDistributionExport
-                    exportConfig={spotDistributionExport}
-                />
-
-                {canRevise ? (
-                    <DispoOrderReviseAction orderId={order.id} />
-                ) : null}
-
-                {order.revision || order.revises ? (
-                    <Card
-                        className="border-border/70 rounded-xl shadow-xs"
-                        data-test="dispo-order-revision-links"
-                    >
-                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                            <CardTitle className="text-sm font-semibold">
-                                Versionen
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 px-5 py-4 text-sm">
-                            {order.revises ? (
-                                <p data-test="dispo-order-revises-link">
-                                    Nachbesserung von{' '}
-                                    <Link
-                                        href={`/dispoauftraege/${order.revises.id}`}
-                                        className="font-medium underline-offset-4 hover:underline"
-                                    >
-                                        {order.revises.number}
-                                    </Link>{' '}
-                                    ({order.revises.status_label})
-                                </p>
-                            ) : null}
-                            {order.revision ? (
-                                <p data-test="dispo-order-revision-link">
-                                    Korrigierte Version:{' '}
-                                    <Link
-                                        href={`/dispoauftraege/${order.revision.id}`}
-                                        className="font-medium underline-offset-4 hover:underline"
-                                    >
-                                        {order.revision.number}
-                                    </Link>{' '}
-                                    ({order.revision.status_label})
-                                </p>
-                            ) : null}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                {order.status === 'awaiting_sales_approval' && current ? (
-                    <Card
-                        className="border-border/70 rounded-xl shadow-xs"
-                        data-test="dispo-order-approval-panel"
-                    >
-                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                            <CardTitle className="text-sm font-semibold">
-                                Freigabeanforderung
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 px-5 py-4 text-sm">
-                            <p>
-                                <span className="font-medium">
-                                    {current.kind_label}
-                                </span>
-                                {' · '}
-                                Status {current.status_label}
-                            </p>
-                            <p className="text-muted-foreground">
-                                Eingereicht von {current.submitted_by_name} am{' '}
-                                {formatDateTime(current.submitted_at)}
-                            </p>
-                            <p className="text-muted-foreground">
-                                Vier-Augen-Prinzip: Der Ersteller darf nicht
-                                selbst entscheiden.
-                            </p>
-                            <SpecialApprovalReasonsList
-                                reasons={current.special_approval_reasons}
+                    <PageHeader
+                        title={order.number}
+                        description={pageDescription}
+                        actions={
+                            <DispoOrderStatusBadge
+                                status={order.status}
+                                label={order.status_label}
                             />
-                        </CardContent>
-                    </Card>
-                ) : null}
+                        }
+                    />
+                    {flash.success ? (
+                        <SuccessState message={flash.success} />
+                    ) : null}
+                    {rulesIntegrityError ? (
+                        <p
+                            className="text-destructive text-sm"
+                            data-test="dispo-order-rules-integrity"
+                            role="alert"
+                        >
+                            {rulesIntegrityError}
+                        </p>
+                    ) : null}
 
-                {order.status === 'approval_rejected' &&
-                current?.rejection_reason ? (
-                    <Card
-                        className="border-border/70 rounded-xl shadow-xs"
-                        data-test="dispo-order-rejection-panel"
-                    >
-                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                            <CardTitle className="text-sm font-semibold">
-                                Ablehnung
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-5 py-4 text-sm">
-                            <p data-test="dispo-order-rejection-reason">
-                                {current.rejection_reason}
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : null}
+                    <DispoOrderApprovalActions
+                        {...approvalActionProps}
+                        mode="decision"
+                    />
 
-                <Card className="border-border/70 rounded-xl shadow-xs">
-                    <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                        <CardTitle className="text-sm font-semibold">
-                            Kopfdaten
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 px-5 py-4 sm:grid-cols-2">
-                        <Detail label="Kunde" value={order.customer_name} />
-                        <Detail label="Agentur" value={order.agency_name} />
-                        {order.invoice_recipient != null &&
-                        order.invoice_recipient !== '' ? (
-                            <Detail
-                                label="Rechnungsempfänger"
-                                value={
-                                    order.invoice_recipient === 'agency'
-                                        ? 'Agentur'
-                                        : order.invoice_recipient === 'customer'
-                                          ? 'Kunde'
-                                          : order.invoice_recipient
-                                }
-                            />
-                        ) : null}
-                        {order.customer_meridian_number != null ||
-                        order.customer_name ? (
-                            <div data-test="dispo-customer-meridian">
-                                <Detail
-                                    label="Meridian (Kunde)"
-                                    value={
-                                        order.customer_meridian_number &&
-                                        order.customer_meridian_number !== ''
-                                            ? order.customer_meridian_number
-                                            : 'Meridian-Nummer folgt'
-                                    }
-                                />
-                            </div>
-                        ) : null}
-                        {order.agency_meridian_number != null ||
-                        order.agency_name ? (
-                            <div data-test="dispo-agency-meridian">
-                                <Detail
-                                    label="Meridian (Agentur)"
-                                    value={
-                                        order.agency_meridian_number &&
-                                        order.agency_meridian_number !== ''
-                                            ? order.agency_meridian_number
-                                            : 'Meridian-Nummer folgt'
-                                    }
-                                />
-                            </div>
-                        ) : null}
-                        <Detail label="Kampagne" value={order.campaign} />
-                        <Detail
-                            label="Produkt / Titel"
-                            value={order.product_title}
-                        />
-                        <div data-test="dispo-order-source-calculation-isolation-hint">
-                            <Detail
-                                label="Quellkalkulation"
-                                value={
-                                    canViewCalculation ? (
+                    {order.positions.some(
+                        (position) =>
+                            isOaTkpDispoShowPosition(position) &&
+                            position.operational_flight_valid !== true,
+                    ) &&
+                    (canTransitionOperationalStatus ||
+                        order.status === 'disposed') ? (
+                        <p
+                            className="text-sm text-amber-900"
+                            data-test="dispo-order-oa-operational-flight-blocker-hint"
+                        >
+                            Vor „Disponiert“ und vor dem Abschluss muss für jede
+                            Online-Audio-TKP-Position ein verbindlicher
+                            Kampagnenzeitraum (operativ) festgelegt sein.
+                        </p>
+                    ) : null}
+
+                    <DispoOrderOperationalStatusActions
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        status={order.status}
+                        canTransition={canTransitionOperationalStatus}
+                        targets={operationalStatusTargets}
+                    />
+
+                    <DispoOrderCompletionSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        status={order.status}
+                        canComplete={canComplete}
+                        canForceComplete={canForceComplete}
+                        readiness={completionReadiness}
+                        summary={completionSummary}
+                    />
+
+                    <DispoOrderCompletedReopenSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        canReopenCompleted={canReopenCompleted}
+                    />
+
+                    <DispoOrderCancellationSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        status={order.status}
+                        canCancel={canCancel}
+                        summary={cancellationSummary}
+                    />
+
+                    <DispoOrderSalesInquiryActions
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        canAsk={canAskSalesInquiry}
+                        canAnswer={canAnswerSalesInquiry}
+                        openInquiry={openSalesInquiry}
+                    />
+
+                    <DispoOrderSpotDistributionExport
+                        exportConfig={spotDistributionExport}
+                    />
+
+                    {canRevise ? (
+                        <DispoOrderReviseAction orderId={order.id} />
+                    ) : null}
+
+                    {order.revision || order.revises ? (
+                        <Card
+                            className="border-border/70 rounded-xl shadow-xs"
+                            data-test="dispo-order-revision-links"
+                        >
+                            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                                <CardTitle className="text-sm font-semibold">
+                                    Versionen
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 px-5 py-4 text-sm">
+                                {order.revises ? (
+                                    <p data-test="dispo-order-revises-link">
+                                        Nachbesserung von{' '}
                                         <Link
-                                            href={`/kalkulationen/${order.calculation_id}`}
-                                            className="text-primary underline-offset-4 hover:underline"
-                                            data-test="dispo-order-source-calculation-link"
+                                            href={`/dispoauftraege/${order.revises.id}`}
+                                            className="font-medium underline-offset-4 hover:underline"
                                         >
-                                            {order.source_calculation_number}
-                                        </Link>
-                                    ) : (
-                                        order.source_calculation_number
-                                    )
-                                }
-                            />
-                            <p className="text-muted-foreground mt-1 text-xs">
-                                Dieser Dispoauftrag enthält den
-                                Kalkulationsstand bei seiner Erstellung. Spätere
-                                Änderungen an der Kalkulation werden nicht
-                                übernommen.
-                            </p>
-                        </div>
-                        <Detail
-                            label="Mediaberater"
-                            value={order.advisor_name}
-                        />
-                        <Detail label="Ersteller" value={order.creator_name} />
-                        <Detail
-                            label="Erstellt am"
-                            value={formatDateTime(order.created_at)}
-                        />
-                        <Detail
-                            label="Freigabeart"
-                            value={order.approval_kind_label}
-                        />
-                        <div data-test="dispo-order-campaign-period">
-                            <Detail
-                                label={campaignPeriodLabel}
-                                value={campaignPeriodDisplay}
-                                helpText={campaignPeriodHelp}
-                            />
-                            <p className="text-muted-foreground mt-1 text-xs">
-                                Aus Kalkulation übernommen
-                            </p>
-                        </div>
-                        {derivedPeriod && derivedSummary ? (
-                            <div
-                                className="space-y-2 sm:col-span-2"
-                                data-test="dispo-order-derived-campaign-period"
-                            >
-                                <Detail
-                                    label="Abgeleiteter Kampagnenzeitraum (Dispo)"
-                                    value={
-                                        derivedSummary.rangeText ??
-                                        (derivedPeriod.status === 'open' ||
-                                        derivedPeriod.status === 'legacy'
-                                            ? '–'
-                                            : '–')
-                                    }
-                                    helpText="Automatisch aus den eingefrorenen Positionen dieses Auftrags berechnet. Read-only."
-                                />
-                                <p
-                                    className="text-sm"
-                                    data-test="dispo-order-derived-campaign-period-status"
-                                >
-                                    Status: {derivedSummary.statusLabel}
+                                            {order.revises.number}
+                                        </Link>{' '}
+                                        ({order.revises.status_label})
+                                    </p>
+                                ) : null}
+                                {order.revision ? (
+                                    <p data-test="dispo-order-revision-link">
+                                        Korrigierte Version:{' '}
+                                        <Link
+                                            href={`/dispoauftraege/${order.revision.id}`}
+                                            className="font-medium underline-offset-4 hover:underline"
+                                        >
+                                            {order.revision.number}
+                                        </Link>{' '}
+                                        ({order.revision.status_label})
+                                    </p>
+                                ) : null}
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    {order.status === 'awaiting_sales_approval' && current ? (
+                        <Card
+                            className="border-border/70 rounded-xl shadow-xs"
+                            data-test="dispo-order-approval-panel"
+                        >
+                            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                                <CardTitle className="text-sm font-semibold">
+                                    Freigabeanforderung
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 px-5 py-4 text-sm">
+                                <p>
+                                    <span className="font-medium">
+                                        {current.kind_label}
+                                    </span>
+                                    {' · '}
+                                    Status {current.status_label}
                                 </p>
-                                {derivedSummary.explanation ? (
-                                    <p
-                                        className="text-muted-foreground text-xs"
-                                        data-test="dispo-order-derived-campaign-period-explanation"
-                                    >
-                                        {derivedSummary.explanation}
-                                    </p>
-                                ) : null}
-                                {derivedPeriod.status === 'partial' &&
-                                derivedPeriod.contributing_count != null &&
-                                derivedPeriod.unresolved_count != null ? (
-                                    <p
-                                        className="text-muted-foreground text-xs"
-                                        data-test="dispo-order-derived-campaign-period-counts"
-                                    >
-                                        Beitragend:{' '}
-                                        {derivedPeriod.contributing_count} ·
-                                        Ohne konkreten Zeitraum:{' '}
-                                        {derivedPeriod.unresolved_count}
-                                    </p>
-                                ) : null}
-                                {derivedSummary.showUnresolved &&
-                                derivedPeriod.unresolved_positions.length >
-                                    0 ? (
-                                    <ul
-                                        className="text-muted-foreground list-inside list-disc text-xs"
-                                        data-test="dispo-order-derived-campaign-period-unresolved"
-                                    >
-                                        {derivedPeriod.unresolved_positions.map(
-                                            (item) => (
-                                                <li
-                                                    key={
-                                                        item.dispo_order_position_id
-                                                    }
-                                                >
-                                                    {item.label}
-                                                    {item.unresolved_reason_label
-                                                        ? ` – ${item.unresolved_reason_label}`
-                                                        : ''}
-                                                </li>
-                                            ),
-                                        )}
-                                    </ul>
-                                ) : null}
-                                {derivedPeriod.conflict_with_calculation ? (
-                                    <p
-                                        className="text-xs text-amber-800 dark:text-amber-200"
-                                        data-test="dispo-order-derived-campaign-period-conflict"
-                                    >
-                                        Hinweis: Der Zeitraum aus der
-                                        Kalkulation weicht vom abgeleiteten
-                                        Dispo-Zeitraum ab. Beide Werte bleiben
-                                        getrennt sichtbar; die
-                                        Auftragserstellung wird dadurch nicht
-                                        blockiert.
-                                    </p>
-                                ) : null}
-                                {!derivedPeriod.conflict_with_calculation &&
-                                derivedPeriod.calculation_period_complete &&
-                                !derivedPeriod.derived_period_complete ? (
-                                    <p
-                                        className="text-muted-foreground text-xs"
-                                        data-test="dispo-order-derived-campaign-period-only-calc"
-                                    >
-                                        Es liegt nur ein Kalkulationszeitraum
-                                        vor; aus den Positionen konnte kein
-                                        vollständiger Dispo-Zeitraum abgeleitet
-                                        werden.
-                                    </p>
-                                ) : null}
-                                {!derivedPeriod.conflict_with_calculation &&
-                                !derivedPeriod.calculation_period_complete &&
-                                derivedPeriod.derived_period_complete ? (
-                                    <p
-                                        className="text-muted-foreground text-xs"
-                                        data-test="dispo-order-derived-campaign-period-only-derived"
-                                    >
-                                        Es liegt nur ein abgeleiteter
-                                        Dispo-Zeitraum vor; in der Kalkulation
-                                        war kein vollständiger Kampagnenzeitraum
-                                        erfasst.
-                                    </p>
-                                ) : null}
+                                <p className="text-muted-foreground">
+                                    Eingereicht von {current.submitted_by_name}{' '}
+                                    am {formatDateTime(current.submitted_at)}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    Vier-Augen-Prinzip: Der Ersteller darf nicht
+                                    selbst entscheiden.
+                                </p>
+                                <SpecialApprovalReasonsList
+                                    reasons={current.special_approval_reasons}
+                                />
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    {order.status === 'approval_rejected' &&
+                    current?.rejection_reason ? (
+                        <Card
+                            className="border-border/70 rounded-xl shadow-xs"
+                            data-test="dispo-order-rejection-panel"
+                        >
+                            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                                <CardTitle className="text-sm font-semibold">
+                                    Ablehnung
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-5 py-4 text-sm">
+                                <p data-test="dispo-order-rejection-reason">
+                                    {current.rejection_reason}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    <Card className="border-border/70 rounded-xl shadow-xs">
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Kopfdaten
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+                            <Detail label="Kunde" value={order.customer_name} />
+                            <Detail label="Agentur" value={order.agency_name} />
+                            {order.invoice_recipient != null &&
+                            order.invoice_recipient !== '' ? (
+                                <Detail
+                                    label="Rechnungsempfänger"
+                                    value={
+                                        order.invoice_recipient === 'agency'
+                                            ? 'Agentur'
+                                            : order.invoice_recipient ===
+                                                'customer'
+                                              ? 'Kunde'
+                                              : order.invoice_recipient
+                                    }
+                                />
+                            ) : null}
+                            {order.customer_meridian_number != null ||
+                            order.customer_name ? (
+                                <div data-test="dispo-customer-meridian">
+                                    <Detail
+                                        label="Meridian (Kunde)"
+                                        value={
+                                            order.customer_meridian_number &&
+                                            order.customer_meridian_number !==
+                                                ''
+                                                ? order.customer_meridian_number
+                                                : 'Meridian-Nummer folgt'
+                                        }
+                                    />
+                                </div>
+                            ) : null}
+                            {order.agency_meridian_number != null ||
+                            order.agency_name ? (
+                                <div data-test="dispo-agency-meridian">
+                                    <Detail
+                                        label="Meridian (Agentur)"
+                                        value={
+                                            order.agency_meridian_number &&
+                                            order.agency_meridian_number !== ''
+                                                ? order.agency_meridian_number
+                                                : 'Meridian-Nummer folgt'
+                                        }
+                                    />
+                                </div>
+                            ) : null}
+                            <Detail label="Kampagne" value={order.campaign} />
+                            <Detail
+                                label="Produkt / Titel"
+                                value={order.product_title}
+                            />
+                            <div data-test="dispo-order-source-calculation-isolation-hint">
+                                <Detail
+                                    label="Quellkalkulation"
+                                    value={
+                                        canViewCalculation ? (
+                                            <Link
+                                                href={`/kalkulationen/${order.calculation_id}`}
+                                                className="text-primary underline-offset-4 hover:underline"
+                                                data-test="dispo-order-source-calculation-link"
+                                            >
+                                                {
+                                                    order.source_calculation_number
+                                                }
+                                            </Link>
+                                        ) : (
+                                            order.source_calculation_number
+                                        )
+                                    }
+                                />
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    Dieser Dispoauftrag enthält den
+                                    Kalkulationsstand bei seiner Erstellung.
+                                    Spätere Änderungen an der Kalkulation werden
+                                    nicht übernommen.
+                                </p>
                             </div>
-                        ) : null}
-                        {showHeaderCalcOrigin ? (
-                            <div
-                                className="space-y-3 border-t pt-3 sm:col-span-2"
-                                data-test="dispo-order-calc-origin-custom-fields"
-                            >
-                                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                            <Detail
+                                label="Mediaberater"
+                                value={order.advisor_name}
+                            />
+                            <Detail
+                                label="Ersteller"
+                                value={order.creator_name}
+                            />
+                            <Detail
+                                label="Erstellt am"
+                                value={formatDateTime(order.created_at)}
+                            />
+                            <Detail
+                                label="Freigabeart"
+                                value={order.approval_kind_label}
+                            />
+                            <div data-test="dispo-order-campaign-period">
+                                <Detail
+                                    label={campaignPeriodLabel}
+                                    value={campaignPeriodDisplay}
+                                    helpText={campaignPeriodHelp}
+                                />
+                                <p className="text-muted-foreground mt-1 text-xs">
                                     Aus Kalkulation übernommen
                                 </p>
-                                {visibleCalcOriginHeaderTextFields.length >
-                                0 ? (
-                                    <SchemaTextFields
-                                        fields={
-                                            visibleCalcOriginHeaderTextFields
-                                        }
-                                        values={Object.fromEntries(
-                                            visibleCalcOriginHeaderTextFields.map(
-                                                (field) => [
-                                                    field.key,
-                                                    textReadOnlyCapturedDisplay(
-                                                        headerValues[field.key],
-                                                        headerCaptured[
-                                                            field.key
-                                                        ] === true,
-                                                    ),
-                                                ],
-                                            ),
-                                        )}
-                                        readOnly
-                                        idPrefix="dispo-calc-origin"
-                                        onChange={() => undefined}
-                                    />
-                                ) : null}
-                                {visibleCalcOriginHeaderChoiceFields.length >
-                                0 ? (
-                                    <SchemaChoiceReadonlyFields
-                                        fields={
-                                            visibleCalcOriginHeaderChoiceFields
-                                        }
-                                        values={headerValues}
-                                        captured={headerCaptured}
-                                        idPrefix="dispo-calc-origin-choice"
-                                    />
-                                ) : null}
-                                {visibleCalcOriginHeaderFileFields.length >
-                                0 ? (
-                                    <SchemaFileFields
-                                        fields={
-                                            visibleCalcOriginHeaderFileFields
-                                        }
-                                        orderId={order.id}
-                                        lockVersion={order.lock_version}
-                                        canUpload={false}
-                                    />
-                                ) : null}
                             </div>
-                        ) : null}
-                    </CardContent>
-                </Card>
-
-                {canSyncCalculationDynamicFields ? (
-                    <div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            data-test="dispo-order-sync-calc-dynamic-fields"
-                            disabled={
-                                syncingCalcFields || dynamicControlsLocked
-                            }
-                            onClick={syncCalculationDynamicFields}
-                        >
-                            {syncingCalcFields
-                                ? 'Wird übernommen…'
-                                : 'Dynamische Zeitraumfelder aus Kalkulation übernehmen'}
-                        </Button>
-                    </div>
-                ) : null}
-
-                <Card
-                    className="border-border/70 rounded-xl shadow-xs"
-                    data-test="dispo-order-notes-card"
-                >
-                    <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                        <CardTitle className="text-sm font-semibold">
-                            Rechnungs- und Dispohinweise
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4 px-5 py-4">
-                        {canUpdate ? (
-                            <>
-                                {billingVisible ? (
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="dispo-order-billing-special-features">
-                                            {billingRequired
-                                                ? `${billingLabel} *`
-                                                : billingLabel}
-                                        </Label>
-                                        {billingHelp ? (
-                                            <p
-                                                id="dispo-order-billing-special-features-help"
-                                                className="text-muted-foreground text-xs"
-                                            >
-                                                {billingHelp}
-                                            </p>
-                                        ) : null}
-                                        <textarea
-                                            id="dispo-order-billing-special-features"
-                                            className={formTextareaClass}
-                                            value={billingSpecialFeatures}
-                                            data-test="dispo-order-billing-special-features"
-                                            disabled={
-                                                savingNotes ||
-                                                dynamicControlsLocked
-                                            }
-                                            aria-describedby={
-                                                billingHelp
-                                                    ? 'dispo-order-billing-special-features-help'
-                                                    : undefined
-                                            }
-                                            onChange={(event) =>
-                                                setBillingSpecialFeatures(
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                        {fieldErrors[
-                                            'dynamic_field_values.billing_special_features'
-                                        ] ? (
-                                            <p className="text-destructive text-xs">
-                                                {
-                                                    fieldErrors[
-                                                        'dynamic_field_values.billing_special_features'
-                                                    ]
-                                                }
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                                {dispositionVisible ? (
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="dispo-order-disposition-notes">
-                                            {dispositionRequired
-                                                ? `${dispositionLabel} *`
-                                                : dispositionLabel}
-                                        </Label>
-                                        {dispositionHelp ? (
-                                            <p
-                                                id="dispo-order-disposition-notes-help"
-                                                className="text-muted-foreground text-xs"
-                                            >
-                                                {dispositionHelp}
-                                            </p>
-                                        ) : null}
-                                        <textarea
-                                            id="dispo-order-disposition-notes"
-                                            className={formTextareaClass}
-                                            value={dispositionNotes}
-                                            data-test="dispo-order-disposition-notes"
-                                            disabled={
-                                                savingNotes ||
-                                                dynamicControlsLocked
-                                            }
-                                            aria-describedby={
-                                                dispositionHelp
-                                                    ? 'dispo-order-disposition-notes-help'
-                                                    : undefined
-                                            }
-                                            onChange={(event) =>
-                                                setDispositionNotes(
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                        {fieldErrors[
-                                            'dynamic_field_values.disposition_notes'
-                                        ] ? (
-                                            <p className="text-destructive text-xs">
-                                                {
-                                                    fieldErrors[
-                                                        'dynamic_field_values.disposition_notes'
-                                                    ]
-                                                }
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                                {fieldErrors.dynamic_field_values ||
-                                fieldErrors.lock_version ? (
-                                    <p className="text-destructive text-xs">
-                                        {fieldErrors.dynamic_field_values ??
-                                            fieldErrors.lock_version}
-                                    </p>
-                                ) : null}
-                                <Button
-                                    type="button"
-                                    disabled={
-                                        savingNotes || dynamicControlsLocked
-                                    }
-                                    data-test="dispo-order-save-system-notes"
-                                    onClick={saveSystemNotes}
+                            {derivedPeriod && derivedSummary ? (
+                                <div
+                                    className="space-y-2 sm:col-span-2"
+                                    data-test="dispo-order-derived-campaign-period"
                                 >
-                                    {savingNotes
-                                        ? 'Wird gespeichert…'
-                                        : 'Speichern'}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                {headerRuntime.isFieldVisible(
-                                    'billing_special_features',
-                                ) ? (
-                                    <div data-test="dispo-order-billing-special-features">
-                                        <Detail
-                                            label={billingLabel}
-                                            value={displayOptionalText(
-                                                headerValues.billing_special_features,
+                                    <Detail
+                                        label="Abgeleiteter Kampagnenzeitraum (Dispo)"
+                                        value={
+                                            derivedSummary.rangeText ??
+                                            (derivedPeriod.status === 'open' ||
+                                            derivedPeriod.status === 'legacy'
+                                                ? '–'
+                                                : '–')
+                                        }
+                                        helpText="Automatisch aus den eingefrorenen Positionen dieses Auftrags berechnet. Read-only."
+                                    />
+                                    <p
+                                        className="text-sm"
+                                        data-test="dispo-order-derived-campaign-period-status"
+                                    >
+                                        Status: {derivedSummary.statusLabel}
+                                    </p>
+                                    {derivedSummary.explanation ? (
+                                        <p
+                                            className="text-muted-foreground text-xs"
+                                            data-test="dispo-order-derived-campaign-period-explanation"
+                                        >
+                                            {derivedSummary.explanation}
+                                        </p>
+                                    ) : null}
+                                    {derivedPeriod.status === 'partial' &&
+                                    derivedPeriod.contributing_count != null &&
+                                    derivedPeriod.unresolved_count != null ? (
+                                        <p
+                                            className="text-muted-foreground text-xs"
+                                            data-test="dispo-order-derived-campaign-period-counts"
+                                        >
+                                            Beitragend:{' '}
+                                            {derivedPeriod.contributing_count} ·
+                                            Ohne konkreten Zeitraum:{' '}
+                                            {derivedPeriod.unresolved_count}
+                                        </p>
+                                    ) : null}
+                                    {derivedSummary.showUnresolved &&
+                                    derivedPeriod.unresolved_positions.length >
+                                        0 ? (
+                                        <ul
+                                            className="text-muted-foreground list-inside list-disc text-xs"
+                                            data-test="dispo-order-derived-campaign-period-unresolved"
+                                        >
+                                            {derivedPeriod.unresolved_positions.map(
+                                                (item) => (
+                                                    <li
+                                                        key={
+                                                            item.dispo_order_position_id
+                                                        }
+                                                    >
+                                                        {item.label}
+                                                        {item.unresolved_reason_label
+                                                            ? ` – ${item.unresolved_reason_label}`
+                                                            : ''}
+                                                    </li>
+                                                ),
                                             )}
-                                            helpText={billingHelp}
-                                        />
-                                    </div>
-                                ) : null}
-                                {headerRuntime.isFieldVisible(
-                                    'disposition_notes',
-                                ) ? (
-                                    <div data-test="dispo-order-disposition-notes">
-                                        <Detail
-                                            label={dispositionLabel}
-                                            value={displayOptionalText(
-                                                headerValues.disposition_notes,
+                                        </ul>
+                                    ) : null}
+                                    {derivedPeriod.conflict_with_calculation ? (
+                                        <p
+                                            className="text-xs text-amber-800 dark:text-amber-200"
+                                            data-test="dispo-order-derived-campaign-period-conflict"
+                                        >
+                                            Hinweis: Der Zeitraum aus der
+                                            Kalkulation weicht vom abgeleiteten
+                                            Dispo-Zeitraum ab. Beide Werte
+                                            bleiben getrennt sichtbar; die
+                                            Auftragserstellung wird dadurch
+                                            nicht blockiert.
+                                        </p>
+                                    ) : null}
+                                    {!derivedPeriod.conflict_with_calculation &&
+                                    derivedPeriod.calculation_period_complete &&
+                                    !derivedPeriod.derived_period_complete ? (
+                                        <p
+                                            className="text-muted-foreground text-xs"
+                                            data-test="dispo-order-derived-campaign-period-only-calc"
+                                        >
+                                            Es liegt nur ein
+                                            Kalkulationszeitraum vor; aus den
+                                            Positionen konnte kein vollständiger
+                                            Dispo-Zeitraum abgeleitet werden.
+                                        </p>
+                                    ) : null}
+                                    {!derivedPeriod.conflict_with_calculation &&
+                                    !derivedPeriod.calculation_period_complete &&
+                                    derivedPeriod.derived_period_complete ? (
+                                        <p
+                                            className="text-muted-foreground text-xs"
+                                            data-test="dispo-order-derived-campaign-period-only-derived"
+                                        >
+                                            Es liegt nur ein abgeleiteter
+                                            Dispo-Zeitraum vor; in der
+                                            Kalkulation war kein vollständiger
+                                            Kampagnenzeitraum erfasst.
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            {showHeaderCalcOrigin ? (
+                                <div
+                                    className="space-y-3 border-t pt-3 sm:col-span-2"
+                                    data-test="dispo-order-calc-origin-custom-fields"
+                                >
+                                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                        Aus Kalkulation übernommen
+                                    </p>
+                                    {visibleCalcOriginHeaderTextFields.length >
+                                    0 ? (
+                                        <SchemaTextFields
+                                            fields={
+                                                visibleCalcOriginHeaderTextFields
+                                            }
+                                            values={Object.fromEntries(
+                                                visibleCalcOriginHeaderTextFields.map(
+                                                    (field) => [
+                                                        field.key,
+                                                        textReadOnlyCapturedDisplay(
+                                                            headerValues[
+                                                                field.key
+                                                            ],
+                                                            headerCaptured[
+                                                                field.key
+                                                            ] === true,
+                                                        ),
+                                                    ],
+                                                ),
                                             )}
-                                            helpText={dispositionHelp}
+                                            readOnly
+                                            idPrefix="dispo-calc-origin"
+                                            onChange={() => undefined}
                                         />
-                                    </div>
-                                ) : null}
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                                    ) : null}
+                                    {visibleCalcOriginHeaderChoiceFields.length >
+                                    0 ? (
+                                        <SchemaChoiceReadonlyFields
+                                            fields={
+                                                visibleCalcOriginHeaderChoiceFields
+                                            }
+                                            values={headerValues}
+                                            captured={headerCaptured}
+                                            idPrefix="dispo-calc-origin-choice"
+                                        />
+                                    ) : null}
+                                    {visibleCalcOriginHeaderFileFields.length >
+                                    0 ? (
+                                        <SchemaFileFields
+                                            fields={
+                                                visibleCalcOriginHeaderFileFields
+                                            }
+                                            orderId={order.id}
+                                            lockVersion={order.lock_version}
+                                            canUpload={false}
+                                        />
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </CardContent>
+                    </Card>
 
-                {showHeaderCustomCard ? (
+                    {canSyncCalculationDynamicFields ? (
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                data-test="dispo-order-sync-calc-dynamic-fields"
+                                disabled={
+                                    syncingCalcFields || dynamicControlsLocked
+                                }
+                                onClick={syncCalculationDynamicFields}
+                            >
+                                {syncingCalcFields
+                                    ? 'Wird übernommen…'
+                                    : 'Dynamische Zeitraumfelder aus Kalkulation übernehmen'}
+                            </Button>
+                        </div>
+                    ) : null}
+
                     <Card
                         className="border-border/70 rounded-xl shadow-xs"
-                        data-test="dispo-order-custom-header-card"
+                        data-test="dispo-order-notes-card"
                     >
                         <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
                             <CardTitle className="text-sm font-semibold">
-                                Weitere Angaben
+                                Rechnungs- und Dispohinweise
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 px-5 py-4">
                             {canUpdate ? (
                                 <>
-                                    {visibleEditableHeaderTextFields.length >
-                                    0 ? (
-                                        <SchemaTextFields
-                                            fields={
-                                                visibleEditableHeaderTextFields
-                                            }
-                                            values={customHeaderValues}
-                                            errors={fieldErrors}
-                                            disabled={
-                                                savingNotes ||
-                                                dynamicControlsLocked
-                                            }
-                                            idPrefix="dispo-custom"
-                                            onChange={(key, value) =>
-                                                setCustomHeaderValues(
-                                                    (current) => ({
-                                                        ...current,
-                                                        [key]: value,
-                                                    }),
-                                                )
-                                            }
-                                        />
-                                    ) : null}
-                                    {visibleEditableHeaderChoiceFields.length >
-                                    0 ? (
-                                        <div data-test="dispo-order-custom-header-choice-fields">
-                                            <SchemaChoiceFields
-                                                fields={
-                                                    visibleEditableHeaderChoiceFields
-                                                }
-                                                values={
-                                                    customHeaderChoiceValues
-                                                }
-                                                errors={fieldErrors}
+                                    {billingVisible ? (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="dispo-order-billing-special-features">
+                                                {billingRequired
+                                                    ? `${billingLabel} *`
+                                                    : billingLabel}
+                                            </Label>
+                                            {billingHelp ? (
+                                                <p
+                                                    id="dispo-order-billing-special-features-help"
+                                                    className="text-muted-foreground text-xs"
+                                                >
+                                                    {billingHelp}
+                                                </p>
+                                            ) : null}
+                                            <textarea
+                                                id="dispo-order-billing-special-features"
+                                                className={formTextareaClass}
+                                                value={billingSpecialFeatures}
+                                                data-test="dispo-order-billing-special-features"
                                                 disabled={
                                                     savingNotes ||
                                                     dynamicControlsLocked
                                                 }
-                                                idPrefix="dispo-custom-choice"
-                                                onChange={(key, value) => {
-                                                    setCustomHeaderChoiceValues(
-                                                        (current) => ({
-                                                            ...current,
-                                                            [key]: value,
-                                                        }),
-                                                    );
-                                                    setCustomHeaderChoiceTouched(
-                                                        (current) => ({
-                                                            ...current,
-                                                            [key]: true,
-                                                        }),
-                                                    );
-                                                    setCustomHeaderChoiceMeta(
-                                                        (current) => ({
-                                                            ...current,
-                                                            [key]: {
-                                                                initPayloadSafe: true,
-                                                                issue: null,
-                                                            },
-                                                        }),
-                                                    );
-                                                }}
+                                                aria-describedby={
+                                                    billingHelp
+                                                        ? 'dispo-order-billing-special-features-help'
+                                                        : undefined
+                                                }
+                                                onChange={(event) =>
+                                                    setBillingSpecialFeatures(
+                                                        event.target.value,
+                                                    )
+                                                }
                                             />
+                                            {fieldErrors[
+                                                'dynamic_field_values.billing_special_features'
+                                            ] ? (
+                                                <p className="text-destructive text-xs">
+                                                    {
+                                                        fieldErrors[
+                                                            'dynamic_field_values.billing_special_features'
+                                                        ]
+                                                    }
+                                                </p>
+                                            ) : null}
                                         </div>
                                     ) : null}
-                                    {visibleEditableHeaderFileFields.length >
-                                    0 ? (
-                                        <SchemaFileFields
-                                            fields={
-                                                visibleEditableHeaderFileFields
-                                            }
-                                            orderId={order.id}
-                                            lockVersion={order.lock_version}
-                                            canUpload={canUploadMaterial}
-                                            disabled={
-                                                savingNotes ||
-                                                dynamicControlsLocked
-                                            }
-                                        />
+                                    {dispositionVisible ? (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="dispo-order-disposition-notes">
+                                                {dispositionRequired
+                                                    ? `${dispositionLabel} *`
+                                                    : dispositionLabel}
+                                            </Label>
+                                            {dispositionHelp ? (
+                                                <p
+                                                    id="dispo-order-disposition-notes-help"
+                                                    className="text-muted-foreground text-xs"
+                                                >
+                                                    {dispositionHelp}
+                                                </p>
+                                            ) : null}
+                                            <textarea
+                                                id="dispo-order-disposition-notes"
+                                                className={formTextareaClass}
+                                                value={dispositionNotes}
+                                                data-test="dispo-order-disposition-notes"
+                                                disabled={
+                                                    savingNotes ||
+                                                    dynamicControlsLocked
+                                                }
+                                                aria-describedby={
+                                                    dispositionHelp
+                                                        ? 'dispo-order-disposition-notes-help'
+                                                        : undefined
+                                                }
+                                                onChange={(event) =>
+                                                    setDispositionNotes(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {fieldErrors[
+                                                'dynamic_field_values.disposition_notes'
+                                            ] ? (
+                                                <p className="text-destructive text-xs">
+                                                    {
+                                                        fieldErrors[
+                                                            'dynamic_field_values.disposition_notes'
+                                                        ]
+                                                    }
+                                                </p>
+                                            ) : null}
+                                        </div>
                                     ) : null}
                                     {fieldErrors.dynamic_field_values ||
                                     fieldErrors.lock_version ? (
@@ -2004,8 +1867,8 @@ export default function DispoOrderShow({
                                         disabled={
                                             savingNotes || dynamicControlsLocked
                                         }
-                                        data-test="dispo-order-save-custom-headers"
-                                        onClick={saveCustomHeaders}
+                                        data-test="dispo-order-save-system-notes"
+                                        onClick={saveSystemNotes}
                                     >
                                         {savingNotes
                                             ? 'Wird gespeichert…'
@@ -2014,524 +1877,661 @@ export default function DispoOrderShow({
                                 </>
                             ) : (
                                 <>
-                                    {visibleEditableHeaderTextFields.length >
-                                    0 ? (
-                                        <SchemaTextFields
-                                            fields={
-                                                visibleEditableHeaderTextFields
-                                            }
-                                            values={Object.fromEntries(
-                                                visibleEditableHeaderTextFields.map(
-                                                    (field) => {
-                                                        const raw =
-                                                            headerValues[
-                                                                field.key
-                                                            ];
-                                                        return [
-                                                            field.key,
-                                                            typeof raw ===
-                                                                'string' ||
-                                                            typeof raw ===
-                                                                'number'
-                                                                ? String(raw)
-                                                                : '',
-                                                        ];
-                                                    },
-                                                ),
-                                            )}
-                                            readOnly
-                                            idPrefix="dispo-custom-ro"
-                                            onChange={() => undefined}
-                                        />
-                                    ) : null}
-                                    {visibleEditableHeaderChoiceFields.length >
-                                    0 ? (
-                                        <div data-test="dispo-order-custom-header-choice-fields-ro">
-                                            <SchemaChoiceReadonlyFields
-                                                fields={
-                                                    visibleEditableHeaderChoiceFields
-                                                }
-                                                values={headerValues}
-                                                captured={nativeChoiceCapturedMap(
-                                                    visibleEditableHeaderChoiceFields,
-                                                    headerCaptured,
+                                    {headerRuntime.isFieldVisible(
+                                        'billing_special_features',
+                                    ) ? (
+                                        <div data-test="dispo-order-billing-special-features">
+                                            <Detail
+                                                label={billingLabel}
+                                                value={displayOptionalText(
+                                                    headerValues.billing_special_features,
                                                 )}
-                                                idPrefix="dispo-custom-choice-ro"
+                                                helpText={billingHelp}
                                             />
                                         </div>
                                     ) : null}
-                                    {visibleEditableHeaderFileFields.length >
-                                    0 ? (
-                                        <SchemaFileFields
-                                            fields={
-                                                visibleEditableHeaderFileFields
-                                            }
-                                            orderId={order.id}
-                                            lockVersion={order.lock_version}
-                                            canUpload={canUploadMaterial}
-                                        />
+                                    {headerRuntime.isFieldVisible(
+                                        'disposition_notes',
+                                    ) ? (
+                                        <div data-test="dispo-order-disposition-notes">
+                                            <Detail
+                                                label={dispositionLabel}
+                                                value={displayOptionalText(
+                                                    headerValues.disposition_notes,
+                                                )}
+                                                helpText={dispositionHelp}
+                                            />
+                                        </div>
                                     ) : null}
                                 </>
                             )}
                         </CardContent>
                     </Card>
-                ) : null}
 
-                <Card className="border-border/70 rounded-xl shadow-xs">
-                    <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                        <CardTitle className="text-sm font-semibold">
-                            Summen
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 px-5 py-4 text-sm">
-                        <SummaryRow
-                            label="Media-Brutto"
-                            value={money(order.media_gross)}
-                        />
-                        <SummaryRow
-                            label="Positionsrabatte"
-                            value={money(order.position_discount_total)}
-                        />
-                        <SummaryRow
-                            label="Auftragsrabatte"
-                            value={money(order.order_discount_total)}
-                        />
-                        {order.ae_enabled ? (
-                            <SummaryRow
-                                label="AE gesamt"
-                                value={money(order.ae_total)}
-                            />
-                        ) : null}
-                        <SummaryRow
-                            label="Netto (N/N)"
-                            value={money(order.nn_invest)}
-                            emphasis
-                            data-test="dispo-order-net-total"
-                        />
-                        {order.requires_special_approval ? (
-                            <div
-                                className="pt-2"
-                                data-test="dispo-order-special-approval-hint"
-                            >
-                                <p className="text-primary text-xs font-medium">
-                                    Sonderfreigabe erforderlich
-                                </p>
-                                <SpecialApprovalReasonsList
-                                    reasons={order.special_approval_reasons}
-                                />
-                            </div>
-                        ) : null}
-                        {order.source_calculation_totals &&
-                        order.source_calculation_totals.nn_invest !==
-                            order.nn_invest ? (
-                            <p
-                                className="text-muted-foreground border-border/60 mt-3 border-t pt-3 text-xs"
-                                data-test="dispo-order-source-calculation-totals"
-                            >
-                                Summe der Quellkalkulation{' '}
-                                {order.source_calculation_number}:{' '}
-                                {money(
-                                    order.source_calculation_totals.nn_invest,
-                                )}{' '}
-                                N/N (nicht Auftragssumme)
-                            </p>
-                        ) : null}
-                    </CardContent>
-                </Card>
-
-                <DispoOrderApprovalHistory entries={order.approval_history} />
-
-                <DispoOrderStatusHistory entries={order.status_history ?? []} />
-
-                <Card className="border-border/70 min-w-0 overflow-x-auto rounded-xl shadow-xs">
-                    <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
-                        <CardTitle className="text-sm font-semibold">
-                            Positionen ({order.positions.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4 px-5 py-4">
-                        {order.positions.map((position, index) => {
-                            const positionValues =
-                                position.dynamic_field_values ?? {};
-                            const positionCaptured =
-                                position.dynamic_field_captured ?? {};
-                            const periodOpen = positionValues.period_open;
-                            const periodOpenCaptured =
-                                positionCaptured.period_open === true;
-                            const flightCaptured =
-                                positionCaptured.position_flight_period ===
-                                true;
-                            const flightDisplay = displayCalcOriginPeriod(
-                                positionValues.position_flight_period,
-                                flightCaptured,
-                            );
-                            const view = visiblePositionFieldViews[
-                                position.id
-                            ] ?? {
-                                editableText: [],
-                                editableChoice: [],
-                                editableFile: [],
-                                calcOriginText: [],
-                                calcOriginChoice: [],
-                                calcOriginFile: [],
-                            };
-                            const showCalcOrigin =
-                                view.calcOriginText.length > 0 ||
-                                view.calcOriginChoice.length > 0 ||
-                                view.calcOriginFile.some(
-                                    (field) => field.current_upload !== null,
-                                );
-                            const showNative =
-                                view.editableText.length > 0 ||
-                                view.editableChoice.length > 0 ||
-                                view.editableFile.some(
-                                    (field) =>
-                                        canUploadMaterial ||
-                                        field.current_upload !== null,
-                                );
-
-                            return (
-                                <section
-                                    key={position.id}
-                                    className="rounded-lg border p-4"
-                                    data-test={`dispo-order-position-${index}`}
-                                >
-                                    <p className="font-medium">
-                                        {position.inventory_name} ·{' '}
-                                        {position.advertising_medium_name}
-                                    </p>
-                                    <p
-                                        className="text-muted-foreground mt-1 text-xs"
-                                        data-test={`dispo-order-position-combination-${index}`}
-                                    >
-                                        Buchungskennzeichen:{' '}
-                                        {position.booking_code?.trim()
-                                            ? position.booking_code
-                                            : '— (Legacy)'}
-                                        {' · '}
-                                        Einplanung durch:{' '}
-                                        {position.planning_responsibility_label?.trim()
-                                            ? position.planning_responsibility_label
-                                            : '— (Legacy)'}
-                                        {position.combination_hint_text?.trim()
-                                            ? ` · Hinweis: ${position.combination_hint_text}`
-                                            : ''}
-                                    </p>
-                                    <p
-                                        className={
-                                            isInconsistentDispoShowPosition(
-                                                position,
-                                            )
-                                                ? 'text-destructive mt-1 text-xs'
-                                                : 'text-muted-foreground mt-1 text-xs'
-                                        }
-                                        data-test={`dispo-order-position-meta-${index}`}
-                                        data-method-classification={
-                                            position.method_classification ??
-                                            undefined
-                                        }
-                                    >
-                                        {formatDispoShowPositionMeta(position)}
-                                    </p>
-                                    {isOaTkpDispoShowPosition(position) ? (
-                                        <DispoOrderOaTkpSnapshotPanel
-                                            position={position}
-                                            index={index}
-                                        />
-                                    ) : null}
-                                    <DispoOrderInvoiceEndMonths
-                                        orderId={order.id}
-                                        positionId={position.id}
-                                        lockVersion={order.lock_version}
-                                        months={
-                                            position.invoice_end_months ?? null
-                                        }
-                                        monthLabels={
-                                            position.invoice_end_month_labels
-                                        }
-                                        periodState={
-                                            position.invoice_end_period_state ??
-                                            'invalid'
-                                        }
-                                        canEdit={canUpdateInvoiceEndMonths}
-                                    />
-                                    {!isOaTkpDispoShowPosition(position) &&
-                                    !isInconsistentDispoShowPosition(
-                                        position,
-                                    ) &&
-                                    position.components &&
-                                    position.components.length > 0 ? (
-                                        <div
-                                            className="text-muted-foreground mt-2 space-y-1 text-xs"
-                                            data-test={`dispo-order-position-components-${index}`}
-                                        >
-                                            {position.component_profile &&
-                                            COMPONENT_PROFILE_UI[
-                                                position.component_profile
-                                            ] ? (
-                                                <p
-                                                    data-test={`dispo-order-position-profile-${index}`}
-                                                >
-                                                    Komponentenprofil:{' '}
-                                                    {
-                                                        COMPONENT_PROFILE_UI[
-                                                            position
-                                                                .component_profile
-                                                        ].label
-                                                    }
-                                                    {' · '}
-                                                    {
-                                                        COMPONENT_PROFILE_UI[
-                                                            position
-                                                                .component_profile
-                                                        ].unit_label
-                                                    }
-                                                    :{' '}
-                                                    {position.total_spot_count}
-                                                    {position.derived_component_airings !=
-                                                    null ? (
-                                                        <>
-                                                            {' '}
-                                                            · abgeleitete
-                                                            Sendungen:{' '}
-                                                            {
-                                                                position.derived_component_airings
-                                                            }
-                                                        </>
-                                                    ) : null}
-                                                </p>
-                                            ) : null}
-                                            <p>
-                                                Spot-Komponenten ·{' '}
-                                                {position.component_calculation_strategy ===
-                                                'individual'
-                                                    ? 'Komponenten einzeln berechnen'
-                                                    : 'Gemeinsame Gesamtlänge'}
-                                            </p>
-                                            <ul className="list-inside list-disc">
-                                                {[...position.components]
-                                                    .sort(
-                                                        (a, b) =>
-                                                            (a.sort ?? 0) -
-                                                            (b.sort ?? 0),
+                    {showHeaderCustomCard ? (
+                        <Card
+                            className="border-border/70 rounded-xl shadow-xs"
+                            data-test="dispo-order-custom-header-card"
+                        >
+                            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                                <CardTitle className="text-sm font-semibold">
+                                    Weitere Angaben
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4 px-5 py-4">
+                                {canUpdate ? (
+                                    <>
+                                        {visibleEditableHeaderTextFields.length >
+                                        0 ? (
+                                            <SchemaTextFields
+                                                fields={
+                                                    visibleEditableHeaderTextFields
+                                                }
+                                                values={customHeaderValues}
+                                                errors={fieldErrors}
+                                                disabled={
+                                                    savingNotes ||
+                                                    dynamicControlsLocked
+                                                }
+                                                idPrefix="dispo-custom"
+                                                onChange={(key, value) =>
+                                                    setCustomHeaderValues(
+                                                        (current) => ({
+                                                            ...current,
+                                                            [key]: value,
+                                                        }),
                                                     )
-                                                    .map((component) => (
-                                                        <li
-                                                            key={`${component.role}-${component.sort ?? 0}`}
-                                                        >
-                                                            {componentDisplayLabel(
-                                                                position,
-                                                                component,
-                                                            )}
-                                                            :{' '}
-                                                            {
-                                                                component.length_seconds
-                                                            }
-                                                            s
-                                                            {position.component_calculation_strategy ===
-                                                                'individual' &&
-                                                            component.media_gross
-                                                                ? ` · ${component.media_gross}`
-                                                                : ''}
-                                                        </li>
-                                                    ))}
-                                            </ul>
-                                        </div>
-                                    ) : null}
-                                    <div
-                                        className="text-muted-foreground mt-2 space-y-1 text-xs"
-                                        data-test={
-                                            isOaTkpDispoShowPosition(position)
-                                                ? `dispo-order-calc-origin-flight-${position.id}`
-                                                : undefined
-                                        }
+                                                }
+                                            />
+                                        ) : null}
+                                        {visibleEditableHeaderChoiceFields.length >
+                                        0 ? (
+                                            <div data-test="dispo-order-custom-header-choice-fields">
+                                                <SchemaChoiceFields
+                                                    fields={
+                                                        visibleEditableHeaderChoiceFields
+                                                    }
+                                                    values={
+                                                        customHeaderChoiceValues
+                                                    }
+                                                    errors={fieldErrors}
+                                                    disabled={
+                                                        savingNotes ||
+                                                        dynamicControlsLocked
+                                                    }
+                                                    idPrefix="dispo-custom-choice"
+                                                    onChange={(key, value) => {
+                                                        setCustomHeaderChoiceValues(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: value,
+                                                            }),
+                                                        );
+                                                        setCustomHeaderChoiceTouched(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: true,
+                                                            }),
+                                                        );
+                                                        setCustomHeaderChoiceMeta(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: {
+                                                                    initPayloadSafe: true,
+                                                                    issue: null,
+                                                                },
+                                                            }),
+                                                        );
+                                                    }}
+                                                />
+                                            </div>
+                                        ) : null}
+                                        {visibleEditableHeaderFileFields.length >
+                                        0 ? (
+                                            <SchemaFileFields
+                                                fields={
+                                                    visibleEditableHeaderFileFields
+                                                }
+                                                orderId={order.id}
+                                                lockVersion={order.lock_version}
+                                                canUpload={canUploadMaterial}
+                                                disabled={
+                                                    savingNotes ||
+                                                    dynamicControlsLocked
+                                                }
+                                            />
+                                        ) : null}
+                                        {fieldErrors.dynamic_field_values ||
+                                        fieldErrors.lock_version ? (
+                                            <p className="text-destructive text-xs">
+                                                {fieldErrors.dynamic_field_values ??
+                                                    fieldErrors.lock_version}
+                                            </p>
+                                        ) : null}
+                                        <Button
+                                            type="button"
+                                            disabled={
+                                                savingNotes ||
+                                                dynamicControlsLocked
+                                            }
+                                            data-test="dispo-order-save-custom-headers"
+                                            onClick={saveCustomHeaders}
+                                        >
+                                            {savingNotes
+                                                ? 'Wird gespeichert…'
+                                                : 'Speichern'}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {visibleEditableHeaderTextFields.length >
+                                        0 ? (
+                                            <SchemaTextFields
+                                                fields={
+                                                    visibleEditableHeaderTextFields
+                                                }
+                                                values={Object.fromEntries(
+                                                    visibleEditableHeaderTextFields.map(
+                                                        (field) => {
+                                                            const raw =
+                                                                headerValues[
+                                                                    field.key
+                                                                ];
+                                                            return [
+                                                                field.key,
+                                                                typeof raw ===
+                                                                    'string' ||
+                                                                typeof raw ===
+                                                                    'number'
+                                                                    ? String(
+                                                                          raw,
+                                                                      )
+                                                                    : '',
+                                                            ];
+                                                        },
+                                                    ),
+                                                )}
+                                                readOnly
+                                                idPrefix="dispo-custom-ro"
+                                                onChange={() => undefined}
+                                            />
+                                        ) : null}
+                                        {visibleEditableHeaderChoiceFields.length >
+                                        0 ? (
+                                            <div data-test="dispo-order-custom-header-choice-fields-ro">
+                                                <SchemaChoiceReadonlyFields
+                                                    fields={
+                                                        visibleEditableHeaderChoiceFields
+                                                    }
+                                                    values={headerValues}
+                                                    captured={nativeChoiceCapturedMap(
+                                                        visibleEditableHeaderChoiceFields,
+                                                        headerCaptured,
+                                                    )}
+                                                    idPrefix="dispo-custom-choice-ro"
+                                                />
+                                            </div>
+                                        ) : null}
+                                        {visibleEditableHeaderFileFields.length >
+                                        0 ? (
+                                            <SchemaFileFields
+                                                fields={
+                                                    visibleEditableHeaderFileFields
+                                                }
+                                                orderId={order.id}
+                                                lockVersion={order.lock_version}
+                                                canUpload={canUploadMaterial}
+                                            />
+                                        ) : null}
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
+                    <Card className="border-border/70 rounded-xl shadow-xs">
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Summen
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 px-5 py-4 text-sm">
+                            <SummaryRow
+                                label="Media-Brutto"
+                                value={money(order.media_gross)}
+                            />
+                            <SummaryRow
+                                label="Positionsrabatte"
+                                value={money(order.position_discount_total)}
+                            />
+                            <SummaryRow
+                                label="Auftragsrabatte"
+                                value={money(order.order_discount_total)}
+                            />
+                            {order.ae_enabled ? (
+                                <SummaryRow
+                                    label="AE gesamt"
+                                    value={money(order.ae_total)}
+                                />
+                            ) : null}
+                            <SummaryRow
+                                label="Netto (N/N)"
+                                value={money(order.nn_invest)}
+                                emphasis
+                                data-test="dispo-order-net-total"
+                            />
+                            {order.requires_special_approval ? (
+                                <div
+                                    className="pt-2"
+                                    data-test="dispo-order-special-approval-hint"
+                                >
+                                    <p className="text-primary text-xs font-medium">
+                                        Sonderfreigabe erforderlich
+                                    </p>
+                                    <SpecialApprovalReasonsList
+                                        reasons={order.special_approval_reasons}
+                                    />
+                                </div>
+                            ) : null}
+                            {order.source_calculation_totals &&
+                            order.source_calculation_totals.nn_invest !==
+                                order.nn_invest ? (
+                                <p
+                                    className="text-muted-foreground border-border/60 mt-3 border-t pt-3 text-xs"
+                                    data-test="dispo-order-source-calculation-totals"
+                                >
+                                    Summe der Quellkalkulation{' '}
+                                    {order.source_calculation_number}:{' '}
+                                    {money(
+                                        order.source_calculation_totals
+                                            .nn_invest,
+                                    )}{' '}
+                                    N/N (nicht Auftragssumme)
+                                </p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+
+                    <DispoOrderApprovalHistory
+                        entries={order.approval_history}
+                    />
+
+                    <DispoOrderStatusHistory
+                        entries={order.status_history ?? []}
+                    />
+
+                    <Card className="border-border/70 min-w-0 overflow-x-auto rounded-xl shadow-xs">
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Positionen ({order.positions.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 px-5 py-4">
+                            {order.positions.map((position, index) => {
+                                const positionValues =
+                                    position.dynamic_field_values ?? {};
+                                const positionCaptured =
+                                    position.dynamic_field_captured ?? {};
+                                const periodOpen = positionValues.period_open;
+                                const periodOpenCaptured =
+                                    positionCaptured.period_open === true;
+                                const flightCaptured =
+                                    positionCaptured.position_flight_period ===
+                                    true;
+                                const flightDisplay = displayCalcOriginPeriod(
+                                    positionValues.position_flight_period,
+                                    flightCaptured,
+                                );
+                                const view = visiblePositionFieldViews[
+                                    position.id
+                                ] ?? {
+                                    editableText: [],
+                                    editableChoice: [],
+                                    editableFile: [],
+                                    calcOriginText: [],
+                                    calcOriginChoice: [],
+                                    calcOriginFile: [],
+                                };
+                                const showCalcOrigin =
+                                    view.calcOriginText.length > 0 ||
+                                    view.calcOriginChoice.length > 0 ||
+                                    view.calcOriginFile.some(
+                                        (field) =>
+                                            field.current_upload !== null,
+                                    );
+                                const showNative =
+                                    view.editableText.length > 0 ||
+                                    view.editableChoice.length > 0 ||
+                                    view.editableFile.some(
+                                        (field) =>
+                                            canUploadMaterial ||
+                                            field.current_upload !== null,
+                                    );
+
+                                return (
+                                    <section
+                                        key={position.id}
+                                        className="rounded-lg border p-4"
+                                        data-test={`dispo-order-position-${index}`}
                                     >
-                                        {isOaTkpDispoShowPosition(position) ? (
-                                            <p className="text-foreground text-sm font-medium">
-                                                Kalkulationszeitraum
-                                                (ursprünglicher Snapshot)
-                                            </p>
-                                        ) : null}
-                                        <p>
-                                            {periodOpenLabel}:{' '}
-                                            {!periodOpenCaptured
-                                                ? 'Nicht erfasst'
-                                                : periodOpen
-                                                  ? 'Ja'
-                                                  : 'Nein'}
+                                        <p className="font-medium">
+                                            {position.inventory_name} ·{' '}
+                                            {position.advertising_medium_name}
                                         </p>
-                                        {periodOpenHelp ? (
-                                            <p className="text-muted-foreground/80">
-                                                {periodOpenHelp}
-                                            </p>
-                                        ) : null}
-                                        <p>
-                                            {flightPeriodLabel}: {flightDisplay}
+                                        <p
+                                            className="text-muted-foreground mt-1 text-xs"
+                                            data-test={`dispo-order-position-combination-${index}`}
+                                        >
+                                            Buchungskennzeichen:{' '}
+                                            {position.booking_code?.trim()
+                                                ? position.booking_code
+                                                : '— (Legacy)'}
+                                            {' · '}
+                                            Einplanung durch:{' '}
+                                            {position.planning_responsibility_label?.trim()
+                                                ? position.planning_responsibility_label
+                                                : '— (Legacy)'}
+                                            {position.combination_hint_text?.trim()
+                                                ? ` · Hinweis: ${position.combination_hint_text}`
+                                                : ''}
                                         </p>
-                                        {flightPeriodHelp ? (
-                                            <p className="text-muted-foreground/80">
-                                                {flightPeriodHelp}
-                                            </p>
-                                        ) : null}
+                                        <p
+                                            className={
+                                                isInconsistentDispoShowPosition(
+                                                    position,
+                                                )
+                                                    ? 'text-destructive mt-1 text-xs'
+                                                    : 'text-muted-foreground mt-1 text-xs'
+                                            }
+                                            data-test={`dispo-order-position-meta-${index}`}
+                                            data-method-classification={
+                                                position.method_classification ??
+                                                undefined
+                                            }
+                                        >
+                                            {formatDispoShowPositionMeta(
+                                                position,
+                                            )}
+                                        </p>
                                         {isOaTkpDispoShowPosition(position) ? (
-                                            <p className="text-muted-foreground/80">
-                                                Read-only aus der Kalkulation;
-                                                wird durch den operativen
-                                                Zeitraum nicht verändert.
-                                            </p>
+                                            <DispoOrderOaTkpSnapshotPanel
+                                                position={position}
+                                                index={index}
+                                            />
                                         ) : null}
-                                    </div>
-                                    {isOaTkpDispoShowPosition(position) ? (
-                                        <DispoOrderOperationalFlightEditor
+                                        <DispoOrderInvoiceEndMonths
                                             orderId={order.id}
                                             positionId={position.id}
                                             lockVersion={order.lock_version}
-                                            flightStart={
-                                                position.operational_flight_start ??
+                                            months={
+                                                position.invoice_end_months ??
                                                 null
                                             }
-                                            flightEnd={
-                                                position.operational_flight_end ??
-                                                null
+                                            monthLabels={
+                                                position.invoice_end_month_labels
                                             }
-                                            flightValid={
-                                                position.operational_flight_valid ===
-                                                true
+                                            periodState={
+                                                position.invoice_end_period_state ??
+                                                'invalid'
                                             }
-                                            canEdit={canUpdateOperationalFlight}
-                                            handoffFlightSource={{
-                                                periodOpen:
-                                                    typeof periodOpen ===
-                                                    'boolean'
-                                                        ? periodOpen
-                                                        : null,
-                                                periodOpenCaptured,
-                                                flight:
-                                                    positionValues.position_flight_period ??
-                                                    null,
-                                                flightCaptured,
-                                            }}
+                                            canEdit={canUpdateInvoiceEndMonths}
                                         />
-                                    ) : null}
-                                    {showCalcOrigin ? (
+                                        {!isOaTkpDispoShowPosition(position) &&
+                                        !isInconsistentDispoShowPosition(
+                                            position,
+                                        ) &&
+                                        position.components &&
+                                        position.components.length > 0 ? (
+                                            <div
+                                                className="text-muted-foreground mt-2 space-y-1 text-xs"
+                                                data-test={`dispo-order-position-components-${index}`}
+                                            >
+                                                {position.component_profile &&
+                                                COMPONENT_PROFILE_UI[
+                                                    position.component_profile
+                                                ] ? (
+                                                    <p
+                                                        data-test={`dispo-order-position-profile-${index}`}
+                                                    >
+                                                        Komponentenprofil:{' '}
+                                                        {
+                                                            COMPONENT_PROFILE_UI[
+                                                                position
+                                                                    .component_profile
+                                                            ].label
+                                                        }
+                                                        {' · '}
+                                                        {
+                                                            COMPONENT_PROFILE_UI[
+                                                                position
+                                                                    .component_profile
+                                                            ].unit_label
+                                                        }
+                                                        :{' '}
+                                                        {
+                                                            position.total_spot_count
+                                                        }
+                                                        {position.derived_component_airings !=
+                                                        null ? (
+                                                            <>
+                                                                {' '}
+                                                                · abgeleitete
+                                                                Sendungen:{' '}
+                                                                {
+                                                                    position.derived_component_airings
+                                                                }
+                                                            </>
+                                                        ) : null}
+                                                    </p>
+                                                ) : null}
+                                                <p>
+                                                    Spot-Komponenten ·{' '}
+                                                    {position.component_calculation_strategy ===
+                                                    'individual'
+                                                        ? 'Komponenten einzeln berechnen'
+                                                        : 'Gemeinsame Gesamtlänge'}
+                                                </p>
+                                                <ul className="list-inside list-disc">
+                                                    {[...position.components]
+                                                        .sort(
+                                                            (a, b) =>
+                                                                (a.sort ?? 0) -
+                                                                (b.sort ?? 0),
+                                                        )
+                                                        .map((component) => (
+                                                            <li
+                                                                key={`${component.role}-${component.sort ?? 0}`}
+                                                            >
+                                                                {componentDisplayLabel(
+                                                                    position,
+                                                                    component,
+                                                                )}
+                                                                :{' '}
+                                                                {
+                                                                    component.length_seconds
+                                                                }
+                                                                s
+                                                                {position.component_calculation_strategy ===
+                                                                    'individual' &&
+                                                                component.media_gross
+                                                                    ? ` · ${component.media_gross}`
+                                                                    : ''}
+                                                            </li>
+                                                        ))}
+                                                </ul>
+                                            </div>
+                                        ) : null}
                                         <div
-                                            className="mt-4 space-y-3"
-                                            data-test={`dispo-order-calc-origin-position-fields-${position.id}`}
+                                            className="text-muted-foreground mt-2 space-y-1 text-xs"
+                                            data-test={
+                                                isOaTkpDispoShowPosition(
+                                                    position,
+                                                )
+                                                    ? `dispo-order-calc-origin-flight-${position.id}`
+                                                    : undefined
+                                            }
                                         >
-                                            <p className="text-sm font-medium">
-                                                Aus Kalkulation übernommen
+                                            {isOaTkpDispoShowPosition(
+                                                position,
+                                            ) ? (
+                                                <p className="text-foreground text-sm font-medium">
+                                                    Kalkulationszeitraum
+                                                    (ursprünglicher Snapshot)
+                                                </p>
+                                            ) : null}
+                                            <p>
+                                                {periodOpenLabel}:{' '}
+                                                {!periodOpenCaptured
+                                                    ? 'Nicht erfasst'
+                                                    : periodOpen
+                                                      ? 'Ja'
+                                                      : 'Nein'}
                                             </p>
-                                            {view.calcOriginText.length > 0 ? (
-                                                <SchemaTextFields
-                                                    fields={view.calcOriginText}
-                                                    values={Object.fromEntries(
-                                                        view.calcOriginText.map(
-                                                            (field) => [
-                                                                field.key,
-                                                                textReadOnlyCapturedDisplay(
-                                                                    positionValues[
-                                                                        field
-                                                                            .key
-                                                                    ],
-                                                                    positionCaptured[
-                                                                        field
-                                                                            .key
-                                                                    ] === true,
-                                                                ),
-                                                            ],
-                                                        ),
-                                                    )}
-                                                    readOnly
-                                                    idPrefix={`dispo-pos-calc-${position.id}`}
-                                                    onChange={() => undefined}
-                                                />
+                                            {periodOpenHelp ? (
+                                                <p className="text-muted-foreground/80">
+                                                    {periodOpenHelp}
+                                                </p>
                                             ) : null}
-                                            {view.calcOriginChoice.length >
-                                            0 ? (
-                                                <SchemaChoiceReadonlyFields
-                                                    fields={
-                                                        view.calcOriginChoice
-                                                    }
-                                                    values={positionValues}
-                                                    captured={positionCaptured}
-                                                    idPrefix={`dispo-pos-calc-choice-${position.id}`}
-                                                />
+                                            <p>
+                                                {flightPeriodLabel}:{' '}
+                                                {flightDisplay}
+                                            </p>
+                                            {flightPeriodHelp ? (
+                                                <p className="text-muted-foreground/80">
+                                                    {flightPeriodHelp}
+                                                </p>
                                             ) : null}
-                                            {view.calcOriginFile.length > 0 ? (
-                                                <SchemaFileFields
-                                                    fields={view.calcOriginFile}
-                                                    orderId={order.id}
-                                                    lockVersion={
-                                                        order.lock_version
-                                                    }
-                                                    positionId={position.id}
-                                                    canUpload={false}
-                                                />
+                                            {isOaTkpDispoShowPosition(
+                                                position,
+                                            ) ? (
+                                                <p className="text-muted-foreground/80">
+                                                    Read-only aus der
+                                                    Kalkulation; wird durch den
+                                                    operativen Zeitraum nicht
+                                                    verändert.
+                                                </p>
                                             ) : null}
                                         </div>
-                                    ) : null}
-                                    {showNative ? (
-                                        <div
-                                            className="mt-4 space-y-3"
-                                            data-test={`dispo-order-native-position-fields-${position.id}`}
-                                        >
-                                            <p className="text-sm font-medium">
-                                                Weitere Angaben
-                                            </p>
-                                            {canUpdate ? (
-                                                <>
-                                                    {view.editableText.length >
-                                                    0 ? (
-                                                        <SchemaTextFields
-                                                            fields={
-                                                                view.editableText
-                                                            }
-                                                            values={
-                                                                positionCustomValues[
-                                                                    position.id
-                                                                ] ?? {}
-                                                            }
-                                                            errors={fieldErrors}
-                                                            errorKeyPrefixes={[
-                                                                `position_dynamic_field_values.${position.id}`,
-                                                            ]}
-                                                            disabled={
-                                                                savingPositionCustoms
-                                                            }
-                                                            idPrefix={`dispo-pos-custom-${position.id}`}
-                                                            onChange={(
-                                                                key,
-                                                                value,
-                                                            ) =>
-                                                                setPositionCustomValues(
-                                                                    (
-                                                                        current,
-                                                                    ) => ({
-                                                                        ...current,
-                                                                        [position.id]:
-                                                                            {
-                                                                                ...current[
-                                                                                    position
-                                                                                        .id
-                                                                                ],
-                                                                                [key]: value,
-                                                                            },
-                                                                    }),
-                                                                )
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                    {view.editableChoice
-                                                        .length > 0 ? (
-                                                        <div
-                                                            data-test={`dispo-order-native-position-choice-fields-${position.id}`}
-                                                        >
-                                                            <SchemaChoiceFields
+                                        {isOaTkpDispoShowPosition(position) ? (
+                                            <DispoOrderOperationalFlightEditor
+                                                orderId={order.id}
+                                                positionId={position.id}
+                                                lockVersion={order.lock_version}
+                                                flightStart={
+                                                    position.operational_flight_start ??
+                                                    null
+                                                }
+                                                flightEnd={
+                                                    position.operational_flight_end ??
+                                                    null
+                                                }
+                                                flightValid={
+                                                    position.operational_flight_valid ===
+                                                    true
+                                                }
+                                                canEdit={
+                                                    canUpdateOperationalFlight
+                                                }
+                                                handoffFlightSource={{
+                                                    periodOpen:
+                                                        typeof periodOpen ===
+                                                        'boolean'
+                                                            ? periodOpen
+                                                            : null,
+                                                    periodOpenCaptured,
+                                                    flight:
+                                                        positionValues.position_flight_period ??
+                                                        null,
+                                                    flightCaptured,
+                                                }}
+                                            />
+                                        ) : null}
+                                        {showCalcOrigin ? (
+                                            <div
+                                                className="mt-4 space-y-3"
+                                                data-test={`dispo-order-calc-origin-position-fields-${position.id}`}
+                                            >
+                                                <p className="text-sm font-medium">
+                                                    Aus Kalkulation übernommen
+                                                </p>
+                                                {view.calcOriginText.length >
+                                                0 ? (
+                                                    <SchemaTextFields
+                                                        fields={
+                                                            view.calcOriginText
+                                                        }
+                                                        values={Object.fromEntries(
+                                                            view.calcOriginText.map(
+                                                                (field) => [
+                                                                    field.key,
+                                                                    textReadOnlyCapturedDisplay(
+                                                                        positionValues[
+                                                                            field
+                                                                                .key
+                                                                        ],
+                                                                        positionCaptured[
+                                                                            field
+                                                                                .key
+                                                                        ] ===
+                                                                            true,
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                        )}
+                                                        readOnly
+                                                        idPrefix={`dispo-pos-calc-${position.id}`}
+                                                        onChange={() =>
+                                                            undefined
+                                                        }
+                                                    />
+                                                ) : null}
+                                                {view.calcOriginChoice.length >
+                                                0 ? (
+                                                    <SchemaChoiceReadonlyFields
+                                                        fields={
+                                                            view.calcOriginChoice
+                                                        }
+                                                        values={positionValues}
+                                                        captured={
+                                                            positionCaptured
+                                                        }
+                                                        idPrefix={`dispo-pos-calc-choice-${position.id}`}
+                                                    />
+                                                ) : null}
+                                                {view.calcOriginFile.length >
+                                                0 ? (
+                                                    <SchemaFileFields
+                                                        fields={
+                                                            view.calcOriginFile
+                                                        }
+                                                        orderId={order.id}
+                                                        lockVersion={
+                                                            order.lock_version
+                                                        }
+                                                        positionId={position.id}
+                                                        canUpload={false}
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        {showNative ? (
+                                            <div
+                                                className="mt-4 space-y-3"
+                                                data-test={`dispo-order-native-position-fields-${position.id}`}
+                                            >
+                                                <p className="text-sm font-medium">
+                                                    Weitere Angaben
+                                                </p>
+                                                {canUpdate ? (
+                                                    <>
+                                                        {view.editableText
+                                                            .length > 0 ? (
+                                                            <SchemaTextFields
                                                                 fields={
-                                                                    view.editableChoice
+                                                                    view.editableText
                                                                 }
                                                                 values={
-                                                                    positionChoiceValues[
+                                                                    positionCustomValues[
                                                                         position
                                                                             .id
                                                                     ] ?? {}
@@ -2545,12 +2545,12 @@ export default function DispoOrderShow({
                                                                 disabled={
                                                                     savingPositionCustoms
                                                                 }
-                                                                idPrefix={`dispo-pos-custom-choice-${position.id}`}
+                                                                idPrefix={`dispo-pos-custom-${position.id}`}
                                                                 onChange={(
                                                                     key,
                                                                     value,
-                                                                ) => {
-                                                                    setPositionChoiceValues(
+                                                                ) =>
+                                                                    setPositionCustomValues(
                                                                         (
                                                                             current,
                                                                         ) => ({
@@ -2564,328 +2564,395 @@ export default function DispoOrderShow({
                                                                                     [key]: value,
                                                                                 },
                                                                         }),
-                                                                    );
-                                                                    setPositionChoiceTouched(
-                                                                        (
-                                                                            current,
-                                                                        ) => ({
-                                                                            ...current,
-                                                                            [position.id]:
-                                                                                {
-                                                                                    ...current[
-                                                                                        position
-                                                                                            .id
-                                                                                    ],
-                                                                                    [key]: true,
-                                                                                },
-                                                                        }),
-                                                                    );
-                                                                    setPositionChoiceMeta(
-                                                                        (
-                                                                            current,
-                                                                        ) => ({
-                                                                            ...current,
-                                                                            [position.id]:
-                                                                                {
-                                                                                    ...current[
-                                                                                        position
-                                                                                            .id
-                                                                                    ],
-                                                                                    [key]: {
-                                                                                        initPayloadSafe: true,
-                                                                                        issue: null,
-                                                                                    },
-                                                                                },
-                                                                        }),
-                                                                    );
-                                                                }}
+                                                                    )
+                                                                }
                                                             />
-                                                        </div>
-                                                    ) : null}
-                                                    {view.editableFile.length >
-                                                    0 ? (
-                                                        <SchemaFileFields
-                                                            fields={
-                                                                view.editableFile
-                                                            }
-                                                            orderId={order.id}
-                                                            lockVersion={
-                                                                order.lock_version
-                                                            }
-                                                            positionId={
-                                                                position.id
-                                                            }
-                                                            canUpload={
-                                                                canUploadMaterial
-                                                            }
-                                                            disabled={
-                                                                savingPositionCustoms
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {view.editableText.length >
-                                                    0 ? (
-                                                        <SchemaTextFields
-                                                            fields={
-                                                                view.editableText
-                                                            }
-                                                            values={
-                                                                positionCustomValues[
-                                                                    position.id
-                                                                ] ?? {}
-                                                            }
-                                                            readOnly
-                                                            idPrefix={`dispo-pos-custom-${position.id}`}
-                                                            onChange={() =>
-                                                                undefined
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                    {view.editableChoice
-                                                        .length > 0 ? (
-                                                        <div
-                                                            data-test={`dispo-order-native-position-choice-fields-ro-${position.id}`}
-                                                        >
-                                                            <SchemaChoiceReadonlyFields
+                                                        ) : null}
+                                                        {view.editableChoice
+                                                            .length > 0 ? (
+                                                            <div
+                                                                data-test={`dispo-order-native-position-choice-fields-${position.id}`}
+                                                            >
+                                                                <SchemaChoiceFields
+                                                                    fields={
+                                                                        view.editableChoice
+                                                                    }
+                                                                    values={
+                                                                        positionChoiceValues[
+                                                                            position
+                                                                                .id
+                                                                        ] ?? {}
+                                                                    }
+                                                                    errors={
+                                                                        fieldErrors
+                                                                    }
+                                                                    errorKeyPrefixes={[
+                                                                        `position_dynamic_field_values.${position.id}`,
+                                                                    ]}
+                                                                    disabled={
+                                                                        savingPositionCustoms
+                                                                    }
+                                                                    idPrefix={`dispo-pos-custom-choice-${position.id}`}
+                                                                    onChange={(
+                                                                        key,
+                                                                        value,
+                                                                    ) => {
+                                                                        setPositionChoiceValues(
+                                                                            (
+                                                                                current,
+                                                                            ) => ({
+                                                                                ...current,
+                                                                                [position.id]:
+                                                                                    {
+                                                                                        ...current[
+                                                                                            position
+                                                                                                .id
+                                                                                        ],
+                                                                                        [key]: value,
+                                                                                    },
+                                                                            }),
+                                                                        );
+                                                                        setPositionChoiceTouched(
+                                                                            (
+                                                                                current,
+                                                                            ) => ({
+                                                                                ...current,
+                                                                                [position.id]:
+                                                                                    {
+                                                                                        ...current[
+                                                                                            position
+                                                                                                .id
+                                                                                        ],
+                                                                                        [key]: true,
+                                                                                    },
+                                                                            }),
+                                                                        );
+                                                                        setPositionChoiceMeta(
+                                                                            (
+                                                                                current,
+                                                                            ) => ({
+                                                                                ...current,
+                                                                                [position.id]:
+                                                                                    {
+                                                                                        ...current[
+                                                                                            position
+                                                                                                .id
+                                                                                        ],
+                                                                                        [key]: {
+                                                                                            initPayloadSafe: true,
+                                                                                            issue: null,
+                                                                                        },
+                                                                                    },
+                                                                            }),
+                                                                        );
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : null}
+                                                        {view.editableFile
+                                                            .length > 0 ? (
+                                                            <SchemaFileFields
                                                                 fields={
-                                                                    view.editableChoice
+                                                                    view.editableFile
+                                                                }
+                                                                orderId={
+                                                                    order.id
+                                                                }
+                                                                lockVersion={
+                                                                    order.lock_version
+                                                                }
+                                                                positionId={
+                                                                    position.id
+                                                                }
+                                                                canUpload={
+                                                                    canUploadMaterial
+                                                                }
+                                                                disabled={
+                                                                    savingPositionCustoms
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {view.editableText
+                                                            .length > 0 ? (
+                                                            <SchemaTextFields
+                                                                fields={
+                                                                    view.editableText
                                                                 }
                                                                 values={
-                                                                    positionValues
+                                                                    positionCustomValues[
+                                                                        position
+                                                                            .id
+                                                                    ] ?? {}
                                                                 }
-                                                                captured={nativeChoiceCapturedMap(
-                                                                    view.editableChoice,
-                                                                    positionCaptured,
-                                                                )}
-                                                                idPrefix={`dispo-pos-custom-choice-ro-${position.id}`}
+                                                                readOnly
+                                                                idPrefix={`dispo-pos-custom-${position.id}`}
+                                                                onChange={() =>
+                                                                    undefined
+                                                                }
                                                             />
-                                                        </div>
-                                                    ) : null}
-                                                    {view.editableFile.length >
-                                                    0 ? (
-                                                        <SchemaFileFields
-                                                            fields={
-                                                                view.editableFile
-                                                            }
-                                                            orderId={order.id}
-                                                            lockVersion={
-                                                                order.lock_version
-                                                            }
-                                                            positionId={
-                                                                position.id
-                                                            }
-                                                            canUpload={
-                                                                canUploadMaterial
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                </>
-                                            )}
-                                        </div>
-                                    ) : null}
-                                    {!isOaTkpDispoShowPosition(position) &&
-                                    !isInconsistentDispoShowPosition(
-                                        position,
-                                    ) &&
-                                    position.time_ranges.length > 0 ? (
-                                        <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-                                            {position.time_ranges.map(
-                                                (range) => (
-                                                    <li
-                                                        key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
-                                                    >
-                                                        {formatHour(
-                                                            range.start_hour,
-                                                        )}
-                                                        –
-                                                        {formatInclusiveEnd(
-                                                            range.end_hour_exclusive,
-                                                        )}{' '}
-                                                        · {range.spot_count}{' '}
-                                                        Spots
-                                                        {range.range_gross
-                                                            ? ` · ${money(range.range_gross)}`
-                                                            : ''}
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                    ) : null}
-                                    {!isOaTkpDispoShowPosition(position) &&
-                                    !isInconsistentDispoShowPosition(
-                                        position,
-                                    ) &&
-                                    position.planner_entries &&
-                                    position.planner_entries.length > 0 ? (
-                                        <ul
-                                            className="text-muted-foreground mt-2 space-y-0.5 text-xs"
-                                            data-test={`dispo-planner-entries-${position.id}`}
-                                        >
-                                            {sortPlannerEntriesForDisplay(
-                                                position.planner_entries,
-                                            ).map((entry) => (
-                                                <li
-                                                    key={`${entry.date}-${entry.hour}`}
-                                                >
-                                                    {formatPlannerEntryLine(
-                                                        entry,
-                                                    )}
-                                                    {entry.line_gross
-                                                        ? ` · ${money(entry.line_gross)}`
-                                                        : ''}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : null}
-                                    {position.position_discounts.length > 0 ? (
-                                        <ul className="text-muted-foreground mt-2 text-xs">
-                                            {position.position_discounts.map(
-                                                (discount, discountIndex) => (
-                                                    <li key={discountIndex}>
-                                                        {discount.custom_label ??
-                                                            discount.type}
-                                                        {discount.percent
-                                                            ? ` ${formatPercent(discount.percent)}`
-                                                            : ''}
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                    ) : null}
-                                    {position.pricing_settlement_mode ===
-                                    'fixed_price' ? (
-                                        <div
-                                            className="mt-3 space-y-1 text-sm"
-                                            data-test={`dispo-order-fixed-price-${index}`}
-                                        >
-                                            <p className="font-semibold tabular-nums">
-                                                Festpreis (N/N):{' '}
-                                                {money(
-                                                    position.fixed_price_nn ??
-                                                        position.nn_invest,
+                                                        ) : null}
+                                                        {view.editableChoice
+                                                            .length > 0 ? (
+                                                            <div
+                                                                data-test={`dispo-order-native-position-choice-fields-ro-${position.id}`}
+                                                            >
+                                                                <SchemaChoiceReadonlyFields
+                                                                    fields={
+                                                                        view.editableChoice
+                                                                    }
+                                                                    values={
+                                                                        positionValues
+                                                                    }
+                                                                    captured={nativeChoiceCapturedMap(
+                                                                        view.editableChoice,
+                                                                        positionCaptured,
+                                                                    )}
+                                                                    idPrefix={`dispo-pos-custom-choice-ro-${position.id}`}
+                                                                />
+                                                            </div>
+                                                        ) : null}
+                                                        {view.editableFile
+                                                            .length > 0 ? (
+                                                            <SchemaFileFields
+                                                                fields={
+                                                                    view.editableFile
+                                                                }
+                                                                orderId={
+                                                                    order.id
+                                                                }
+                                                                lockVersion={
+                                                                    order.lock_version
+                                                                }
+                                                                positionId={
+                                                                    position.id
+                                                                }
+                                                                canUpload={
+                                                                    canUploadMaterial
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                    </>
                                                 )}
-                                            </p>
-                                            <p className="text-muted-foreground text-xs">
-                                                Referenz-Mediabrutto{' '}
-                                                {money(position.media_gross)}
-                                            </p>
-                                            {position.effective_pay_factor_percent ? (
-                                                <p className="text-muted-foreground text-xs">
-                                                    Payfaktor{' '}
-                                                    {formatPercent(
-                                                        position.effective_pay_factor_percent,
+                                            </div>
+                                        ) : null}
+                                        {!isOaTkpDispoShowPosition(position) &&
+                                        !isInconsistentDispoShowPosition(
+                                            position,
+                                        ) &&
+                                        position.time_ranges.length > 0 ? (
+                                            <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                                                {position.time_ranges.map(
+                                                    (range) => (
+                                                        <li
+                                                            key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                        >
+                                                            {formatHour(
+                                                                range.start_hour,
+                                                            )}
+                                                            –
+                                                            {formatInclusiveEnd(
+                                                                range.end_hour_exclusive,
+                                                            )}{' '}
+                                                            · {range.spot_count}{' '}
+                                                            Spots
+                                                            {range.range_gross
+                                                                ? ` · ${money(range.range_gross)}`
+                                                                : ''}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        ) : null}
+                                        {!isOaTkpDispoShowPosition(position) &&
+                                        !isInconsistentDispoShowPosition(
+                                            position,
+                                        ) &&
+                                        position.planner_entries &&
+                                        position.planner_entries.length > 0 ? (
+                                            <ul
+                                                className="text-muted-foreground mt-2 space-y-0.5 text-xs"
+                                                data-test={`dispo-planner-entries-${position.id}`}
+                                            >
+                                                {sortPlannerEntriesForDisplay(
+                                                    position.planner_entries,
+                                                ).map((entry) => (
+                                                    <li
+                                                        key={`${entry.date}-${entry.hour}`}
+                                                    >
+                                                        {formatPlannerEntryLine(
+                                                            entry,
+                                                        )}
+                                                        {entry.line_gross
+                                                            ? ` · ${money(entry.line_gross)}`
+                                                            : ''}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
+                                        {position.position_discounts.length >
+                                        0 ? (
+                                            <ul className="text-muted-foreground mt-2 text-xs">
+                                                {position.position_discounts.map(
+                                                    (
+                                                        discount,
+                                                        discountIndex,
+                                                    ) => (
+                                                        <li key={discountIndex}>
+                                                            {discount.custom_label ??
+                                                                discount.type}
+                                                            {discount.percent
+                                                                ? ` ${formatPercent(discount.percent)}`
+                                                                : ''}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        ) : null}
+                                        {position.pricing_settlement_mode ===
+                                        'fixed_price' ? (
+                                            <div
+                                                className="mt-3 space-y-1 text-sm"
+                                                data-test={`dispo-order-fixed-price-${index}`}
+                                            >
+                                                <p className="font-semibold tabular-nums">
+                                                    Festpreis (N/N):{' '}
+                                                    {money(
+                                                        position.fixed_price_nn ??
+                                                            position.nn_invest,
                                                     )}
-                                                    {position.effective_total_discount_percent
-                                                        ? ` · Gesamtabschlag (→ N/N) ${formatPercent(position.effective_total_discount_percent)}`
-                                                        : ''}
                                                 </p>
-                                            ) : null}
-                                            {Number(position.ae_amount) > 0 ? (
-                                                <p
-                                                    className="text-muted-foreground text-xs"
-                                                    data-test={`dispo-order-fixed-price-ae-${index}`}
-                                                >
-                                                    AE{' '}
-                                                    {money(position.ae_amount)}
-                                                </p>
-                                            ) : null}
-                                            {position.calculation_method_name ? (
                                                 <p className="text-muted-foreground text-xs">
-                                                    Berechnungsbasis:{' '}
-                                                    {
-                                                        position.calculation_method_name
-                                                    }
+                                                    Referenz-Mediabrutto{' '}
+                                                    {money(
+                                                        position.media_gross,
+                                                    )}
                                                 </p>
-                                            ) : null}
-                                        </div>
-                                    ) : (
-                                        <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
-                                            {money(position.nn_invest)} N/N
-                                        </p>
+                                                {position.effective_pay_factor_percent ? (
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Payfaktor{' '}
+                                                        {formatPercent(
+                                                            position.effective_pay_factor_percent,
+                                                        )}
+                                                        {position.effective_total_discount_percent
+                                                            ? ` · Gesamtabschlag (→ N/N) ${formatPercent(position.effective_total_discount_percent)}`
+                                                            : ''}
+                                                    </p>
+                                                ) : null}
+                                                {Number(position.ae_amount) >
+                                                0 ? (
+                                                    <p
+                                                        className="text-muted-foreground text-xs"
+                                                        data-test={`dispo-order-fixed-price-ae-${index}`}
+                                                    >
+                                                        AE{' '}
+                                                        {money(
+                                                            position.ae_amount,
+                                                        )}
+                                                    </p>
+                                                ) : null}
+                                                {position.calculation_method_name ? (
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Berechnungsbasis:{' '}
+                                                        {
+                                                            position.calculation_method_name
+                                                        }
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        ) : (
+                                            <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
+                                                {money(position.nn_invest)} N/N
+                                            </p>
+                                        )}
+                                    </section>
+                                );
+                            })}
+                            {(order.production_lines ?? []).length > 0 ? (
+                                <section
+                                    className="border-border/70 space-y-2 rounded-lg border border-dashed p-4"
+                                    data-test="dispo-production-lines"
+                                >
+                                    <h3 className="text-sm font-semibold">
+                                        Produktion / Sonstiges (
+                                        {(order.production_lines ?? []).length})
+                                    </h3>
+                                    <p className="text-muted-foreground text-xs">
+                                        Zusatzleistungen ohne Sendeplanung
+                                        (Kennzeichen S); Werte sind aus der
+                                        Kalkulation eingefroren.
+                                    </p>
+                                    {(order.production_lines ?? []).map(
+                                        (line) => (
+                                            <div
+                                                key={line.id}
+                                                className="flex flex-wrap items-baseline justify-between gap-2 border-t pt-2 text-sm"
+                                                data-test={`dispo-production-line-${line.id}`}
+                                            >
+                                                <div className="min-w-0">
+                                                    <p className="font-medium">
+                                                        <span
+                                                            className="bg-muted mr-2 rounded px-1.5 py-0.5 text-xs font-semibold"
+                                                            data-test="dispo-production-booking-code"
+                                                        >
+                                                            {line.booking_code ??
+                                                                'S'}
+                                                        </span>
+                                                        {line.label}
+                                                    </p>
+                                                    <p className="text-muted-foreground text-xs">
+                                                        {line.inventory_name} ·
+                                                        Menge{' '}
+                                                        {line.quantity ?? '–'} ×{' '}
+                                                        {line.unit_price
+                                                            ? money(
+                                                                  line.unit_price,
+                                                              )
+                                                            : '–'}
+                                                        {line.remark
+                                                            ? ` · ${line.remark}`
+                                                            : ''}
+                                                    </p>
+                                                </div>
+                                                <p className="text-primary font-semibold tabular-nums">
+                                                    {money(line.nn_invest)} N/N
+                                                </p>
+                                            </div>
+                                        ),
                                     )}
                                 </section>
-                            );
-                        })}
-                        {(order.production_lines ?? []).length > 0 ? (
-                            <section
-                                className="border-border/70 space-y-2 rounded-lg border border-dashed p-4"
-                                data-test="dispo-production-lines"
-                            >
-                                <h3 className="text-sm font-semibold">
-                                    Produktion / Sonstiges (
-                                    {(order.production_lines ?? []).length})
-                                </h3>
-                                <p className="text-muted-foreground text-xs">
-                                    Zusatzleistungen ohne Sendeplanung
-                                    (Kennzeichen S); Werte sind aus der
-                                    Kalkulation eingefroren.
-                                </p>
-                                {(order.production_lines ?? []).map((line) => (
-                                    <div
-                                        key={line.id}
-                                        className="flex flex-wrap items-baseline justify-between gap-2 border-t pt-2 text-sm"
-                                        data-test={`dispo-production-line-${line.id}`}
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="font-medium">
-                                                <span
-                                                    className="bg-muted mr-2 rounded px-1.5 py-0.5 text-xs font-semibold"
-                                                    data-test="dispo-production-booking-code"
-                                                >
-                                                    {line.booking_code ?? 'S'}
-                                                </span>
-                                                {line.label}
-                                            </p>
-                                            <p className="text-muted-foreground text-xs">
-                                                {line.inventory_name} · Menge{' '}
-                                                {line.quantity ?? '–'} ×{' '}
-                                                {line.unit_price
-                                                    ? money(line.unit_price)
-                                                    : '–'}
-                                                {line.remark
-                                                    ? ` · ${line.remark}`
-                                                    : ''}
-                                            </p>
-                                        </div>
-                                        <p className="text-primary font-semibold tabular-nums">
-                                            {money(line.nn_invest)} N/N
+                            ) : null}
+                            {canUpdate && anyPositionHasEditableCustoms ? (
+                                <>
+                                    {fieldErrors.lock_version ? (
+                                        <p className="text-destructive text-xs">
+                                            {fieldErrors.lock_version}
                                         </p>
-                                    </div>
-                                ))}
-                            </section>
-                        ) : null}
-                        {canUpdate && anyPositionHasEditableCustoms ? (
-                            <>
-                                {fieldErrors.lock_version ? (
-                                    <p className="text-destructive text-xs">
-                                        {fieldErrors.lock_version}
-                                    </p>
-                                ) : null}
-                                <Button
-                                    type="button"
-                                    disabled={
-                                        savingPositionCustoms ||
-                                        dynamicControlsLocked
-                                    }
-                                    data-test="dispo-order-save-position-customs"
-                                    onClick={savePositionCustoms}
-                                >
-                                    {savingPositionCustoms
-                                        ? 'Wird gespeichert…'
-                                        : 'Positionsangaben speichern'}
-                                </Button>
-                            </>
-                        ) : null}
-                    </CardContent>
-                </Card>
+                                    ) : null}
+                                    <Button
+                                        type="button"
+                                        disabled={
+                                            savingPositionCustoms ||
+                                            dynamicControlsLocked
+                                        }
+                                        data-test="dispo-order-save-position-customs"
+                                        onClick={savePositionCustoms}
+                                    >
+                                        {savingPositionCustoms
+                                            ? 'Wird gespeichert…'
+                                            : 'Positionsangaben speichern'}
+                                    </Button>
+                                </>
+                            ) : null}
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {showCommunication ? (
                     <aside
-                        className="min-w-0 xl:sticky xl:top-6 xl:row-span-2 xl:row-start-1 xl:col-start-2 xl:self-start"
+                        className="min-w-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start"
                         data-test="dispo-order-communication-aside"
                     >
                         <DispoOrderCommunicationHistory

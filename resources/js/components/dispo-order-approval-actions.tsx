@@ -85,8 +85,7 @@ export function DispoOrderApprovalActions({
         requiresExceptionAcknowledgement && !showUploadEvidence;
 
     const showSubmitButton = showSubmitUi && canSubmit;
-    const showDecisionButtons =
-        showDecisionUi && (canApprove || canReject);
+    const showDecisionButtons = showDecisionUi && (canApprove || canReject);
 
     const wrapperTestId =
         mode === 'submit'

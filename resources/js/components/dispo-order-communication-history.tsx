@@ -115,7 +115,8 @@ export function DispoOrderCommunicationHistory({
             <CardContent
                 className={cn(
                     'space-y-3 px-5 py-4',
-                    scrollable && 'flex min-h-0 flex-1 flex-col gap-3 space-y-0',
+                    scrollable &&
+                        'flex min-h-0 flex-1 flex-col gap-3 space-y-0',
                 )}
             >
                 <div
