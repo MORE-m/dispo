@@ -152,5 +152,15 @@ Umsetzung in **PR2**. Genehmigen/Ablehnen nicht ohne weitere Prüfung ändern.
 
 ## Umsetzungsstand PR1
 
-Umgesetzt in Branch `feat/po-calc-dispo-ux-1-wizard-elements` gemäß PO-UX-05 (manuell + Budget) und den UX-Punkten Entfernen im Header.  
-PR2–PR5 sind **nicht** Bestandteil dieses Slices.
+Umgesetzt und gemergt (`366c535`, PR #253) gemäß PO-UX-05 (manuell + Budget) und den UX-Punkten Entfernen im Header.
+
+## Umsetzungsstand PR2
+
+Implementiert in Branch `feat/po-calc-dispo-ux-1-pr2-layout` (Draft in Review):
+
+- Zweispaltiges Desktop-Layout ab `xl` mit sticky Kommunikations-Sidebar.
+- Mobile: Kommunikation im normalen Seitenfluss vor dem Endblock.
+- Endreihenfolge: Kundenbestätigung → Material → Dateien → „Zur Freigabe einreichen“.
+- Genehmigen/Ablehnen bleiben oben; rein darstellungsbezogene `mode`-Prop an `DispoOrderApprovalActions`.
+
+PR3–PR5 sind **nicht** Bestandteil dieses Slices.

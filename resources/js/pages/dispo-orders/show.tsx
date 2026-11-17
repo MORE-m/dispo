@@ -99,6 +99,7 @@ import {
     evaluateSnapshotFieldRuntime,
     filterByEffectiveVisible,
 } from '@/lib/snapshot-field-runtime';
+import { cn } from '@/lib/utils';
 import type {
     ApprovalHistoryEntry,
     DispoOrderRevisionLink,
@@ -1231,10 +1232,42 @@ export default function DispoOrderShow({
             (field) => field.current_upload !== null,
         );
 
+    const communicationEntries = order.communication ?? [];
+    const showCommunication =
+        communicationEntries.length > 0 || canAddComment;
+
+    const approvalActionProps = {
+        orderId: order.id,
+        lockVersion: order.lock_version,
+        canSubmit,
+        canApprove,
+        canReject,
+        isCreator,
+        status: order.status,
+        requiresExceptionAcknowledgement,
+        customerConfirmationMode:
+            current?.customer_confirmation_mode ?? null,
+        customerConfirmationUpload:
+            current?.customer_confirmation_upload ?? null,
+    } as const;
+
     return (
         <>
             <Head title={`Dispoauftrag ${order.number}`} />
-            <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6">
+            <div
+                className={cn(
+                    'mx-auto flex w-full flex-1 flex-col gap-6 p-6',
+                    showCommunication
+                        ? 'max-w-7xl xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start'
+                        : 'max-w-5xl',
+                )}
+                data-test="dispo-order-show-layout"
+                data-layout={showCommunication ? 'with-communication' : 'single'}
+            >
+                <div
+                    className="flex min-w-0 flex-col gap-6"
+                    data-test="dispo-order-main-column"
+                >
                 <PageHeader
                     title={order.number}
                     description={pageDescription}
@@ -1259,58 +1292,10 @@ export default function DispoOrderShow({
                 ) : null}
 
                 <DispoOrderApprovalActions
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    canSubmit={canSubmit}
-                    canApprove={canApprove}
-                    canReject={canReject}
-                    isCreator={isCreator}
-                    status={order.status}
-                    requiresExceptionAcknowledgement={
-                        requiresExceptionAcknowledgement
-                    }
-                    customerConfirmationMode={
-                        current?.customer_confirmation_mode ?? null
-                    }
-                    customerConfirmationUpload={
-                        current?.customer_confirmation_upload ?? null
-                    }
+                    {...approvalActionProps}
+                    mode="decision"
                 />
 
-                <DispoOrderCustomerConfirmationSection
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    status={order.status}
-                    canEdit={canUpdateCustomerConfirmation}
-                    canUpload={canUploadCustomerConfirmation}
-                    withoutUpload={Boolean(
-                        order.customer_confirmation_without_upload,
-                    )}
-                    exceptionReason={
-                        order.customer_confirmation_exception_reason ?? null
-                    }
-                    setByName={
-                        order.customer_confirmation_exception_set_by_name ??
-                        null
-                    }
-                    setAt={order.customer_confirmation_exception_set_at ?? null}
-                    activeUpload={activeCustomerConfirmationUpload}
-                />
-
-                {canUploadMaterial ? (
-                    <DispoOrderMaterialUploadSection
-                        orderId={order.id}
-                        lockVersion={order.lock_version}
-                        categories={materialUploadCategories}
-                    />
-                ) : null}
-
-                <DispoOrderUploadsSection
-                    orderId={order.id}
-                    lockVersion={order.lock_version}
-                    uploads={uploads}
-                    canArchive={canArchiveUpload}
-                />
                 {order.positions.some(
                     (position) =>
                         isOaTkpDispoShowPosition(position) &&
@@ -2158,13 +2143,7 @@ export default function DispoOrderShow({
 
                 <DispoOrderStatusHistory entries={order.status_history ?? []} />
 
-                <DispoOrderCommunicationHistory
-                    entries={order.communication ?? []}
-                    orderId={order.id}
-                    canAddComment={canAddComment}
-                />
-
-                <Card className="border-border/70 rounded-xl shadow-xs">
+                <Card className="border-border/70 min-w-0 overflow-x-auto rounded-xl shadow-xs">
                     <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
                         <CardTitle className="text-sm font-semibold">
                             Positionen ({order.positions.length})
@@ -2902,6 +2881,69 @@ export default function DispoOrderShow({
                         ) : null}
                     </CardContent>
                 </Card>
+                </div>
+
+                {showCommunication ? (
+                    <aside
+                        className="min-w-0 xl:sticky xl:top-6 xl:row-span-2 xl:row-start-1 xl:col-start-2 xl:self-start"
+                        data-test="dispo-order-communication-aside"
+                    >
+                        <DispoOrderCommunicationHistory
+                            entries={communicationEntries}
+                            orderId={order.id}
+                            canAddComment={canAddComment}
+                            scrollable
+                            className="xl:shadow-sm"
+                        />
+                    </aside>
+                ) : null}
+
+                <div
+                    className="flex min-w-0 flex-col gap-6 xl:col-start-1"
+                    data-test="dispo-order-closing-block"
+                >
+                    <DispoOrderCustomerConfirmationSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        status={order.status}
+                        canEdit={canUpdateCustomerConfirmation}
+                        canUpload={canUploadCustomerConfirmation}
+                        withoutUpload={Boolean(
+                            order.customer_confirmation_without_upload,
+                        )}
+                        exceptionReason={
+                            order.customer_confirmation_exception_reason ?? null
+                        }
+                        setByName={
+                            order.customer_confirmation_exception_set_by_name ??
+                            null
+                        }
+                        setAt={
+                            order.customer_confirmation_exception_set_at ?? null
+                        }
+                        activeUpload={activeCustomerConfirmationUpload}
+                    />
+
+                    {canUploadMaterial ? (
+                        <DispoOrderMaterialUploadSection
+                            orderId={order.id}
+                            lockVersion={order.lock_version}
+                            categories={materialUploadCategories}
+                        />
+                    ) : null}
+
+                    <DispoOrderUploadsSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        uploads={uploads}
+                        canArchive={canArchiveUpload}
+                    />
+
+                    <DispoOrderApprovalActions
+                        {...approvalActionProps}
+                        mode="submit"
+                    />
+                </div>
             </div>
         </>
     );

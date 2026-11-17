@@ -28,6 +28,8 @@ type ActionResponse = {
     redirect: string;
 };
 
+export type DispoOrderApprovalActionsMode = 'all' | 'submit' | 'decision';
+
 export function DispoOrderApprovalActions({
     orderId,
     lockVersion,
@@ -39,6 +41,7 @@ export function DispoOrderApprovalActions({
     requiresExceptionAcknowledgement = false,
     customerConfirmationMode = null,
     customerConfirmationUpload = null,
+    mode = 'all',
 }: {
     orderId: number;
     lockVersion: number;
@@ -50,6 +53,8 @@ export function DispoOrderApprovalActions({
     requiresExceptionAcknowledgement?: boolean;
     customerConfirmationMode?: 'upload' | 'exception' | null;
     customerConfirmationUpload?: CustomerConfirmationUploadSnapshot | null;
+    /** Rein darstellungsbezogen: Einreichen und Entscheidungen trennen. */
+    mode?: DispoOrderApprovalActionsMode;
 }) {
     const [submitOpen, setSubmitOpen] = useState(false);
     const [approveOpen, setApproveOpen] = useState(false);
@@ -63,8 +68,14 @@ export function DispoOrderApprovalActions({
     const noteId = useId();
     const ackId = useId();
 
+    const showSubmitUi = mode === 'all' || mode === 'submit';
+    const showDecisionUi = mode === 'all' || mode === 'decision';
+
     const showCreatorHint =
-        isCreator && status === 'awaiting_sales_approval' && !canApprove;
+        showDecisionUi &&
+        isCreator &&
+        status === 'awaiting_sales_approval' &&
+        !canApprove;
 
     const showUploadEvidence =
         customerConfirmationMode === 'upload' ||
@@ -72,6 +83,17 @@ export function DispoOrderApprovalActions({
 
     const showExceptionAck =
         requiresExceptionAcknowledgement && !showUploadEvidence;
+
+    const showSubmitButton = showSubmitUi && canSubmit;
+    const showDecisionButtons =
+        showDecisionUi && (canApprove || canReject);
+
+    const wrapperTestId =
+        mode === 'submit'
+            ? 'dispo-order-approval-actions-submit'
+            : mode === 'decision'
+              ? 'dispo-order-approval-actions-decision'
+              : 'dispo-order-approval-actions';
 
     async function runAction(
         path: string,
@@ -110,11 +132,19 @@ export function DispoOrderApprovalActions({
         }
     }
 
+    if (
+        !showSubmitButton &&
+        !showDecisionButtons &&
+        !showCreatorHint &&
+        !submitOpen &&
+        !approveOpen &&
+        !rejectOpen
+    ) {
+        return null;
+    }
+
     return (
-        <div
-            className="flex flex-col gap-3"
-            data-test="dispo-order-approval-actions"
-        >
+        <div className="flex flex-col gap-3" data-test={wrapperTestId}>
             {error && !submitOpen && !approveOpen && !rejectOpen ? (
                 <ErrorState
                     message={error}
@@ -122,7 +152,7 @@ export function DispoOrderApprovalActions({
                 />
             ) : null}
 
-            {canSubmit ? (
+            {showSubmitButton ? (
                 <Button
                     type="button"
                     data-test="dispo-order-submit-open"
@@ -146,7 +176,7 @@ export function DispoOrderApprovalActions({
                 </p>
             ) : null}
 
-            {canApprove || canReject ? (
+            {showDecisionButtons ? (
                 <div className="flex flex-wrap gap-2">
                     {canApprove ? (
                         <Button
@@ -177,233 +207,248 @@ export function DispoOrderApprovalActions({
                 </div>
             ) : null}
 
-            <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
-                <DialogContent data-test="dispo-order-submit-dialog">
-                    <DialogHeader>
-                        <DialogTitle>Zur Freigabe einreichen</DialogTitle>
-                        <DialogDescription>
-                            Der Dispoauftrag wird zur Vertriebsfreigabe
-                            eingereicht. Eine zweite Person muss danach
-                            genehmigen oder ablehnen. Ein direkter Übergang zur
-                            Disposition ist nicht möglich.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {error ? (
-                        <ErrorState
-                            message={error}
-                            data-test="dispo-order-submit-error"
-                        />
-                    ) : null}
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setSubmitOpen(false)}
-                            disabled={submitting}
-                        >
-                            Abbrechen
-                        </Button>
-                        <Button
-                            type="button"
-                            data-test="dispo-order-submit-confirm"
-                            disabled={submitting}
-                            onClick={() =>
-                                void runAction(
-                                    `/dispoauftraege/${orderId}/einreichen`,
-                                    {},
-                                    () => setSubmitOpen(false),
-                                )
-                            }
-                        >
-                            {submitting ? 'Wird eingereicht…' : 'Einreichen'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
-                <DialogContent data-test="dispo-order-approve-dialog">
-                    <DialogHeader>
-                        <DialogTitle>Dispoauftrag genehmigen</DialogTitle>
-                        <DialogDescription>
-                            Nach der Genehmigung liegt der Auftrag bei der
-                            Disposition. Eine optionale Notiz wird in der
-                            Freigabehistorie gespeichert.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-2">
-                        <Label htmlFor={noteId}>Notiz (optional)</Label>
-                        <textarea
-                            id={noteId}
-                            className={formTextareaClass}
-                            value={note}
-                            maxLength={500}
-                            data-test="dispo-order-approve-note"
-                            onChange={(event) => setNote(event.target.value)}
-                            disabled={submitting}
-                        />
-                    </div>
-                    {showUploadEvidence && customerConfirmationUpload ? (
-                        <div
-                            className="space-y-1 text-sm"
-                            data-test="approval-customer-confirmation-upload"
-                        >
-                            <p className="font-medium">
-                                Kundenbestätigung (Upload)
-                            </p>
-                            <p>
-                                {customerConfirmationUpload.original_filename}
-                            </p>
-                            <p className="text-muted-foreground">
-                                {formatFileSize(
-                                    customerConfirmationUpload.size_bytes,
-                                )}
-                                {customerConfirmationUpload.uploaded_by_name
-                                    ? ` · ${customerConfirmationUpload.uploaded_by_name}`
-                                    : ''}
-                                {customerConfirmationUpload.uploaded_at
-                                    ? ` · ${formatDateTime(customerConfirmationUpload.uploaded_at)}`
-                                    : ''}
-                            </p>
-                            {customerConfirmationUpload.download_url ? (
-                                <a
-                                    href={
-                                        customerConfirmationUpload.download_url
-                                    }
-                                    className="text-primary underline-offset-4 hover:underline"
-                                    data-test="approval-customer-confirmation-download"
-                                >
-                                    Herunterladen
-                                </a>
-                            ) : null}
-                        </div>
-                    ) : null}
-                    {showExceptionAck ? (
-                        <div className="flex items-start gap-3">
-                            <Checkbox
-                                id={ackId}
-                                checked={exceptionAck}
-                                disabled={submitting}
-                                data-test="customer-confirmation-exception-ack"
-                                onCheckedChange={(value) =>
-                                    setExceptionAck(value === true)
-                                }
+            {showSubmitUi ? (
+                <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
+                    <DialogContent data-test="dispo-order-submit-dialog">
+                        <DialogHeader>
+                            <DialogTitle>Zur Freigabe einreichen</DialogTitle>
+                            <DialogDescription>
+                                Der Dispoauftrag wird zur Vertriebsfreigabe
+                                eingereicht. Eine zweite Person muss danach
+                                genehmigen oder ablehnen. Ein direkter Übergang
+                                zur Disposition ist nicht möglich.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {error ? (
+                            <ErrorState
+                                message={error}
+                                data-test="dispo-order-submit-error"
                             />
-                            <Label
-                                htmlFor={ackId}
-                                className="text-sm leading-snug font-normal"
+                        ) : null}
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSubmitOpen(false)}
+                                disabled={submitting}
                             >
-                                Ausnahme ohne Kundenbestätigungs-Upload
-                                ausdrücklich mitfreigeben
-                            </Label>
-                        </div>
-                    ) : null}
-                    {error ? (
-                        <ErrorState
-                            message={error}
-                            data-test="dispo-order-approve-error"
-                        />
-                    ) : null}
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setApproveOpen(false)}
-                            disabled={submitting}
-                        >
-                            Abbrechen
-                        </Button>
-                        <Button
-                            type="button"
-                            data-test="dispo-order-approve-confirm"
-                            disabled={
-                                submitting ||
-                                (showExceptionAck && !exceptionAck)
-                            }
-                            onClick={() =>
-                                void runAction(
-                                    `/dispoauftraege/${orderId}/genehmigen`,
-                                    {
-                                        note,
-                                        ...(showExceptionAck
-                                            ? {
-                                                  customer_confirmation_exception_acknowledged:
-                                                      exceptionAck,
-                                              }
-                                            : {}),
-                                    },
-                                    () => setApproveOpen(false),
-                                )
-                            }
-                        >
-                            {submitting ? 'Wird genehmigt…' : 'Genehmigen'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                                Abbrechen
+                            </Button>
+                            <Button
+                                type="button"
+                                data-test="dispo-order-submit-confirm"
+                                disabled={submitting}
+                                onClick={() =>
+                                    void runAction(
+                                        `/dispoauftraege/${orderId}/einreichen`,
+                                        {},
+                                        () => setSubmitOpen(false),
+                                    )
+                                }
+                            >
+                                {submitting
+                                    ? 'Wird eingereicht…'
+                                    : 'Einreichen'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
 
-            <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                <DialogContent data-test="dispo-order-reject-dialog">
-                    <DialogHeader>
-                        <DialogTitle>Dispoauftrag ablehnen</DialogTitle>
-                        <DialogDescription>
-                            Eine Ablehnung betrifft diesen Snapshot endgültig.
-                            Der Auftrag bleibt unveränderbar im Status „Freigabe
-                            abgelehnt“. Eine Korrektur erfolgt über eine neue
-                            Nachbesserung der Kalkulation.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-2">
-                        <Label htmlFor={reasonId}>Begründung</Label>
-                        <textarea
-                            id={reasonId}
-                            className={formTextareaClass}
-                            value={reason}
-                            required
-                            maxLength={2000}
-                            data-test="dispo-order-reject-reason"
-                            aria-invalid={
-                                error !== null && reason.trim() === ''
-                                    ? true
-                                    : undefined
-                            }
-                            onChange={(event) => setReason(event.target.value)}
-                            disabled={submitting}
-                        />
-                    </div>
-                    {error ? (
-                        <ErrorState
-                            message={error}
-                            data-test="dispo-order-reject-error"
-                        />
-                    ) : null}
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setRejectOpen(false)}
-                            disabled={submitting}
-                        >
-                            Abbrechen
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="destructive"
-                            data-test="dispo-order-reject-confirm"
-                            disabled={submitting}
-                            onClick={() =>
-                                void runAction(
-                                    `/dispoauftraege/${orderId}/ablehnen`,
-                                    { reason },
-                                    () => setRejectOpen(false),
-                                )
-                            }
-                        >
-                            {submitting ? 'Wird abgelehnt…' : 'Ablehnen'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {showDecisionUi ? (
+                <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
+                    <DialogContent data-test="dispo-order-approve-dialog">
+                        <DialogHeader>
+                            <DialogTitle>Dispoauftrag genehmigen</DialogTitle>
+                            <DialogDescription>
+                                Nach der Genehmigung liegt der Auftrag bei der
+                                Disposition. Eine optionale Notiz wird in der
+                                Freigabehistorie gespeichert.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-2">
+                            <Label htmlFor={noteId}>Notiz (optional)</Label>
+                            <textarea
+                                id={noteId}
+                                className={formTextareaClass}
+                                value={note}
+                                maxLength={500}
+                                data-test="dispo-order-approve-note"
+                                onChange={(event) =>
+                                    setNote(event.target.value)
+                                }
+                                disabled={submitting}
+                            />
+                        </div>
+                        {showUploadEvidence && customerConfirmationUpload ? (
+                            <div
+                                className="space-y-1 text-sm"
+                                data-test="approval-customer-confirmation-upload"
+                            >
+                                <p className="font-medium">
+                                    Kundenbestätigung (Upload)
+                                </p>
+                                <p>
+                                    {
+                                        customerConfirmationUpload.original_filename
+                                    }
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {formatFileSize(
+                                        customerConfirmationUpload.size_bytes,
+                                    )}
+                                    {customerConfirmationUpload.uploaded_by_name
+                                        ? ` · ${customerConfirmationUpload.uploaded_by_name}`
+                                        : ''}
+                                    {customerConfirmationUpload.uploaded_at
+                                        ? ` · ${formatDateTime(customerConfirmationUpload.uploaded_at)}`
+                                        : ''}
+                                </p>
+                                {customerConfirmationUpload.download_url ? (
+                                    <a
+                                        href={
+                                            customerConfirmationUpload.download_url
+                                        }
+                                        className="text-primary underline-offset-4 hover:underline"
+                                        data-test="approval-customer-confirmation-download"
+                                    >
+                                        Herunterladen
+                                    </a>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {showExceptionAck ? (
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    id={ackId}
+                                    checked={exceptionAck}
+                                    disabled={submitting}
+                                    data-test="customer-confirmation-exception-ack"
+                                    onCheckedChange={(value) =>
+                                        setExceptionAck(value === true)
+                                    }
+                                />
+                                <Label
+                                    htmlFor={ackId}
+                                    className="text-sm leading-snug font-normal"
+                                >
+                                    Ausnahme ohne Kundenbestätigungs-Upload
+                                    ausdrücklich mitfreigeben
+                                </Label>
+                            </div>
+                        ) : null}
+                        {error ? (
+                            <ErrorState
+                                message={error}
+                                data-test="dispo-order-approve-error"
+                            />
+                        ) : null}
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setApproveOpen(false)}
+                                disabled={submitting}
+                            >
+                                Abbrechen
+                            </Button>
+                            <Button
+                                type="button"
+                                data-test="dispo-order-approve-confirm"
+                                disabled={
+                                    submitting ||
+                                    (showExceptionAck && !exceptionAck)
+                                }
+                                onClick={() =>
+                                    void runAction(
+                                        `/dispoauftraege/${orderId}/genehmigen`,
+                                        {
+                                            note,
+                                            ...(showExceptionAck
+                                                ? {
+                                                      customer_confirmation_exception_acknowledged:
+                                                          exceptionAck,
+                                                  }
+                                                : {}),
+                                        },
+                                        () => setApproveOpen(false),
+                                    )
+                                }
+                            >
+                                {submitting ? 'Wird genehmigt…' : 'Genehmigen'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+
+            {showDecisionUi ? (
+                <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+                    <DialogContent data-test="dispo-order-reject-dialog">
+                        <DialogHeader>
+                            <DialogTitle>Dispoauftrag ablehnen</DialogTitle>
+                            <DialogDescription>
+                                Eine Ablehnung betrifft diesen Snapshot
+                                endgültig. Der Auftrag bleibt unveränderbar im
+                                Status „Freigabe abgelehnt“. Eine Korrektur
+                                erfolgt über eine neue Nachbesserung der
+                                Kalkulation.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-2">
+                            <Label htmlFor={reasonId}>Begründung</Label>
+                            <textarea
+                                id={reasonId}
+                                className={formTextareaClass}
+                                value={reason}
+                                required
+                                maxLength={2000}
+                                data-test="dispo-order-reject-reason"
+                                aria-invalid={
+                                    error !== null && reason.trim() === ''
+                                        ? true
+                                        : undefined
+                                }
+                                onChange={(event) =>
+                                    setReason(event.target.value)
+                                }
+                                disabled={submitting}
+                            />
+                        </div>
+                        {error ? (
+                            <ErrorState
+                                message={error}
+                                data-test="dispo-order-reject-error"
+                            />
+                        ) : null}
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRejectOpen(false)}
+                                disabled={submitting}
+                            >
+                                Abbrechen
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                data-test="dispo-order-reject-confirm"
+                                disabled={submitting}
+                                onClick={() =>
+                                    void runAction(
+                                        `/dispoauftraege/${orderId}/ablehnen`,
+                                        { reason },
+                                        () => setRejectOpen(false),
+                                    )
+                                }
+                            >
+                                {submitting ? 'Wird abgelehnt…' : 'Ablehnen'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
         </div>
     );
 }
