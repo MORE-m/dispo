@@ -3,6 +3,8 @@ import { expect, type Page } from '@playwright/test';
 /**
  * PO-CALC-DISPO-UX-1: Frische manuelle Positionen starten ohne Inventar.
  * Bestehende E2E-Flows rufen dies auf, bevor Positionsfelder bedient werden.
+ *
+ * Das native Select ist sr-only/aria-hidden – Sichtbarkeit daran nicht koppeln.
  */
 export async function ensureWizardInventorySelected(
     page: Page,
@@ -12,10 +14,15 @@ export async function ensureWizardInventorySelected(
         label: 'Radio Hamburg',
     },
 ): Promise<void> {
+    const picker = page.locator(
+        `[data-test="position-inventory-picker-${positionIndex}"]`,
+    );
+    await expect(picker).toBeVisible({ timeout: 30_000 });
+
     const select = page.locator(
         `[data-test="position-inventory-${positionIndex}"]`,
     );
-    await expect(select).toBeVisible({ timeout: 15_000 });
+    await expect(select).toBeAttached({ timeout: 15_000 });
 
     const current = await select.inputValue();
     if (current !== '') {
@@ -27,15 +34,15 @@ export async function ensureWizardInventorySelected(
             `[data-test="position-inventory-tile-${positionIndex}-${inventory.code}"]`,
         );
         if ((await tile.count()) > 0) {
-            await tile.click();
-            await expect(select).not.toHaveValue('');
+            await tile.click({ force: true });
+            await expect(select).not.toHaveValue('', { timeout: 15_000 });
             return;
         }
     }
 
     if (inventory.label) {
         await select.selectOption({ label: inventory.label });
-        await expect(select).not.toHaveValue('');
+        await expect(select).not.toHaveValue('', { timeout: 15_000 });
         return;
     }
 
