@@ -130,8 +130,12 @@ npm run test:unit
 npm run build
 npx playwright test
 composer audit
-npm audit --omit=dev
+node scripts/npm-audit-production.mjs
 ```
+
+`node scripts/npm-audit-production.mjs` führt `npm audit --omit=dev` aus und wertet
+das JSON aus. Nur die befristete Ausnahme `GHSA-fc5q-39xc-vjpf` (picomatch) darf
+bestehen; siehe `docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md`.
 
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
 MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
