@@ -11,6 +11,8 @@
         "check:fix": "vp check --fix",
         "types:check": "tsc --noEmit",
         "test:unit": "vitest run",
+        "audit:production": "node scripts/npm-audit-production.mjs",
+        "test:security:npm-audit": "node --test tests/security/npm-audit-production.test.mjs",
         "test:e2e": "playwright test",
         "test:e2e:blp402b": "playwright test -c playwright.blp402b.config.ts",
         "test:e2e:blp402c": "playwright test -c playwright.blp402c.config.ts",
