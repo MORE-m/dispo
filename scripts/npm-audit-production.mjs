@@ -55,7 +55,11 @@ export function advisoryMatchesException(advisory) {
  * @param {Set<string>} [stack]
  * @returns {boolean}
  */
-export function packageOnlyExempted(vulnerabilities, packageName, stack = new Set()) {
+export function packageOnlyExempted(
+    vulnerabilities,
+    packageName,
+    stack = new Set(),
+) {
     if (stack.has(packageName)) {
         return true;
     }
@@ -132,15 +136,11 @@ export function evaluateProductionAudit(report, options = {}) {
  * @param {string} cwd
  */
 export function runNpmAuditJson(cwd) {
-    const result = spawnSync(
-        'npm',
-        ['audit', '--omit=dev', '--json'],
-        {
-            cwd,
-            encoding: 'utf8',
-            maxBuffer: 20 * 1024 * 1024,
-        },
-    );
+    const result = spawnSync('npm', ['audit', '--omit=dev', '--json'], {
+        cwd,
+        encoding: 'utf8',
+        maxBuffer: 20 * 1024 * 1024,
+    });
 
     const stdout = result.stdout ?? '';
     if (!stdout.trim()) {
