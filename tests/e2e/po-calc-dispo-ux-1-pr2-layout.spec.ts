@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
-/** PR2 layout contract; CI re-verified after main absorbed SEC-NPM-AUDIT (#255). */
+/** PR2 layout contract; CI must verify sticky chat + closing order after SEC-NPM-AUDIT (#255) on main. */
 async function login(page: Page, email: string) {
     await page.goto('/login');
     await page.locator('#email').fill(email);
