@@ -71,25 +71,22 @@ void describe('npm-audit-production exception filter', () => {
         );
     });
 
-    void it(
-        'accepts metavulnerabilities that only stem from the allow-listed GHSA',
-        () => {
-            assert.equal(
-                packageOnlyExempted(
-                    picomatchReport.vulnerabilities,
-                    'laravel-vite-plugin',
-                ),
-                true,
-            );
-            assert.equal(
-                packageOnlyExempted(
-                    picomatchReport.vulnerabilities,
-                    '@inertiajs/vite',
-                ),
-                true,
-            );
-        },
-    );
+    void it('accepts metavulnerabilities that only stem from the allow-listed GHSA', () => {
+        assert.equal(
+            packageOnlyExempted(
+                picomatchReport.vulnerabilities,
+                'laravel-vite-plugin',
+            ),
+            true,
+        );
+        assert.equal(
+            packageOnlyExempted(
+                picomatchReport.vulnerabilities,
+                '@inertiajs/vite',
+            ),
+            true,
+        );
+    });
 
     void it('fails when another advisory is present', () => {
         const mixed = structuredClone(picomatchReport);
@@ -112,17 +109,14 @@ void describe('npm-audit-production exception filter', () => {
         assert.deepEqual(verdict.remaining, ['source-map-js']);
     });
 
-    void it(
-        'passes when only the allow-listed chain is present before expiry',
-        () => {
-            const verdict = evaluateProductionAudit(picomatchReport, {
-                now: new Date('2026-11-18T12:00:00Z'),
-            });
-            assert.equal(verdict.ok, true);
-            assert.ok(verdict.exempted.includes('picomatch'));
-            assert.ok(verdict.exempted.includes('laravel-vite-plugin'));
-        },
-    );
+    void it('passes when only the allow-listed chain is present before expiry', () => {
+        const verdict = evaluateProductionAudit(picomatchReport, {
+            now: new Date('2026-11-18T12:00:00Z'),
+        });
+        assert.equal(verdict.ok, true);
+        assert.ok(verdict.exempted.includes('picomatch'));
+        assert.ok(verdict.exempted.includes('laravel-vite-plugin'));
+    });
 
     void it('fails after the documented expiry date', () => {
         assert.equal(
