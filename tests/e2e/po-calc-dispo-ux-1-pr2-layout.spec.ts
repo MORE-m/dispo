@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
+/** PR2 layout contract; CI re-verified after main absorbed SEC-NPM-AUDIT (#255). */
 async function login(page: Page, email: string) {
     await page.goto('/login');
     await page.locator('#email').fill(email);
