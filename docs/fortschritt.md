@@ -877,6 +877,19 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Historischer Post-Merge-Run `37421402438` | **FAILURE** (`npm audit --omit=dev`, GHSA-68fv-2mgg-jv7q); mysql/e2e-spt008 und Pint/PHPStan/Pest grün; Browser-Steps übersprungen |
 | Deploy | **kein** |
 
+## npm-audit picomatch / GHSA-fc5q-39xc-vjpf (November 2026)
+
+| Prüfpunkt | Status |
+|---|---|
+| Advisory `<= 4.0.7`, Patch-Release | **keine** veröffentlicht |
+| Breaking-Vorschlag `laravel-vite-plugin@2.1.0` | **abgelehnt** |
+| Praxisrisiko Runtime | **niedrig** (Build-Tooling) |
+| Befristete Ausnahme bis 2026-12-18 | freigegeben (`scripts/npm-audit-production.mjs`) |
+| PO-/Security-Freigabe | **18.11.2026** – `docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md` |
+| PR #255 | Security-Chore mit fail-closed Audit-Helper |
+| PR #254 | bleibt Draft bis Chore auf `main` |
+| Verlängerung | **keine** stillschweigende; Restrisiko ungepatcht |
+
 ## npm-audit source-map-js / GHSA-68fv-2mgg-jv7q (Oktober 2026)
 
 | Prüfpunkt | Status |

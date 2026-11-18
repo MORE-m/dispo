@@ -81,7 +81,9 @@ jobs:
         run: composer audit
 
       - name: npm audit (production)
-        run: npm audit --omit=dev
+        run: |
+          node --test tests/security/npm-audit-production.test.mjs
+          node scripts/npm-audit-production.mjs
 
       - name: Playwright browsers
         run: npx playwright install --with-deps chromium
