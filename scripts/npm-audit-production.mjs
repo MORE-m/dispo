@@ -22,6 +22,8 @@ export const EXCEPTION = {
     ghsa: 'GHSA-fc5q-39xc-vjpf',
     /** npm advisory source id observed in audit JSON for this GHSA */
     sourceIds: new Set([1247710]),
+    /** PO-/Security-Freigabe erteilt am 18.11.2026 (siehe Entscheidungsdok). */
+    approvedOn: '2026-11-18',
     /** Inclusive calendar date (UTC) – after this the exception must be re-approved. */
     expiresOn: '2026-12-18',
     packageName: 'picomatch',

@@ -1,10 +1,37 @@
 # SEC-NPM-AUDIT-PICOMATCH – GHSA-fc5q-39xc-vjpf
 
-Status: **PO-/Security-Entscheidung – Draft zur Freigabe**  
-Datum: **18.11.2026**  
+Status: **PO-/Security-Freigabe erteilt**  
+Datum Entscheidung: **18.11.2026**  
+Freigabedatum: **18.11.2026**  
+Ablaufdatum: **18.12.2026 einschließlich (UTC)**  
 Kennung: `SEC-NPM-AUDIT-PICOMATCH-1`  
 Advisory: [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) / CVE-2026-112366  
-Bezug: CI-Blocker PR #254 / Run `44162317657`, `origin/main` @ `366c535`
+Bezug: CI-Blocker PR #254 / Run `44162317657`, `origin/main` @ `366c535`  
+Security-Fix + Tests: PR #255 / Feature-HEAD vor Freigabe-Doku `d81bb31c3bfeef06687abc6c8f99c7cc1b95d03b` / CI `44307557326`
+
+---
+
+## PO-/Security-Freigabe (verbindlich)
+
+Am **18.11.2026** hat der Product Owner die befristete Security-Ausnahme **ausdrücklich freigegeben**.
+
+Freigabeumfang:
+
+- Advisory `GHSA-fc5q-39xc-vjpf` / CVE-2026-112366 / Paket `picomatch`
+- Ablauf **18.12.2026 einschließlich (UTC)**
+- ausschließlich diese Advisory sowie nachweislich daraus abgeleitete Metavulnerabilities
+- nur unter den Bedingungen von PR #255 (fail-closed Audit-Helper, Unit-Tests, unveränderte Ausnahmebreite)
+
+Begründung der Freigabe:
+
+1. Zum Entscheidungszeitpunkt kein veröffentlichtes gepatchtes `picomatch`-Release.
+2. Kein nachgewiesener Angriffspfad über den Laravel-/HTTP-Produktbetrieb.
+3. Betroffenheit liegt im Build-/Entwicklungskontext (Vite/Tooling), nicht im ausgelieferten App-Runtime-Pfad.
+
+Die Freigabe autorisiert die **befristete Ausnahme**, nicht die Behauptung, dass die Schwachstelle behoben sei.  
+**Keine stillschweigende Verlängerung** – jede Verlängerung oder Erweiterung erfordert eine neue PO-/Security-Freigabe.
+
+Überprüfter Security-Fix (Findings 1/2): unbekannte/zyklische Metaketten und ungültige Audit-Berichte fail-closed; Tests in `tests/security/npm-audit-production.test.mjs`.
 
 ---
 
@@ -85,18 +112,29 @@ Tests: `tests/security/npm-audit-production.test.mjs`
 
 ---
 
+## Verbleibendes Restrisiko und Neubewertung
+
+- `picomatch` bleibt **ungepatcht** im Dependency-Tree (`<= 4.0.7`).
+- Restrisiko: ReDoS bei adversen Extglob-Patterns auf Build-/Dev-Hosts.
+- Produktbetrieb (Laravel/HTTP, ausgeliefertes Frontend-Bundle): kein bekannter Angriffspfad.
+- **Neubewertung spätestens am/vor 18.12.2026** bzw. sofort bei gepatchtem Upstream-Release.
+- Nach Ablauf ohne neue Freigabe muss der CI-Check fehlschlagen.
+
+---
+
 ## Follow-up (verbindlich)
 
 1. Wöchentlich bzw. spätestens vor Ablauf prüfen, ob `picomatch` eine Patch-Version veröffentlicht hat.
 2. Sobald Patch verfügbar: Ausnahme entfernen, Lockfile auf gepatchte Version bringen, Audit wieder ohne Exception grün.
 3. Breaking-Downgrade von `laravel-vite-plugin` bleibt ohne separate technische Freigabe verboten.
 4. PR #254 (PO-CALC-DISPO-UX-1 PR2) bleibt Draft, bis dieser Security-Chore auf `main` ist und die Gates wieder grün sind.
+5. Keine Verlängerung der Ausnahme ohne erneute PO-/Security-Freigabe.
 
 ---
 
 ## Nicht-Scope
 
-- Keine Änderungen an PR #254 / Dispo-Layout.
+- Keine Änderungen an PR #254 / Dispo-Layout im Rahmen dieser Entscheidung.
 - Kein `npm audit fix --force`.
 - Keine Mutation von `dispo_mat_core`.
-- Kein Merge ohne PO-/Security-Freigabe dieser Entscheidung.
+- Keine pauschale Severity-Absenkung und kein Abschalten von `npm audit --omit=dev`.

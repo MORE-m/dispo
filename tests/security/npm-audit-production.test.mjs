@@ -314,6 +314,7 @@ void describe('npm-audit-production exception filter', () => {
         });
         assert.equal(expired.ok, false);
         assert.match(expired.reason, /expired/i);
+        assert.equal(EXCEPTION.approvedOn, '2026-11-18');
         assert.equal(EXCEPTION.expiresOn, '2026-12-18');
     });
 });
