@@ -16,6 +16,7 @@ import path from 'node:path';
 
 /** @typedef {{ source?: number, name?: string, title?: string, url?: string, severity?: string, range?: string }} AdvisoryVia */
 /** @typedef {{ via: Array<string|AdvisoryVia>, severity?: string }} VulnEntry */
+/** @typedef {{ vulnerabilities: Record<string, VulnEntry>, metadata?: unknown, error?: unknown, message?: unknown }} AuditReport */
 
 export const EXCEPTION = {
     ghsa: 'GHSA-fc5q-39xc-vjpf',
@@ -25,6 +26,9 @@ export const EXCEPTION = {
     expiresOn: '2026-12-18',
     packageName: 'picomatch',
 };
+
+/** npm audit: 0 = clean, 1 = vulnerabilities reported. Other codes are tool failures. */
+const ACCEPTED_NPM_AUDIT_STATUSES = new Set([0, 1]);
 
 /**
  * @param {string} expiresOn
@@ -52,45 +56,160 @@ export function advisoryMatchesException(advisory) {
 /**
  * @param {Record<string, VulnEntry>} vulnerabilities
  * @param {string} packageName
- * @param {Set<string>} [stack]
+ * @param {Set<string>} visiting
+ * @returns {true|false|'cycle'}
+ */
+function resolvePackageExemption(vulnerabilities, packageName, visiting) {
+    if (visiting.has(packageName)) {
+        // Signal cyclic edge to the caller; never treat as proven exemption.
+        return 'cycle';
+    }
+
+    const entry = vulnerabilities[packageName];
+    if (entry === undefined || entry === null || typeof entry !== 'object') {
+        return false;
+    }
+
+    const vias = entry.via;
+    if (!Array.isArray(vias) || vias.length === 0) {
+        return false;
+    }
+
+    visiting.add(packageName);
+
+    let sawConcreteProof = false;
+    let sawCycleOnlyChild = false;
+
+    for (const via of vias) {
+        if (typeof via === 'string') {
+            if (via.trim() === '') {
+                visiting.delete(packageName);
+                return false;
+            }
+
+            const child = resolvePackageExemption(
+                vulnerabilities,
+                via,
+                visiting,
+            );
+            if (child === 'cycle') {
+                // Back-edge / unresolved cycle: do not count as proof.
+                sawCycleOnlyChild = true;
+                continue;
+            }
+            if (child !== true) {
+                visiting.delete(packageName);
+                return false;
+            }
+            sawConcreteProof = true;
+            continue;
+        }
+
+        if (via === null || typeof via !== 'object') {
+            visiting.delete(packageName);
+            return false;
+        }
+
+        if (!advisoryMatchesException(via)) {
+            visiting.delete(packageName);
+            return false;
+        }
+        sawConcreteProof = true;
+    }
+
+    visiting.delete(packageName);
+
+    if (sawConcreteProof) {
+        return true;
+    }
+
+    // Propagate unresolved cycles to the parent so a sibling allow-listed
+    // advisory on the parent can still prove the chain.
+    if (sawCycleOnlyChild) {
+        return 'cycle';
+    }
+
+    return false;
+}
+
+/**
+ * Returns whether every vulnerability path for `packageName` resolves only to the
+ * allow-listed GHSA. Unknown references and unresolved cycles fail closed.
+ *
+ * @param {Record<string, VulnEntry>} vulnerabilities
+ * @param {string} packageName
+ * @param {Set<string>} [visiting] path-local recursion guard (do not reuse across roots)
  * @returns {boolean}
  */
 export function packageOnlyExempted(
     vulnerabilities,
     packageName,
-    stack = new Set(),
+    visiting = new Set(),
 ) {
-    if (stack.has(packageName)) {
-        return true;
-    }
-    stack.add(packageName);
-
-    const entry = vulnerabilities[packageName];
-    if (!entry) {
-        return true;
-    }
-
-    for (const via of entry.via ?? []) {
-        if (typeof via === 'string') {
-            if (!packageOnlyExempted(vulnerabilities, via, stack)) {
-                return false;
-            }
-            continue;
-        }
-
-        if (!advisoryMatchesException(via)) {
-            return false;
-        }
-    }
-
-    return true;
+    return (
+        resolvePackageExemption(vulnerabilities, packageName, visiting) === true
+    );
 }
 
 /**
- * @param {{ vulnerabilities?: Record<string, VulnEntry>, metadata?: { vulnerabilities?: Record<string, number> } }} report
+ * @param {unknown} report
+ * @returns {asserts report is AuditReport}
+ */
+export function assertValidAuditReport(report) {
+    if (
+        report === null ||
+        typeof report !== 'object' ||
+        Array.isArray(report)
+    ) {
+        throw new Error('npm audit report must be a JSON object');
+    }
+
+    const record = /** @type {Record<string, unknown>} */ (report);
+
+    if (
+        'error' in record &&
+        record.error !== undefined &&
+        record.error !== null
+    ) {
+        throw new Error(
+            `npm audit reported an error: ${typeof record.error === 'string' ? record.error : JSON.stringify(record.error)}`,
+        );
+    }
+
+    if (!Object.hasOwn(record, 'vulnerabilities')) {
+        throw new Error('npm audit report is missing a vulnerabilities object');
+    }
+
+    if (
+        record.vulnerabilities === null ||
+        typeof record.vulnerabilities !== 'object' ||
+        Array.isArray(record.vulnerabilities)
+    ) {
+        throw new Error(
+            'npm audit report vulnerabilities must be a plain object',
+        );
+    }
+}
+
+/**
+ * @param {unknown} report
  * @param {{ now?: Date }} [options]
  */
 export function evaluateProductionAudit(report, options = {}) {
+    try {
+        assertValidAuditReport(report);
+    } catch (error) {
+        return {
+            ok: false,
+            reason:
+                error instanceof Error
+                    ? error.message
+                    : 'Invalid npm audit report',
+            remaining: [],
+            exempted: [],
+        };
+    }
+
     if (isExceptionExpired(EXCEPTION.expiresOn, options.now)) {
         return {
             ok: false,
@@ -100,12 +219,13 @@ export function evaluateProductionAudit(report, options = {}) {
         };
     }
 
-    const vulnerabilities = report.vulnerabilities ?? {};
+    const vulnerabilities = report.vulnerabilities;
     const remaining = [];
     const exempted = [];
 
     for (const name of Object.keys(vulnerabilities).sort()) {
-        if (packageOnlyExempted(vulnerabilities, name)) {
+        // Fresh visiting set per root package so independent paths do not leak state.
+        if (packageOnlyExempted(vulnerabilities, name, new Set())) {
             exempted.push(name);
         } else {
             remaining.push(name);
@@ -134,13 +254,31 @@ export function evaluateProductionAudit(report, options = {}) {
 
 /**
  * @param {string} cwd
+ * @param {{ spawnSyncImpl?: typeof spawnSync }} [options]
  */
-export function runNpmAuditJson(cwd) {
-    const result = spawnSync('npm', ['audit', '--omit=dev', '--json'], {
+export function runNpmAuditJson(cwd, options = {}) {
+    const spawn = options.spawnSyncImpl ?? spawnSync;
+    const result = spawn('npm', ['audit', '--omit=dev', '--json'], {
         cwd,
         encoding: 'utf8',
         maxBuffer: 20 * 1024 * 1024,
     });
+
+    if (result.error) {
+        throw new Error(`npm audit failed to start: ${result.error.message}`);
+    }
+
+    if (result.status === null) {
+        throw new Error(
+            `npm audit terminated by signal ${result.signal ?? 'unknown'}`,
+        );
+    }
+
+    if (!ACCEPTED_NPM_AUDIT_STATUSES.has(result.status)) {
+        throw new Error(
+            `npm audit exited with unexpected status ${result.status}: ${result.stderr ?? ''}`,
+        );
+    }
 
     const stdout = result.stdout ?? '';
     if (!stdout.trim()) {
@@ -149,18 +287,29 @@ export function runNpmAuditJson(cwd) {
         );
     }
 
+    let parsed;
     try {
-        return JSON.parse(stdout);
+        parsed = JSON.parse(stdout);
     } catch (error) {
         throw new Error(
             `Failed to parse npm audit JSON: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
+
+    assertValidAuditReport(parsed);
+    return parsed;
 }
 
 function main() {
     const cwd = process.cwd();
-    const report = runNpmAuditJson(cwd);
+    let report;
+    try {
+        report = runNpmAuditJson(cwd);
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+    }
+
     const verdict = evaluateProductionAudit(report);
 
     console.log(
