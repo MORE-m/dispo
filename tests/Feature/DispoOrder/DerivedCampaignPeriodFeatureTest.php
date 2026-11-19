@@ -450,6 +450,8 @@ class DerivedCampaignPeriodFeatureTest extends TestCase
         return [
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
+            // Fixture für Submit-Pfade (PO-PR4: kein stilles RE-Default mehr im Writer).
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fp['header'],
             'dynamic_field_values' => [
@@ -484,6 +486,7 @@ class DerivedCampaignPeriodFeatureTest extends TestCase
         return [
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fp['header'],
             'dynamic_field_values' => [
