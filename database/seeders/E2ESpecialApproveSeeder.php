@@ -43,6 +43,7 @@ class E2ESpecialApproveSeeder extends Seeder
             'planning_mode' => 'manual',
             'schema_fingerprint' => $baseFingerprint,
             'customer_name' => 'Sonderfreigabe Smoke GmbH',
+            'invoice_recipient' => 'customer',
             'campaign' => 'Sonderfreigabe-Smoke-B',
             'product_title' => 'Sonderfreigabe Smoke Produkt',
             'order_discount_percent' => '0',

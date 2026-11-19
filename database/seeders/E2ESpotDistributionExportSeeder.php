@@ -125,6 +125,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $calendarCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Calendar GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[
@@ -153,6 +154,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $tandemCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Tandem GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[
@@ -185,6 +187,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $mixedCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Mixed GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [
@@ -231,6 +234,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $averageCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Average GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[
@@ -262,6 +266,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $multiCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Multi Calendar GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [
@@ -340,6 +345,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
         $emptyCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'SPT008 Empty Export GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[

@@ -113,6 +113,7 @@ class E2EGeneralCommentSeeder extends Seeder
         $calc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP902A Kommentar GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[

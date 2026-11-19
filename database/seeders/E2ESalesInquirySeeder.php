@@ -111,6 +111,7 @@ class E2ESalesInquirySeeder extends Seeder
         $calc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP802B Rückfrage GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[

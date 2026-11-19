@@ -118,6 +118,7 @@ class E2EInvoiceCompletionSeeder extends Seeder
         $calcHappy = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP802D Happy Path GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],
@@ -167,6 +168,7 @@ class E2EInvoiceCompletionSeeder extends Seeder
         $calcAt18 = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP802D AT-18 Blocked GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],
@@ -217,6 +219,7 @@ class E2EInvoiceCompletionSeeder extends Seeder
         $calcOverride = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP802D Override GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],

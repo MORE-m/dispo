@@ -194,6 +194,7 @@ class E2ECompletedReopenCancellationSeeder extends Seeder
         $calculation = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $ctx['schemaFp'],
             'dynamic_field_values' => ['campaign_period' => null],
