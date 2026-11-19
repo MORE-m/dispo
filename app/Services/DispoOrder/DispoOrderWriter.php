@@ -223,6 +223,8 @@ final class DispoOrderWriter
         }
         $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
         if ($revises !== null) {
+            // PO-UX-02 / PR3: operative Kopfdaten vom Vorgänger-Dispo, nicht erneut aus der Calc.
+            $this->applyOperativeHeaderFromPredecessor($order, $revises);
             // Nachbesserung erbt die eingefrorene Konfiguration des Vorgängers.
             $this->dynamicFields->assignClonedSnapshot($order, $revises);
         } else {
@@ -327,6 +329,21 @@ final class DispoOrderWriter
                 'has_revision' => true,
             ],
         );
+    }
+
+    /**
+     * Übernimmt Agentur, Rechnungsempfänger und Briefing vom Vorgänger.
+     * Kunde bleibt aus dem Calc-Freeze ({@see DispoOrderSnapshotMapper::headerFromCalculation}).
+     */
+    private function applyOperativeHeaderFromPredecessor(DispoOrder $order, DispoOrder $predecessor): void
+    {
+        $order->agency_name = $predecessor->agency_name;
+        $order->agency_account_id = $predecessor->agency_account_id;
+        $order->agency_version_id = $predecessor->agency_version_id;
+        $order->agency_meridian_number = $predecessor->agency_meridian_number;
+        $order->agency_salesforce_account_id = $predecessor->agency_salesforce_account_id;
+        $order->invoice_recipient = $predecessor->invoice_recipient;
+        $order->briefing = $predecessor->briefing;
     }
 
     private function isUniqueRevisesViolation(QueryException $exception): bool

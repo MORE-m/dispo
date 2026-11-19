@@ -539,6 +539,10 @@ class PoCalcTkp1d3d2b1OperationalFlightTest extends TestCase
     {
         return $this->withLiveSchemaFingerprint(array_merge([
             'planning_mode' => 'manual',
+            'customer_name' => 'OA Flight Kunde GmbH',
+            'campaign' => 'OA Flight',
+            'product_title' => 'OA Flight Titel',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
             'dynamic_field_values' => ['campaign_period' => null],

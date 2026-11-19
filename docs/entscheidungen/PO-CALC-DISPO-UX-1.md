@@ -156,11 +156,31 @@ Umgesetzt und gemergt (`366c535`, PR #253) gemäß PO-UX-05 (manuell + Budget) u
 
 ## Umsetzungsstand PR2
 
-Implementiert in Branch `feat/po-calc-dispo-ux-1-pr2-layout` (Draft in Review):
+Gemergt (PR #254, `bc59dcd`):
 
 - Zweispaltiges Desktop-Layout ab `xl` mit sticky Kommunikations-Sidebar.
 - Mobile: Kommunikation im normalen Seitenfluss vor dem Endblock.
 - Endreihenfolge: Kundenbestätigung → Material → Dateien → „Zur Freigabe einreichen“.
 - Genehmigen/Ablehnen bleiben oben; rein darstellungsbezogene `mode`-Prop an `DispoOrderApprovalActions`.
 
-PR3–PR5 sind **nicht** Bestandteil dieses Slices.
+## Verbindliche PR3-Ergänzungen (PO-PR3-01…03, 19.11.2026)
+
+- **PO-PR3-01:** Dispositionsrechte unverändert; keine neuen Rollen/Policies.
+- **PO-PR3-02:** Vorläufige Agenturen unter denselben Wizard-/CRM-Regeln erlaubt.
+- **PO-PR3-03:** Direkte Bearbeitung nur in `draft`; `approval_rejected` nur über Revision.
+- `invoice_recipient` bleibt nullable; Pflicht erst bei Einreichung.
+- Agentur entfernen bei RE=`agency` → RE atomar `null` (kein stilles `customer`).
+- Revision übernimmt operative Kopfdaten (Agentur/RE/Briefing) vom Vorgänger-Dispo.
+- Keine neue Approval-Invalidierung.
+
+## Umsetzungsstand PR3
+
+Implementiert in Branch `feat/po-calc-dispo-ux-1-pr3-header` (Draft):
+
+- Eigenständiger Header-Update-Pfad (`dispo-orders.update-header`).
+- CRM-Binder mit Dispo-RE-Null-Semantik; Kunde read-only.
+- Submit-Gate für Rechnungsempfänger.
+- Revision erbt operative Kopfdaten vom Vorgänger.
+- Frontend: `DispoOrderHeaderEditor` in der Kopfdaten-Card; PR2-Layout unverändert.
+
+PR4–PR5 sind **nicht** Bestandteil dieses Slices.

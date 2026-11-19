@@ -396,6 +396,10 @@ class PoCalcTkp1d3d3aMaterialCompletionContractTest extends TestCase
     {
         return $this->withLiveSchemaFingerprint(array_merge([
             'planning_mode' => 'manual',
+            'customer_name' => 'OA Material Kunde GmbH',
+            'campaign' => 'OA Material',
+            'product_title' => 'OA Material Titel',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
             'dynamic_field_values' => ['campaign_period' => null],

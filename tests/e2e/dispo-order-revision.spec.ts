@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
     setCustomerConfirmationException,
 } from './helpers/customer-confirmation';
+import { ensureWizardCustomerFreitext } from './helpers/wizard-customer';
 import { ensureWizardInventorySelected } from './helpers/wizard-inventory';
 
 async function login(page: Page, email: string) {
@@ -16,6 +17,7 @@ async function login(page: Page, email: string) {
 
 async function saveSimpleCalculation(page: Page) {
     await page.goto('/kalkulationen/neu');
+    await ensureWizardCustomerFreitext(page);
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await ensureWizardInventorySelected(page);
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
