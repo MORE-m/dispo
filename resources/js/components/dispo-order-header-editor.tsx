@@ -249,17 +249,9 @@ export function DispoOrderHeaderEditor({
                     }
                 >
                     <option value="">Noch nicht festgelegt</option>
-                    <option value="customer">
-                        Kunde
-                        {order.customer_name ? ` (${order.customer_name})` : ''}
-                    </option>
+                    <option value="customer">Kunde</option>
                     <option value="agency" disabled={!agencySet}>
                         Agentur
-                        {agencySet &&
-                        agencyPicker.mode !== 'empty' &&
-                        'name' in agencyPicker
-                            ? ` (${agencyPicker.name})`
-                            : ''}
                     </option>
                 </select>
             </FormField>
