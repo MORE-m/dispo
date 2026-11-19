@@ -7,6 +7,7 @@ use App\Enums\InvoiceRecipient;
 use App\Models\Calculation;
 use App\Models\CrmAccount;
 use App\Models\CrmAccountVersion;
+use App\Models\DispoOrder;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
@@ -54,7 +55,8 @@ final class CrmOrderHeaderBinder
         array $payload,
         User $actor,
         bool $allowFreitextProvisional,
-        ?Calculation $existing = null,
+        Calculation|DispoOrder|null $existing = null,
+        bool $allowUnsetInvoiceRecipient = false,
     ): array {
         $customerTouched = $this->sideTouched(
             $payload,
@@ -145,13 +147,18 @@ final class CrmOrderHeaderBinder
                 $payload['invoice_recipient'],
                 $customer,
                 $agency,
+                $allowUnsetInvoiceRecipient,
             );
         } elseif ($existing?->invoice_recipient !== null) {
             $invoice = $this->resolveInvoiceRecipient(
                 $existing->invoice_recipient->value,
                 $customer,
                 $agency,
+                $allowUnsetInvoiceRecipient,
             );
+        } elseif ($allowUnsetInvoiceRecipient) {
+            // Dispo-Draft: kein stilles Default auf Kunde.
+            $invoice = null;
         } else {
             // Schlüssel fehlt und kein Bestand: Default Kunde bei gebundenem Kundenaccount.
             $invoice = $this->defaultInvoiceRecipientWhenOmitted($customer);
@@ -508,6 +515,7 @@ final class CrmOrderHeaderBinder
         mixed $raw,
         ?array $customer,
         ?array $agency,
+        bool $allowUnsetInvoiceRecipient = false,
     ): ?InvoiceRecipient {
         $customerBound = $customer !== null && ($customer['account_id'] ?? null) !== null;
         $agencyBound = $agency !== null && ($agency['account_id'] ?? null) !== null;
@@ -524,6 +532,11 @@ final class CrmOrderHeaderBinder
         }
 
         if ($raw === null || $raw === '') {
+            if ($allowUnsetInvoiceRecipient) {
+                // Dispo-Draft: null = noch nicht festgelegt (auch mit gebundener Agentur).
+                return null;
+            }
+
             if ($agencyBound) {
                 throw ValidationException::withMessages([
                     'invoice_recipient' => 'Rechnungsempfänger muss explizit gewählt werden (Kunde oder Agentur).',

@@ -18,6 +18,7 @@ use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
 use App\Http\Requests\DispoOrder\TransitionOperationalStatusRequest;
 use App\Http\Requests\DispoOrder\UpdateCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
+use App\Http\Requests\DispoOrder\UpdateDispoOrderHeaderRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
 use App\Http\Requests\DispoOrder\UpdateOperationalFlightRequest;
@@ -40,6 +41,7 @@ use App\Services\DispoOrder\DispoOrderCompletionReadiness;
 use App\Services\DispoOrder\DispoOrderCompletionService;
 use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
 use App\Services\DispoOrder\DispoOrderGeneralCommentService;
+use App\Services\DispoOrder\DispoOrderHeaderUpdateService;
 use App\Services\DispoOrder\DispoOrderInvoiceEndService;
 use App\Services\DispoOrder\DispoOrderOperationalFlightService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
@@ -83,6 +85,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderCompletionReadiness $completionReadiness,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
+        private readonly DispoOrderHeaderUpdateService $headerUpdate,
         private readonly SpotDistributionExportService $spotDistributionExport,
     ) {}
 
@@ -285,6 +288,23 @@ class DispoOrderController extends Controller
         );
 
         return $this->respondSuccess($request, $order, 'Dispoauftrag gespeichert.');
+    }
+
+    public function updateHeader(
+        UpdateDispoOrderHeaderRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->headerUpdate->update(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->headerPayload(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Kopfdaten gespeichert.');
     }
 
     public function updateCustomerConfirmation(

@@ -77,6 +77,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dispoauftraege/{dispoOrder}/spotverteilung.xlsx', [DispoOrderController::class, 'exportSpotDistribution'])
         ->name('dispo-orders.export-spot-distribution');
     Route::patch('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'update'])->name('dispo-orders.update');
+    Route::patch('dispoauftraege/{dispoOrder}/kopfdaten', [DispoOrderController::class, 'updateHeader'])
+        ->name('dispo-orders.update-header');
     Route::put('dispoauftraege/{dispoOrder}/kundenbestaetigung', [DispoOrderController::class, 'updateCustomerConfirmation'])
         ->name('dispo-orders.customer-confirmation.update');
     Route::post('dispoauftraege/{dispoOrder}/uploads/kundenbestaetigung', [DispoOrderController::class, 'uploadCustomerConfirmation'])

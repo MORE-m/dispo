@@ -15,6 +15,7 @@ import {
     type CancellationSummary,
 } from '@/components/dispo-order-cancellation-section';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
+import { DispoOrderHeaderEditor } from '@/components/dispo-order-header-editor';
 import {
     DispoOrderMaterialUploadSection,
     type MaterialUploadCategoryOption,
@@ -310,6 +311,8 @@ type OrderDetail = {
     calculation_id: number;
     customer_name: string | null;
     agency_name: string | null;
+    customer_account_id?: number | null;
+    agency_account_id?: number | null;
     invoice_recipient?: string | null;
     customer_meridian_number?: string | null;
     agency_meridian_number?: string | null;
@@ -1459,22 +1462,12 @@ export default function DispoOrderShow({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4 px-5 py-4 sm:grid-cols-2">
-                            <Detail label="Kunde" value={order.customer_name} />
-                            <Detail label="Agentur" value={order.agency_name} />
-                            {order.invoice_recipient != null &&
-                            order.invoice_recipient !== '' ? (
-                                <Detail
-                                    label="Rechnungsempfänger"
-                                    value={
-                                        order.invoice_recipient === 'agency'
-                                            ? 'Agentur'
-                                            : order.invoice_recipient ===
-                                                'customer'
-                                              ? 'Kunde'
-                                              : order.invoice_recipient
-                                    }
+                            <div className="sm:col-span-2">
+                                <DispoOrderHeaderEditor
+                                    order={order}
+                                    canEdit={canUpdate}
                                 />
-                            ) : null}
+                            </div>
                             {order.customer_meridian_number != null ||
                             order.customer_name ? (
                                 <div data-test="dispo-customer-meridian">

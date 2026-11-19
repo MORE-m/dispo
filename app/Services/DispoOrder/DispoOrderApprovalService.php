@@ -5,6 +5,7 @@ namespace App\Services\DispoOrder;
 use App\Enums\DispoOrderApprovalKind;
 use App\Enums\DispoOrderApprovalStatus;
 use App\Enums\DispoOrderStatus;
+use App\Enums\InvoiceRecipient;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
@@ -47,6 +48,8 @@ final class DispoOrderApprovalService
                         'order' => 'Der Dispoauftrag enthält keine Positionen und kann nicht eingereicht werden.',
                     ]);
                 }
+
+                $this->assertInvoiceRecipientReadyForSubmit($locked);
 
                 $this->dynamicFields->assertReadyForSubmit($locked);
                 $evidence = $this->customerConfirmation->resolveSubmitEvidence($locked);
@@ -324,6 +327,40 @@ final class DispoOrderApprovalService
     {
         if (! Gate::forUser($actor)->allows($ability, $order)) {
             throw new AuthorizationException('Diese Freigabeentscheidung ist nicht erlaubt.');
+        }
+    }
+
+    /**
+     * PO-UX-04 / PR3: Rechnungsempfänger erst bei Einreichung Pflicht.
+     */
+    private function assertInvoiceRecipientReadyForSubmit(DispoOrder $order): void
+    {
+        $recipient = $order->invoice_recipient;
+        if ($recipient === null) {
+            throw ValidationException::withMessages([
+                'invoice_recipient' => 'Vor der Einreichung muss ein Rechnungsempfänger festgelegt werden.',
+            ]);
+        }
+
+        if ($recipient === InvoiceRecipient::Agency) {
+            $agencyBound = $order->agency_account_id !== null;
+            $agencyNamed = $order->agency_name !== null && $order->agency_name !== '';
+            if (! $agencyBound && ! $agencyNamed) {
+                throw ValidationException::withMessages([
+                    'invoice_recipient' => 'Agentur als Rechnungsempfänger nur bei gesetzter Agentur.',
+                ]);
+            }
+            if (! $agencyBound) {
+                throw ValidationException::withMessages([
+                    'invoice_recipient' => 'Agentur als Rechnungsempfänger erfordert einen Agenturaccount.',
+                ]);
+            }
+        }
+
+        if ($recipient === InvoiceRecipient::Customer && $order->customer_account_id === null) {
+            throw ValidationException::withMessages([
+                'invoice_recipient' => 'Kunde als Rechnungsempfänger erfordert einen Kundenaccount.',
+            ]);
         }
     }
 
