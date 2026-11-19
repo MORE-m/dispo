@@ -4,10 +4,42 @@ import { expect } from '@playwright/test';
 export const CUSTOMER_CONFIRMATION_REASON =
     'Kundenfreigabe liegt per E-Mail vor; Upload wird nachgereicht.';
 
+/**
+ * PO-PR4: Neue Calc→Dispo starten mit RE=null; Submit-Fixtures setzen Kunde.
+ */
+export async function ensureDispoInvoiceRecipientCustomer(page: Page) {
+    const select = page.locator('[data-test="dispo-invoice-recipient"]');
+    if ((await select.count()) === 0) {
+        return;
+    }
+    const current = await select.inputValue();
+    if (current === 'customer' || current === 'agency') {
+        return;
+    }
+    await select.selectOption('customer');
+    const save = page.locator('[data-test="dispo-order-header-save"]');
+    await expect(save).toBeEnabled({ timeout: 10_000 });
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/kopfdaten') &&
+                response.request().method() === 'PATCH' &&
+                response.ok(),
+            { timeout: 15_000 },
+        ),
+        save.click(),
+    ]);
+    await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+        timeout: 15_000,
+    });
+}
+
 export async function setCustomerConfirmationException(
     page: Page,
     reason: string = CUSTOMER_CONFIRMATION_REASON,
 ) {
+    await ensureDispoInvoiceRecipientCustomer(page);
+
     await expect(
         page.locator('[data-test="dispo-order-customer-confirmation"]'),
     ).toBeVisible({ timeout: 15_000 });
