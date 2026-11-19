@@ -19,19 +19,11 @@ export async function ensureDispoInvoiceRecipientCustomer(page: Page) {
     await select.selectOption('customer');
     const save = page.locator('[data-test="dispo-order-header-save"]');
     await expect(save).toBeEnabled({ timeout: 10_000 });
-    await Promise.all([
-        page.waitForResponse(
-            (response) =>
-                response.url().includes('/kopfdaten') &&
-                response.request().method() === 'PATCH' &&
-                response.ok(),
-            { timeout: 15_000 },
-        ),
-        save.click(),
-    ]);
+    await save.click();
     await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
         timeout: 15_000,
     });
+    await expect(select).toHaveValue('customer', { timeout: 15_000 });
 }
 
 export async function setCustomerConfirmationException(
