@@ -277,4 +277,76 @@ describe('DispoOrderApprovalActions', () => {
             screen.queryByTestId('customer-confirmation-exception-ack'),
         ).not.toBeInTheDocument();
     });
+
+    it('mode=submit shows only the submit action', () => {
+        render(
+            <DispoOrderApprovalActions
+                orderId={1}
+                lockVersion={1}
+                canSubmit
+                canApprove
+                canReject
+                isCreator={false}
+                status="draft"
+                mode="submit"
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-order-approval-actions-submit'),
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('dispo-order-submit-open')).toBeInTheDocument();
+        expect(
+            screen.queryByTestId('dispo-order-approve-open'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId('dispo-order-reject-open'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByTestId('dispo-order-approval-actions'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('mode=decision shows only decision actions', () => {
+        render(
+            <DispoOrderApprovalActions
+                orderId={1}
+                lockVersion={2}
+                canSubmit
+                canApprove
+                canReject
+                isCreator={false}
+                status="awaiting_sales_approval"
+                mode="decision"
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-order-approval-actions-decision'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId('dispo-order-approve-open'),
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('dispo-order-reject-open')).toBeInTheDocument();
+        expect(
+            screen.queryByTestId('dispo-order-submit-open'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('mode=decision returns null when nothing to show', () => {
+        const { container } = render(
+            <DispoOrderApprovalActions
+                orderId={1}
+                lockVersion={1}
+                canSubmit
+                canApprove={false}
+                canReject={false}
+                isCreator={false}
+                status="draft"
+                mode="decision"
+            />,
+        );
+
+        expect(container).toBeEmptyDOMElement();
+    });
 });

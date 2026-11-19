@@ -38,10 +38,15 @@ export function DispoOrderCommunicationHistory({
     entries,
     orderId,
     canAddComment = false,
+    className,
+    scrollable = false,
 }: {
     entries: CommunicationEntry[];
     orderId?: number;
     canAddComment?: boolean;
+    className?: string;
+    /** Sticky-Sidebar: Verlauf scrollt, Formular bleibt erreichbar. */
+    scrollable?: boolean;
 }) {
     const [body, setBody] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -90,58 +95,89 @@ export function DispoOrderCommunicationHistory({
 
     return (
         <Card
-            className="border-border/70 rounded-xl shadow-xs"
+            className={cn(
+                'border-border/70 rounded-xl shadow-xs',
+                scrollable && 'flex max-h-[calc(100svh-3rem)] flex-col',
+                className,
+            )}
             data-test="dispo-order-communication-history"
         >
-            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+            <CardHeader
+                className={cn(
+                    'border-border/60 bg-muted/20 border-b px-5 py-4',
+                    scrollable && 'shrink-0',
+                )}
+            >
                 <CardTitle className="text-sm font-semibold">
                     Kommunikation
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-5 py-4">
-                {entries.map((entry) => {
-                    const isResponse = entry.type === 'sales_inquiry_response';
-                    const isGeneral = entry.type === 'general';
+            <CardContent
+                className={cn(
+                    'space-y-3 px-5 py-4',
+                    scrollable &&
+                        'flex min-h-0 flex-1 flex-col gap-3 space-y-0',
+                )}
+            >
+                <div
+                    className={cn(
+                        'space-y-3',
+                        scrollable && 'min-h-0 flex-1 overflow-y-auto',
+                    )}
+                    data-test="dispo-order-communication-entries"
+                >
+                    {entries.map((entry) => {
+                        const isResponse =
+                            entry.type === 'sales_inquiry_response';
+                        const isGeneral = entry.type === 'general';
 
-                    return (
-                        <article
-                            key={entry.id}
-                            className={cn(
-                                'rounded-lg border p-3 text-sm',
-                                isResponse && 'ml-4 border-l-4',
-                                isGeneral &&
-                                    'border-border/80 bg-muted/10 dark:bg-muted/20',
-                            )}
-                            data-test={`communication-entry-${entry.id}`}
-                            data-type={entry.type}
-                            data-parent-id={entry.parent_id ?? undefined}
-                        >
-                            <p className="font-medium">{entry.type_label}</p>
-                            <p className="text-muted-foreground mt-1">
-                                {entry.created_by_name}
-                                {entry.created_at ? (
-                                    <>
-                                        {' '}
-                                        ·{' '}
-                                        <span data-test="communication-created-at">
-                                            {formatDateTime(entry.created_at)}
-                                        </span>
-                                    </>
-                                ) : null}
-                            </p>
-                            <p
-                                className="mt-2 max-w-full break-words whitespace-pre-wrap"
-                                data-test="communication-body"
+                        return (
+                            <article
+                                key={entry.id}
+                                className={cn(
+                                    'rounded-lg border p-3 text-sm',
+                                    isResponse && 'ml-4 border-l-4',
+                                    isGeneral &&
+                                        'border-border/80 bg-muted/10 dark:bg-muted/20',
+                                )}
+                                data-test={`communication-entry-${entry.id}`}
+                                data-type={entry.type}
+                                data-parent-id={entry.parent_id ?? undefined}
                             >
-                                {entry.body}
-                            </p>
-                        </article>
-                    );
-                })}
+                                <p className="font-medium">
+                                    {entry.type_label}
+                                </p>
+                                <p className="text-muted-foreground mt-1">
+                                    {entry.created_by_name}
+                                    {entry.created_at ? (
+                                        <>
+                                            {' '}
+                                            ·{' '}
+                                            <span data-test="communication-created-at">
+                                                {formatDateTime(
+                                                    entry.created_at,
+                                                )}
+                                            </span>
+                                        </>
+                                    ) : null}
+                                </p>
+                                <p
+                                    className="mt-2 max-w-full break-words whitespace-pre-wrap"
+                                    data-test="communication-body"
+                                >
+                                    {entry.body}
+                                </p>
+                            </article>
+                        );
+                    })}
+                </div>
 
                 {showForm ? (
                     <div
-                        className="border-border/70 space-y-2 border-t pt-3"
+                        className={cn(
+                            'border-border/70 space-y-2 border-t pt-3',
+                            scrollable && 'shrink-0',
+                        )}
                         data-test="dispo-order-comment-form"
                     >
                         <Label htmlFor={bodyId}>Kommentar hinzufügen</Label>
