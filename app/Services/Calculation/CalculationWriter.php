@@ -1921,11 +1921,14 @@ final class CalculationWriter
             || ! empty($payload['agency_create_provisional']);
 
         if ($touchesCrm) {
+            // PO-PR4-02: Neue Calcs ohne RE-Eingabe → null (kein stilles customer-Default).
+            // Historische RE bleiben über existing + fehlenden invoice_recipient-Key erhalten.
             $crm = $this->crmHeaders->resolveForCalculation(
                 $payload,
                 $user,
                 allowFreitextProvisional: true,
                 existing: $calculation->exists ? $calculation : null,
+                allowUnsetInvoiceRecipient: true,
             );
             $calculation->customer_name = $crm['customer_name'];
             $calculation->agency_name = $crm['agency_name'];
@@ -1942,7 +1945,16 @@ final class CalculationWriter
         // Ohne CRM-Schlüssel: bestehende Snapshots/Verknüpfungen unverändert lassen.
         $calculation->campaign = $payload['campaign'] ?? null;
         $calculation->product_title = $payload['product_title'] ?? null;
-        $calculation->briefing = $payload['briefing'] ?? null;
+        // PO-PR4-03: Briefing preserve-on-absent (fehlender Key ≠ Löschen).
+        if (array_key_exists('briefing', $payload)) {
+            $raw = $payload['briefing'];
+            if ($raw === null) {
+                $calculation->briefing = null;
+            } else {
+                $text = is_string($raw) ? $raw : (string) $raw;
+                $calculation->briefing = trim($text) === '' ? null : $text;
+            }
+        }
         $orderDiscounts = $this->orderDiscountInputs($payload);
         $calculation->order_discount_percent = $this->effectivePercentFromDiscounts($orderDiscounts);
         if (array_key_exists('ae_enabled', $payload)) {

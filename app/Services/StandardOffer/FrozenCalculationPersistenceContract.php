@@ -205,7 +205,6 @@ final class FrozenCalculationPersistenceContract
         $user = $adoptionContext['advisor'];
         $origin = $adoptionContext['origin_version'];
         $customerName = $adoptionContext['customer_name'];
-        $agencyName = $adoptionContext['agency_name'];
         $campaignOverride = $adoptionContext['campaign'];
 
         $baseSnapshotId = (int) $materialization['configuration_snapshot_id'];
@@ -226,17 +225,22 @@ final class FrozenCalculationPersistenceContract
         $calculation->status = CalculationStatus::Draft;
         $calculation->planning_mode = PlanningMode::Manual;
         $calculation->advisor_id = $user->id;
-        // Freitext-Übernahme → vorläufige Accounts (null-Account-Keys = neue Freitext-Erfassung).
-        // Rechnungsempfänger Kunde (F1, keine Historie erfinden).
+        // PO-PR4 / PO-UX-07: Neue Adoption ohne operative Agentur-/RE-Vorbelegung.
+        // Kunde weiterhin Freitext→Provisional; Agentur bewusst leer; RE=null.
         $crmPayload = [
             'customer_name' => $customerName,
             'customer_account_id' => null,
-            'agency_name' => $agencyName,
+            'agency_name' => null,
             'agency_account_id' => null,
-            'invoice_recipient' => 'customer',
+            'invoice_recipient' => null,
         ];
-        $crm = app(CrmOrderHeaderBinder::class)
-            ->resolveForCalculation($crmPayload, $user, allowFreitextProvisional: true);
+        $crm = app(CrmOrderHeaderBinder::class)->resolveForCalculation(
+            $crmPayload,
+            $user,
+            allowFreitextProvisional: true,
+            existing: null,
+            allowUnsetInvoiceRecipient: true,
+        );
         $calculation->customer_name = $crm['customer_name'];
         $calculation->agency_name = $crm['agency_name'];
         $calculation->customer_account_id = $crm['customer_account_id'];
@@ -252,7 +256,8 @@ final class FrozenCalculationPersistenceContract
             ? $campaignOverride
             : ($materialization['campaign'] ?? null);
         $calculation->product_title = $materialization['product_title'] ?? null;
-        $calculation->briefing = $materialization['briefing'] ?? null;
+        // Operatives Briefing wird im Dispo gepflegt; Adoption erzwingt keines.
+        $calculation->briefing = null;
         $calculation->order_discount_percent = $materialization['order_discount_percent'] ?? '0';
         $calculation->ae_enabled = (bool) ($materialization['ae_enabled'] ?? false);
         $calculation->media_gross = $materialization['media_gross'] ?? '0';

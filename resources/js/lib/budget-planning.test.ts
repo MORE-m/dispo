@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    buildBudgetProposalPayload,
     emptyBudgetElement,
     validateBudgetBasics,
     validateBudgetElements,
@@ -73,5 +74,32 @@ describe('budget planning validation', () => {
                 },
             ]),
         ).toMatch(/Ende/);
+    });
+});
+
+describe('buildBudgetProposalPayload PO-PR4', () => {
+    it('omits agency, invoice_recipient and briefing keys', () => {
+        const payload = buildBudgetProposalPayload({
+            planningMode: 'budget',
+            customerName: 'Kunde',
+            campaign: 'Kampagne',
+            productTitle: 'Titel',
+            orderDiscounts: [],
+            aeEnabled: false,
+            targetBudget: '1000',
+            budgetElements: [
+                {
+                    ...emptyBudgetElement(30),
+                    inventory_id: 1,
+                },
+            ],
+            budgetPositionDiscounts: {},
+        });
+
+        expect(payload.customer_name).toBe('Kunde');
+        expect(payload).not.toHaveProperty('agency_name');
+        expect(payload).not.toHaveProperty('agency_account_id');
+        expect(payload).not.toHaveProperty('invoice_recipient');
+        expect(payload).not.toHaveProperty('briefing');
     });
 });

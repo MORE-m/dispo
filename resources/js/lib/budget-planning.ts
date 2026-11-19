@@ -144,10 +144,8 @@ export function formatBudgetElementSummary(
 export function buildBudgetProposalPayload({
     planningMode,
     customerName,
-    agencyName,
     campaign,
     productTitle,
-    briefing,
     orderDiscounts,
     aeEnabled,
     targetBudget,
@@ -160,10 +158,8 @@ export function buildBudgetProposalPayload({
 }: {
     planningMode: string;
     customerName: string;
-    agencyName: string;
     campaign: string;
     productTitle: string;
-    briefing: string;
     orderDiscounts: DiscountDraft[];
     aeEnabled: boolean;
     targetBudget: string;
@@ -186,13 +182,12 @@ export function buildBudgetProposalPayload({
         }),
     );
 
+    // PO-PR4: Agentur/RE/Briefing nicht mitsenden (Preserve-on-absent / keine Vorbelegung).
     return {
         planning_mode: planningMode,
         customer_name: customerName || null,
-        agency_name: agencyName || null,
         campaign: campaign || null,
         product_title: productTitle || null,
-        briefing: briefing || null,
         order_discount_percent: '0',
         order_discounts: payloadDiscounts(orderDiscounts),
         ae_enabled: aeEnabled,

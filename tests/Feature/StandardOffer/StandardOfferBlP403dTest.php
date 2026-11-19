@@ -44,7 +44,10 @@ class StandardOfferBlP403dTest extends TestCase
         $plainAdopted = $this->writer()->adopt($plain, 'Kunde Plain', 'Agentur X', 'Kampagne Adopt', $sales);
         $this->assertAdoptMatchesFrozen($plain, $plainAdopted, expectComponents: 0);
         $this->assertSame('Kunde Plain', $plainAdopted->customer_name);
-        $this->assertSame('Agentur X', $plainAdopted->agency_name);
+        // PO-PR4 / PO-UX-07: Agentur-Parameter wird ignoriert; RE=null.
+        $this->assertNull($plainAdopted->agency_name);
+        $this->assertNull($plainAdopted->agency_account_id);
+        $this->assertNull($plainAdopted->invoice_recipient);
         $this->assertSame('Kampagne Adopt', $plainAdopted->campaign);
         $this->assertSame($sales->id, $plainAdopted->advisor_id);
 
