@@ -319,6 +319,8 @@ type OrderDetail = {
     campaign: string | null;
     product_title: string | null;
     briefing: string | null;
+    operational_campaign_starts_on?: string | null;
+    operational_campaign_ends_on?: string | null;
     advisor_name: string | null;
     order_discount_percent: string;
     ae_enabled: boolean;
@@ -1312,7 +1314,7 @@ export default function DispoOrderShow({
                         >
                             Vor „Disponiert“ und vor dem Abschluss muss für jede
                             Online-Audio-TKP-Position ein verbindlicher
-                            Kampagnenzeitraum (operativ) festgelegt sein.
+                            Positions-Flight (OA-TKP) festgelegt sein.
                         </p>
                     ) : null}
 

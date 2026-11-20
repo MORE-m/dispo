@@ -319,7 +319,7 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
         await page.locator('[data-test="dispo-order-status-action-disposed"]').click();
         await expect(
             page.locator('[data-test="dispo-order-operational-status-error"]'),
-        ).toContainText('Verbindlicher Kampagnenzeitraum (operativ)', {
+        ).toContainText('Verbindlicher Positions-Flight (OA-TKP)', {
             timeout: 15_000,
         });
         expect(orderStatus(order.id)).toBe('in_progress');
@@ -424,7 +424,7 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
         await page.locator('[data-test="dispo-order-status-action-disposed"]').click();
         await expect(
             page.locator('[data-test="dispo-order-operational-status-error"]'),
-        ).toContainText('Verbindlicher Kampagnenzeitraum (operativ)', {
+        ).toContainText('Verbindlicher Positions-Flight (OA-TKP)', {
             timeout: 15_000,
         });
         expect(orderStatus(order.id)).toBe('in_progress');

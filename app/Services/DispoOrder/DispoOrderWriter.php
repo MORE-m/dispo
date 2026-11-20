@@ -223,12 +223,13 @@ final class DispoOrderWriter
         }
         $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
         if ($revises !== null) {
-            // PO-UX-02 / PR3: operative Kopfdaten vom Vorgänger-Dispo, nicht erneut aus der Calc.
+            // PO-UX-02 / PR3+PR5: operative Kopfdaten vom Vorgänger-Dispo, nicht erneut aus der Calc.
             $this->applyOperativeHeaderFromPredecessor($order, $revises);
             // Nachbesserung erbt die eingefrorene Konfiguration des Vorgängers.
             $this->dynamicFields->assignClonedSnapshot($order, $revises);
         } else {
             $this->dynamicFields->assignComposedSnapshot($order, $calculation, $uniqueIds);
+            // PO-PR5-02 (aktualisiert): kein Prefill – operativer Zeitraum startet null/null.
         }
         $order->save();
 
@@ -332,8 +333,9 @@ final class DispoOrderWriter
     }
 
     /**
-     * Übernimmt Agentur, Rechnungsempfänger und Briefing vom Vorgänger.
+     * Übernimmt Agentur, RE, Briefing und operativen Kampagnenzeitraum vom Vorgänger.
      * Kunde bleibt aus dem Calc-Freeze ({@see DispoOrderSnapshotMapper::headerFromCalculation}).
+     * Kein erneutes Legacy-Prefill aus der Kalkulation (PO-PR5-07).
      */
     private function applyOperativeHeaderFromPredecessor(DispoOrder $order, DispoOrder $predecessor): void
     {
@@ -344,6 +346,8 @@ final class DispoOrderWriter
         $order->agency_salesforce_account_id = $predecessor->agency_salesforce_account_id;
         $order->invoice_recipient = $predecessor->invoice_recipient;
         $order->briefing = $predecessor->briefing;
+        $order->operational_campaign_starts_on = $predecessor->operational_campaign_starts_on;
+        $order->operational_campaign_ends_on = $predecessor->operational_campaign_ends_on;
     }
 
     private function isUniqueRevisesViolation(QueryException $exception): bool

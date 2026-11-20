@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class OperationalFlightContract
 {
-    public const string LABEL = 'Verbindlicher Kampagnenzeitraum (operativ)';
+    public const string LABEL = 'Verbindlicher Positions-Flight (OA-TKP)';
 
     public const string CHECK_KEY = 'oa_operational_flight';
 

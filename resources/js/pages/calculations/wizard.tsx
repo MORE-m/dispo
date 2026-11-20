@@ -1116,12 +1116,11 @@ export default function CalculationWizard({
     const [productTitle, setProductTitle] = useState(
         calculation?.product_title ?? '',
     );
-    const [campaignPeriodStart, setCampaignPeriodStart] = useState(
-        calculation?.dynamic_field_values?.campaign_period?.start ?? '',
-    );
-    const [campaignPeriodEnd, setCampaignPeriodEnd] = useState(
-        calculation?.dynamic_field_values?.campaign_period?.end ?? '',
-    );
+    // PO-PR5: Zeitraum-UI entfernt; historische Werte nur noch für Rule-Evaluation.
+    const campaignPeriodStart =
+        calculation?.dynamic_field_values?.campaign_period?.start ?? '';
+    const campaignPeriodEnd =
+        calculation?.dynamic_field_values?.campaign_period?.end ?? '';
     const customHeaderFields = useMemo(
         () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
@@ -1787,14 +1786,8 @@ export default function CalculationWizard({
                   }),
             campaign: campaign || null,
             product_title: productTitle || null,
+            // PO-PR5: campaign_period nicht senden (Preserve-on-absent; UI entfernt).
             dynamic_field_values: {
-                campaign_period:
-                    campaignPeriodStart || campaignPeriodEnd
-                        ? {
-                              start: campaignPeriodStart || null,
-                              end: campaignPeriodEnd || null,
-                          }
-                        : null,
                 ...Object.fromEntries(
                     customHeaderFields.map((field) => [
                         field.key,
@@ -3532,74 +3525,6 @@ export default function CalculationWizard({
                                             >
                                                 {headerRuntime.integrityError}
                                             </p>
-                                        ) : null}
-                                        {headerRuntime.isFieldVisible(
-                                            'campaign_period',
-                                        ) ? (
-                                            <FormField
-                                                label={
-                                                    (fieldSchema.fields.find(
-                                                        (field) =>
-                                                            field.key ===
-                                                            'campaign_period',
-                                                    )?.label ??
-                                                        'Kampagnenzeitraum') +
-                                                    (headerRuntime.isFieldRequired(
-                                                        'campaign_period',
-                                                    )
-                                                        ? ' *'
-                                                        : '')
-                                                }
-                                                htmlFor="campaign-period-start"
-                                                hint={
-                                                    fieldSchema.fields.find(
-                                                        (field) =>
-                                                            field.key ===
-                                                            'campaign_period',
-                                                    )?.help_text ?? undefined
-                                                }
-                                            >
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <Input
-                                                        id="campaign-period-start"
-                                                        type="date"
-                                                        value={
-                                                            campaignPeriodStart
-                                                        }
-                                                        onChange={(event) =>
-                                                            setCampaignPeriodStart(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            !canEdit ||
-                                                            headerRuntime.integrityError !==
-                                                                null
-                                                        }
-                                                        data-test="campaign-period-start"
-                                                    />
-                                                    <Input
-                                                        id="campaign-period-end"
-                                                        type="date"
-                                                        value={
-                                                            campaignPeriodEnd
-                                                        }
-                                                        onChange={(event) =>
-                                                            setCampaignPeriodEnd(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            !canEdit ||
-                                                            headerRuntime.integrityError !==
-                                                                null
-                                                        }
-                                                        data-test="campaign-period-end"
-                                                    />
-                                                </div>
-                                            </FormField>
                                         ) : null}
                                         {visibleHeaderTextFields.length > 0 ||
                                         visibleHeaderChoiceFields.length > 0 ? (
