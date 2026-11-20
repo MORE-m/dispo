@@ -444,6 +444,12 @@ Ab **DSP-DCP-001** speichert `dispo_orders` additiv den eingefrorenen abgeleitet
 Kampagnenzeitraum (`derived_campaign_period_start`/`end`/`status`/`at`/`snapshot`).
 Das Dyn-Feld `campaign_period` bleibt unverändert Calc-Origin und wird nicht
 umgedeutet. Bestehende Aufträge: Status `legacy` ohne Rückbefüllung.
+Ab **PO-CALC-DISPO-UX-1 PR5** speichert `dispo_orders` zusätzlich den **operativen**
+Kampagnenzeitraum als native Spalten `operational_campaign_starts_on` /
+`operational_campaign_ends_on` (date, nullable; beide null oder beide gesetzt;
+Start ≤ Ende). Getrennt von Calc-Origin, Derived und OA-`operational_flight_*`.
+Kein Prefill bei Create, kein Backfill, rein informativ (keine Freigabe-/Abschluss-
+Steuerung). Dok: `docs/entscheidungen/PO-CALC-DISPO-UX-1.md`.
 Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als

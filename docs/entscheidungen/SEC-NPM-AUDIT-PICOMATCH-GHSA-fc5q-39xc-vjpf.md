@@ -127,8 +127,8 @@ Tests: `tests/security/npm-audit-production.test.mjs`
 1. Wöchentlich bzw. spätestens vor Ablauf prüfen, ob `picomatch` eine Patch-Version veröffentlicht hat.
 2. Sobald Patch verfügbar: Ausnahme entfernen, Lockfile auf gepatchte Version bringen, Audit wieder ohne Exception grün.
 3. Breaking-Downgrade von `laravel-vite-plugin` bleibt ohne separate technische Freigabe verboten.
-4. PR #254 (PO-CALC-DISPO-UX-1 PR2) bleibt Draft, bis dieser Security-Chore auf `main` ist und die Gates wieder grün sind.
-5. Keine Verlängerung der Ausnahme ohne erneute PO-/Security-Freigabe.
+4. **Nachzug 20.11.2026:** Security-Chore PR #255 auf `main` (`ec26e42`, CI `44368007218`); PR #254 (PO-CALC-DISPO-UX-1 PR2) danach gemergt (`bc59dcd`). Historischer Draft-Blocker erledigt.
+5. Keine Verlängerung der Ausnahme ohne erneute PO-/Security-Freigabe. Wiedervorlage vor **2026-12-18**.
 
 ---
 

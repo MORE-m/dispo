@@ -229,6 +229,13 @@ Freigabezyklus erneut. Replace nach Approve und andere Quellstatus sind
 ausgeschlossen. Weitere Invalidierungsauslöser (Preis etc.) bleiben separater
 offener Scope.
 
+**Nachzug PO-CALC-DISPO-UX-1 (PR3–PR5, Nov. 2026):** Operative Kopfdaten
+(Agentur/RE/Briefing) und operativer Kampagnenzeitraum werden am Dispo-Draft
+gepflegt (`dispo-orders.update-header`); Kunde am Dispo read-only; RE-Pflicht
+erst bei Einreichung; Revision erbt operative Kopfdaten inkl. Zeitraum. Keine
+neue Freigabeinvalidierung durch diesen Slice. Details:
+`docs/entscheidungen/PO-CALC-DISPO-UX-1.md`.
+
 Kommentare sowie zusätzliche, nicht ersetzende Uploads invalidieren keine
 Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 

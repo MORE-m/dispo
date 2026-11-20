@@ -280,14 +280,16 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-01 – Preislisten, Import, Tagesgruppen
 
 - **Phase:** 4
-- **Status:** erledigt (`BL-P4-01a` Lifecycle, `BL-P4-01b` Excel-Import, `BL-P4-01c` Wizard-Jahreswahl / PO-PRI-YEAR-1; **PRI-OPS-1** MORE-Adapter PR **#111**)
+- **Status:** erledigt (`BL-P4-01a` Lifecycle, `BL-P4-01b` Excel-Import, `BL-P4-01c` Wizard-Jahreswahl / PO-PRI-YEAR-1; **PRI-OPS-1** MORE-Adapter PR **#111**; **Preisanlieferung XLSX v1** PR **#248**)
 - **Anforderungen:** `PRI-001` bis `PRI-006`
 - **Abhängigkeiten:** BL-P3-02
 - **Ergebnis 01a:** Jahresversionen, Draft/Copy/Activate/Archive, atomare Aktivierung, abgeleitete Tagesgruppen, Jahresdefault, Budget-Fingerprint
 - **Ergebnis 01b:** Excel-Import XLSX/XLS, Preview/Fingerprint, atomare Drafts, privater Storage/Report (`AT-21`)
 - **Ergebnis 01c:** explizite Jahreswahl je Position und im Budget (aktuelles + Folgejahr), Rebind nur bei Jahrwechsel + Speichern, historische Pins stabil, 409 bei Active-Drift
 - **Ergebnis PRI-OPS-1 (PR #111, `c75f92e…`; Post-Merge-CI `36998845471` grün):** MORE-Workbook-Adapter `Spotkalkulation_2026.xlsx`; nur Einzelstunden €/SEK Zeilen 13–36 / Spalten B·D·F; keine Durchschnittszeilen ab 37, keine Formelspalten H/J; 75 leere Basiszellen bleiben fehlend (fail-closed, keine Nullpreise); Import nur mit `--confirm-database`; lokaler Lauf auf `dispo_mat_core` (8 aktive Listen 2026, 501 Items); `.env`/`dispo` unberührt; Merge ohne Import/Deploy
-- **Offen außerhalb 01:** weitere Produkt-Festpreise/digitale Listen laut `initialdaten.md`; kein automatischer Import in `dispo`
+- **Nachtrag 20.11.2026 – Preisanlieferung XLSX v1 (PR #248, `8a7c72d`, CI `43942081286`):** Template-Download + Vier-Spalten-Wide-Import (`PriceListDeliveryWorkbookContract`); MORE-Adapter bleibt; Mapping MORE-Produktiv-Workbook **offen**. Keine Statusänderung an PO-V1-CLOSURE-1.
+- **Offen außerhalb 01:** weitere Produkt-Festpreise/digitale Listen laut `initialdaten.md`; kein automatischer Import in `dispo`; MORE-Produktiv-Workbook-Mapping
+
 - **Akzeptanz 01a:** höchstens eine Active je Inventar/Jahr; historische Versionen unverändert; aktuelles Kalenderjahr als Default
 - **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017), `blp401b` (8018), `blp401c` (8019); MORE: `MoreSpotkalkulationWorkbookParserTest` / `MoreSpotkalkulationMatCoreImportTest`
 
