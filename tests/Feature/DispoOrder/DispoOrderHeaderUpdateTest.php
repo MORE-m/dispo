@@ -348,4 +348,95 @@ class DispoOrderHeaderUpdateTest extends TestCase
         $this->assertNull($result->order->invoice_recipient);
         $this->assertSame('x', $result->order->briefing);
     }
+
+    public function test_revision_inherits_direct_agency_switch_a_to_b(): void
+    {
+        ['order' => $order, 'creator' => $creator, 'calculation' => $calculation] = $this->draftOrder();
+        $agencyA = CrmAccount::query()->where('type', 'agency')->firstOrFail();
+        // Zweite Agentur über Header-Freitext erzeugen (A→B).
+        $this->actingAs($creator)->patch(route('dispo-orders.update-header', $order), [
+            'lock_version' => $order->lock_version,
+            'agency_name' => $agencyA->currentVersion?->name ?? 'Agentur A',
+            'agency_account_id' => $agencyA->id,
+            'invoice_recipient' => 'agency',
+            'briefing' => 'A',
+        ])->assertRedirect();
+        $order->refresh();
+
+        $this->actingAs($creator)->patch(route('dispo-orders.update-header', $order), [
+            'lock_version' => $order->lock_version,
+            'agency_name' => 'Agentur B Switch',
+            'agency_account_id' => null,
+            'invoice_recipient' => 'agency',
+            'briefing' => 'B',
+        ])->assertRedirect();
+        $order->refresh();
+        $agencyBId = $order->agency_account_id;
+        $this->assertNotNull($agencyBId);
+        $this->assertNotSame($agencyA->id, $agencyBId);
+
+        $order->status = DispoOrderStatus::ApprovalRejected;
+        $order->save();
+
+        $revision = app(DispoOrderWriter::class)->createRevision(
+            $order->fresh(),
+            $calculation->fresh(['positions']),
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+
+        $this->assertSame($agencyBId, $revision->agency_account_id);
+        $this->assertSame('B', $revision->briefing);
+        $this->assertSame(InvoiceRecipient::Agency, $revision->invoice_recipient);
+    }
+
+    public function test_multistep_revision_inherits_latest_operative_header_a_b_c(): void
+    {
+        ['order' => $order, 'creator' => $creator, 'calculation' => $calculation] = $this->draftOrder();
+        $agencies = CrmAccount::query()->where('type', 'agency')->orderBy('id')->get();
+        $this->assertGreaterThanOrEqual(1, $agencies->count());
+        $agency = $agencies->first();
+
+        $this->actingAs($creator)->patch(route('dispo-orders.update-header', $order), [
+            'lock_version' => $order->lock_version,
+            'agency_name' => $agency->currentVersion?->name ?? 'Agentur',
+            'agency_account_id' => $agency->id,
+            'invoice_recipient' => 'customer',
+            'briefing' => 'Stufe-A',
+        ])->assertRedirect();
+        $order->refresh();
+
+        $order->status = DispoOrderStatus::ApprovalRejected;
+        $order->save();
+        $revB = app(DispoOrderWriter::class)->createRevision(
+            $order->fresh(),
+            $calculation->fresh(['positions']),
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+        $this->assertSame('Stufe-A', $revB->briefing);
+
+        $this->actingAs($creator)->patch(route('dispo-orders.update-header', $revB), [
+            'lock_version' => $revB->lock_version,
+            'agency_name' => $agency->currentVersion?->name ?? 'Agentur',
+            'agency_account_id' => $agency->id,
+            'invoice_recipient' => 'agency',
+            'briefing' => 'Stufe-B',
+        ])->assertRedirect();
+        $revB->refresh();
+
+        $revB->status = DispoOrderStatus::ApprovalRejected;
+        $revB->save();
+        $revC = app(DispoOrderWriter::class)->createRevision(
+            $revB->fresh(),
+            $calculation->fresh(['positions']),
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+
+        $this->assertSame('Stufe-B', $revC->briefing);
+        $this->assertSame(InvoiceRecipient::Agency, $revC->invoice_recipient);
+        $this->assertSame($agency->id, $revC->agency_account_id);
+        $this->assertNotSame('Stufe-A', $revC->briefing);
+    }
 }

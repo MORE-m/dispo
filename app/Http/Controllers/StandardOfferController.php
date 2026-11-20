@@ -295,7 +295,6 @@ class StandardOfferController extends Controller
 
         $validated = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
-            'agency_name' => ['nullable', 'string', 'max:255'],
             'campaign' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -304,7 +303,7 @@ class StandardOfferController extends Controller
         $calculation = $this->writer->adopt(
             $version,
             $validated['customer_name'],
-            $validated['agency_name'] ?? null,
+            null,
             $validated['campaign'] ?? null,
             $user,
         );

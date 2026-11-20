@@ -114,7 +114,7 @@ test.describe('CRM Wizard Picker', () => {
         await expect(
             page.locator('[data-test="customer-meridian-pending"]'),
         ).toContainText('Meridian-Nummer folgt');
-        await page.locator('#invoice-recipient').selectOption('customer');
+        // PO-PR4: keine RE-Auswahl mehr im Wizard.
 
         await fillMinimalSpotsAndSave(page);
         await page.reload();
@@ -137,9 +137,14 @@ test.describe('CRM Wizard Picker', () => {
         await expect(
             page.locator('[data-test="dispo-customer-meridian"]'),
         ).toContainText(/folgt|Meridian/i);
+        await expect(
+            page.locator('[data-test="dispo-order-header-editor"]'),
+        ).toBeVisible();
+        await expect(page.locator('#invoice-recipient')).toHaveCount(0);
+        await expect(page.locator('[data-test="crm-agency"]')).toHaveCount(0);
     });
 
-    test('Account suchen/wählen → Meridian; Clear → Freitext; Agentur RE', async ({
+    test('Account suchen/wählen → Meridian; Clear → Freitext; Agentur/RE im Dispo', async ({
         page,
     }) => {
         test.setTimeout(180_000);
@@ -180,41 +185,52 @@ test.describe('CRM Wizard Picker', () => {
 
         await page.locator('[data-test="crm-customer-clear"]').click();
         await adoptFreitext(page, 'crm-customer', 'Picker Wechsel Freitext');
-        await selectAccountHit(
-            page,
-            'crm-agency',
-            'Picker SF Agentur',
-            agencyId,
-        );
-        await page.locator('#invoice-recipient').selectOption('agency');
-        await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
 
         await fillMinimalSpotsAndSave(page);
         await page.reload();
         await expect(
             page.locator('[data-test="crm-customer-selected-name"]'),
         ).toHaveText('Picker Wechsel Freitext');
+        await expect(page.locator('[data-test="crm-agency"]')).toHaveCount(0);
+        await expect(page.locator('#invoice-recipient')).toHaveCount(0);
+
+        await createDispoFromCurrentCalc(page);
+        await selectAccountHit(
+            page,
+            'dispo-crm-agency',
+            'Picker SF Agentur',
+            agencyId,
+        );
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption('agency');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
         await expect(
-            page.locator('[data-test="crm-agency-selected-name"]'),
+            page.locator('[data-test="dispo-crm-agency-selected-name"]'),
         ).toHaveText('Picker SF Agentur');
-        await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
+        await expect(page.locator('[data-test="dispo-invoice-recipient"]')).toHaveValue(
+            'agency',
+        );
         await expect(
             page.locator('[data-test="agency-meridian-number"]'),
         ).toContainText('M-PICK-A');
 
-        await page.locator('[data-test="crm-agency-clear"]').click();
-        await expect(page.locator('#invoice-recipient')).not.toHaveValue(
+        await page.locator('[data-test="dispo-crm-agency-clear"]').click();
+        await expect(page.locator('[data-test="dispo-invoice-recipient"]')).not.toHaveValue(
             'agency',
         );
-        await page.locator('#invoice-recipient').selectOption('customer');
-        await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
-        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
-        await page.reload();
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption('customer');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
         await expect(
-            page.locator('[data-test="crm-agency-search"]'),
+            page.locator('[data-test="dispo-crm-agency-search"]'),
         ).toBeVisible();
-        await expect(page.locator('#invoice-recipient')).toHaveValue('customer');
+        await expect(page.locator('[data-test="dispo-invoice-recipient"]')).toHaveValue(
+            'customer',
+        );
     });
 
     test('Wiederholter Save ohne Reload erzeugt keinen zweiten Provisional', async ({
@@ -224,8 +240,6 @@ test.describe('CRM Wizard Picker', () => {
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await adoptFreitext(page, 'crm-customer', 'Picker Idempotent GmbH');
-        await adoptFreitext(page, 'crm-agency', 'Picker Idempotent Agentur');
-        await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await ensureWizardInventorySelected(page);
@@ -244,22 +258,13 @@ test.describe('CRM Wizard Picker', () => {
         const afterFirstCustomer = await page.request.get(
             '/crm/accounts/suche?type=customer&q=Picker%20Idempotent%20GmbH',
         );
-        const afterFirstAgency = await page.request.get(
-            '/crm/accounts/suche?type=agency&q=Picker%20Idempotent%20Agentur',
-        );
         const customerList = (await afterFirstCustomer.json()).accounts ?? [];
-        const agencyList = (await afterFirstAgency.json()).accounts ?? [];
         expect(customerList.length).toBe(1);
-        expect(agencyList.length).toBe(1);
         const customerId = customerList[0].id;
-        const agencyId = agencyList[0].id;
 
         // Ohne Reload: Picker muss Account-Mode sein (Sync nach Save).
         await expect(
             page.locator('[data-test="crm-customer-freitext-hint"]'),
-        ).toHaveCount(0);
-        await expect(
-            page.locator('[data-test="crm-agency-freitext-hint"]'),
         ).toHaveCount(0);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
@@ -270,14 +275,38 @@ test.describe('CRM Wizard Picker', () => {
                 '/crm/accounts/suche?type=customer&q=Picker%20Idempotent%20GmbH',
             )
         ).json();
+        expect(afterSecondCustomer.accounts?.length ?? 0).toBe(1);
+        expect(afterSecondCustomer.accounts[0].id).toBe(customerId);
+
+        // Agentur-Provisional entsteht erst im Dispo-Header (PR4).
+        await createDispoFromCurrentCalc(page);
+        await adoptFreitext(page, 'dispo-crm-agency', 'Picker Idempotent Agentur');
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption('agency');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
+
+        const afterAgency = await page.request.get(
+            '/crm/accounts/suche?type=agency&q=Picker%20Idempotent%20Agentur',
+        );
+        const agencyList = (await afterAgency.json()).accounts ?? [];
+        expect(agencyList.length).toBe(1);
+        const agencyId = agencyList[0].id;
+
+        // Zweiter Header-Save (Dirty über Briefing) erzeugt keinen zweiten Provisional.
+        await page.locator('[data-test="dispo-briefing"]').fill('Idempotent');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
+
         const afterSecondAgency = await (
             await page.request.get(
                 '/crm/accounts/suche?type=agency&q=Picker%20Idempotent%20Agentur',
             )
         ).json();
-        expect(afterSecondCustomer.accounts?.length ?? 0).toBe(1);
         expect(afterSecondAgency.accounts?.length ?? 0).toBe(1);
-        expect(afterSecondCustomer.accounts[0].id).toBe(customerId);
         expect(afterSecondAgency.accounts[0].id).toBe(agencyId);
     });
 

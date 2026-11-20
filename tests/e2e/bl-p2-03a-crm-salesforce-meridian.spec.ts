@@ -129,12 +129,7 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await page
             .locator('[data-test="customer-billing-email"]')
             .fill('billing@vertikal-kunde.test');
-        await adoptFreitext(page, 'crm-agency', 'Vertikal Agentur Historisch');
-        await page.locator('#agency-matching-domain').fill('vertikal-agentur.test');
-        await page
-            .locator('[data-test="agency-billing-email"]')
-            .fill('desk@vertikal-agentur.test');
-        await page.locator('#invoice-recipient').selectOption('agency');
+        // PO-PR4: Agentur/RE erst im Dispo-Header.
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
@@ -145,20 +140,30 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(
             page.locator('[data-test="crm-customer-selected-name"]'),
         ).toHaveText('Vertikal Kunde Historisch');
-        await expect(
-            page.locator('[data-test="crm-agency-selected-name"]'),
-        ).toHaveText('Vertikal Agentur Historisch');
-        await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
+        await expect(page.locator('[data-test="crm-agency"]')).toHaveCount(0);
+        await expect(page.locator('#invoice-recipient')).toHaveCount(0);
         await expect(
             page.locator('[data-test="crm-customer-selection"]'),
-        ).toBeVisible();
-        await expect(
-            page.locator('[data-test="crm-agency-selection"]'),
         ).toBeVisible();
 
         await createDispoFromCurrentCalc(page);
         const dispoUrl = page.url();
-        await expect(page.getByText('Agentur').first()).toBeVisible();
+        await adoptFreitext(page, 'dispo-crm-agency', 'Vertikal Agentur Historisch');
+        await page.locator('#agency-matching-domain').fill('vertikal-agentur.test');
+        await page
+            .locator('[data-test="agency-billing-email"]')
+            .fill('desk@vertikal-agentur.test');
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption('agency');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
+        await expect(
+            page.locator('[data-test="dispo-crm-agency-selected-name"]'),
+        ).toHaveText('Vertikal Agentur Historisch');
+        await expect(page.locator('[data-test="agency-meridian-pending"]')).toContainText(
+            'Meridian-Nummer folgt',
+        );
         await expect(page.locator('[data-test="dispo-customer-meridian"]')).toContainText(
             'Meridian-Nummer folgt',
         );
@@ -200,16 +205,10 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(page.locator('[data-test="customer-meridian-number"]')).toContainText(
             'M-VK',
         );
-        await expect(page.locator('[data-test="agency-meridian-number"]')).toContainText(
-            'M-VA',
-        );
         await expect(
             page.locator('[data-test="crm-customer-selected-name"]'),
         ).toHaveText('Vertikal Kunde Historisch');
-        await expect(
-            page.locator('[data-test="crm-agency-selected-name"]'),
-        ).toHaveText('Vertikal Agentur Historisch');
-        await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
+        await expect(page.locator('[data-test="crm-agency"]')).toHaveCount(0);
         // Nach Domain-Match zeigt der kanonische Account den SF-Namen.
         const search = await page.request.get(
             '/crm/accounts/suche?type=customer&q=SF%20Vertikal%20Kunde',
@@ -223,11 +222,16 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(page.locator('[data-test="dispo-customer-meridian"]')).toContainText(
             'M-VK',
         );
-        await expect(page.locator('[data-test="dispo-agency-meridian"]')).toContainText(
+        await expect(page.locator('[data-test="agency-meridian-number"]')).toContainText(
             'M-VA',
         );
         await expect(page.getByText('Vertikal Kunde Historisch')).toBeVisible();
-        await expect(page.getByText('Vertikal Agentur Historisch')).toBeVisible();
+        await expect(
+            page.locator('[data-test="dispo-crm-agency-selected-name"]'),
+        ).toHaveText('Vertikal Agentur Historisch');
+        await expect(page.locator('[data-test="dispo-invoice-recipient"]')).toHaveValue(
+            'agency',
+        );
         await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
             statusBefore ?? '',
         );
@@ -376,7 +380,7 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await context.close();
     });
 
-    test('Wizard: Domain zuletzt setzen → gespeicherte Provisional-Domains', async ({
+    test('Kunde im Wizard + Agentur im Dispo: Provisional-Domains gespeichert', async ({
         page,
     }) => {
         test.setTimeout(120_000);
@@ -396,12 +400,6 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await page
             .locator('[data-test="customer-billing-email"]')
             .fill('c@wizard-kunde.test');
-        await adoptFreitext(page, 'crm-agency', 'Wizard Domain Agentur');
-        await page.locator('#agency-matching-domain').fill('wizard-agentur.test');
-        await page
-            .locator('[data-test="agency-billing-email"]')
-            .fill('a@wizard-agentur.test');
-        await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
@@ -411,8 +409,20 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(
             page.locator('[data-test="crm-customer-selected-name"]'),
         ).toHaveText('Wizard Domain Kunde');
+
+        await createDispoFromCurrentCalc(page);
+        await adoptFreitext(page, 'dispo-crm-agency', 'Wizard Domain Agentur');
+        await page.locator('#agency-matching-domain').fill('wizard-agentur.test');
+        await page
+            .locator('[data-test="agency-billing-email"]')
+            .fill('a@wizard-agentur.test');
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption('agency');
+        await page.locator('[data-test="dispo-order-header-save"]').click();
+        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+            timeout: 15_000,
+        });
         await expect(
-            page.locator('[data-test="crm-agency-selected-name"]'),
+            page.locator('[data-test="dispo-crm-agency-selected-name"]'),
         ).toHaveText('Wizard Domain Agentur');
 
         const customerSearch = await page.request.get(

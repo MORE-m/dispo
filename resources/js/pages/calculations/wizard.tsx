@@ -42,7 +42,6 @@ import {
 import {
     FormField,
     formSelectClass,
-    formTextareaClass,
     formatPercent,
     money,
     moneyDeduction,
@@ -1107,45 +1106,16 @@ export default function CalculationWizard({
                       meridianNumber: calculation?.customer_meridian_number,
                   }),
     );
-    const [agencyPicker, setAgencyPicker] = useState<CrmAccountPickerValue>(
-        () =>
-            isStandardOffer
-                ? { mode: 'empty' }
-                : crmPickerFromCalculation({
-                      accountId: calculation?.agency_account_id,
-                      name: calculation?.agency_name,
-                      meridianNumber: calculation?.agency_meridian_number,
-                  }),
-    );
-    const [invoiceRecipient, setInvoiceRecipient] = useState<
-        '' | 'customer' | 'agency'
-    >(
-        isStandardOffer
-            ? ''
-            : calculation?.invoice_recipient === 'agency'
-              ? 'agency'
-              : calculation?.invoice_recipient === 'customer'
-                ? 'customer'
-                : '',
-    );
     const customerName =
         customerPicker.mode === 'account' ||
         customerPicker.mode === 'freitext' ||
         customerPicker.mode === 'legacy_freitext'
             ? customerPicker.name
             : '';
-    const agencyName =
-        agencyPicker.mode === 'account' ||
-        agencyPicker.mode === 'freitext' ||
-        agencyPicker.mode === 'legacy_freitext'
-            ? agencyPicker.name
-            : '';
-    const agencyIsSet = agencyPicker.mode !== 'empty';
     const [campaign, setCampaign] = useState(calculation?.campaign ?? '');
     const [productTitle, setProductTitle] = useState(
         calculation?.product_title ?? '',
     );
-    const [briefing, setBriefing] = useState(calculation?.briefing ?? '');
     const [campaignPeriodStart, setCampaignPeriodStart] = useState(
         calculation?.dynamic_field_values?.campaign_period?.start ?? '',
     );
@@ -1808,18 +1778,15 @@ export default function CalculationWizard({
     const payload = useMemo(
         () => ({
             planning_mode: isStandardOffer ? 'manual' : planningMode,
+            // PO-PR4: Agentur/RE/Briefing nicht senden (historisch preserve-on-absent;
+            // neu → leere operative Felder / RE=null im Writer).
             ...(isStandardOffer
                 ? {}
                 : {
                       ...crmPickerToPayload('customer', customerPicker),
-                      ...crmPickerToPayload('agency', agencyPicker),
-                      ...(invoiceRecipient !== ''
-                          ? { invoice_recipient: invoiceRecipient }
-                          : { invoice_recipient: null }),
                   }),
             campaign: campaign || null,
             product_title: productTitle || null,
-            briefing: briefing || null,
             dynamic_field_values: {
                 campaign_period:
                     campaignPeriodStart || campaignPeriodEnd
@@ -2074,11 +2041,8 @@ export default function CalculationWizard({
             standardOffer?.lock_version,
             planningMode,
             customerPicker,
-            agencyPicker,
-            invoiceRecipient,
             campaign,
             productTitle,
-            briefing,
             campaignPeriodStart,
             campaignPeriodEnd,
             customHeaderFields,
@@ -2856,20 +2820,6 @@ export default function CalculationWizard({
                         meridianNumber: saved.customer_meridian_number,
                     }),
                 );
-                setAgencyPicker(
-                    crmPickerFromCalculation({
-                        accountId: saved.agency_account_id,
-                        name: saved.agency_name,
-                        meridianNumber: saved.agency_meridian_number,
-                    }),
-                );
-                setInvoiceRecipient(
-                    saved.invoice_recipient === 'agency'
-                        ? 'agency'
-                        : saved.invoice_recipient === 'customer'
-                          ? 'customer'
-                          : '',
-                );
                 // ID, Fingerprint und gespeicherte Allonge-Vergleichsbasis
                 // übernehmen. Preislisten-Pin und übrige Eingaben bleiben.
                 const savedPositions = saved.positions ?? [];
@@ -2959,10 +2909,8 @@ export default function CalculationWizard({
             const proposalPayload = buildBudgetProposalPayload({
                 planningMode,
                 customerName,
-                agencyName,
                 campaign,
                 productTitle,
-                briefing,
                 orderDiscounts,
                 aeEnabled,
                 targetBudget,
@@ -3543,76 +3491,6 @@ export default function CalculationWizard({
                                                             );
                                                         }}
                                                     />
-                                                    <CrmAccountPicker
-                                                        label="Agentur"
-                                                        type="agency"
-                                                        testIdPrefix="crm-agency"
-                                                        value={agencyPicker}
-                                                        disabled={!canEdit}
-                                                        optional
-                                                        onChange={(next) => {
-                                                            setAgencyPicker(
-                                                                next,
-                                                            );
-                                                            if (
-                                                                next.mode ===
-                                                                    'empty' &&
-                                                                invoiceRecipient ===
-                                                                    'agency'
-                                                            ) {
-                                                                setInvoiceRecipient(
-                                                                    '',
-                                                                );
-                                                            }
-                                                        }}
-                                                    />
-                                                    <FormField
-                                                        label="Rechnungsempfänger"
-                                                        htmlFor="invoice-recipient"
-                                                    >
-                                                        <select
-                                                            id="invoice-recipient"
-                                                            data-test="invoice-recipient"
-                                                            className={
-                                                                formSelectClass
-                                                            }
-                                                            value={
-                                                                invoiceRecipient
-                                                            }
-                                                            onChange={(event) =>
-                                                                setInvoiceRecipient(
-                                                                    event.target
-                                                                        .value as
-                                                                        | ''
-                                                                        | 'customer'
-                                                                        | 'agency',
-                                                                )
-                                                            }
-                                                            disabled={!canEdit}
-                                                        >
-                                                            <option value="">
-                                                                – nicht gesetzt
-                                                                –
-                                                            </option>
-                                                            <option value="customer">
-                                                                Kunde
-                                                                {customerName
-                                                                    ? ` (${customerName})`
-                                                                    : ''}
-                                                            </option>
-                                                            <option
-                                                                value="agency"
-                                                                disabled={
-                                                                    !agencyIsSet
-                                                                }
-                                                            >
-                                                                Agentur
-                                                                {agencyName
-                                                                    ? ` (${agencyName})`
-                                                                    : ''}
-                                                            </option>
-                                                        </select>
-                                                    </FormField>
                                                 </div>
                                             </>
                                         )}
@@ -3640,22 +3518,6 @@ export default function CalculationWizard({
                                                 value={productTitle}
                                                 onChange={(event) =>
                                                     setProductTitle(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
-                                        <FormField
-                                            label="Briefing (optional)"
-                                            htmlFor="briefing"
-                                        >
-                                            <textarea
-                                                id="briefing"
-                                                className={`${formTextareaClass} sm:col-span-2`}
-                                                value={briefing}
-                                                onChange={(event) =>
-                                                    setBriefing(
                                                         event.target.value,
                                                     )
                                                 }

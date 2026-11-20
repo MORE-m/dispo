@@ -237,6 +237,7 @@ class E2EMaterialAudioUploadSeeder extends Seeder
         $calc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $ctx['schemaFp'],
             'positions' => [[

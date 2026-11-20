@@ -313,6 +313,7 @@ class E2EOaTkpDispoSeeder extends Seeder
         return [
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
             'schema_fingerprint' => $ctx['schemaFp'],

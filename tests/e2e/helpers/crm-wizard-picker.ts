@@ -1,9 +1,15 @@
 import { expect, type Page } from '@playwright/test';
 
+/** CRM-Picker-Prefix: Wizard-Kunde oder Dispo-Agentur (PR4). */
+export type CrmPickerPrefix =
+    | 'crm-customer'
+    | 'crm-agency'
+    | 'dispo-crm-agency';
+
 /** Übernimmt eine freie Firmierung im CRM-Wizard-Picker (ohne Suchtreffer-Zwang). */
 export async function adoptFreitext(
     page: Page,
-    prefix: 'crm-customer' | 'crm-agency',
+    prefix: CrmPickerPrefix,
     name: string,
 ) {
     await page.locator(`[data-test="${prefix}-search"]`).fill(name);
@@ -16,7 +22,7 @@ export async function adoptFreitext(
 /** Wählt einen bestehenden Account aus der Suche (expliziter Treffer-Klick). */
 export async function selectAccountHit(
     page: Page,
-    prefix: 'crm-customer' | 'crm-agency',
+    prefix: CrmPickerPrefix,
     query: string,
     accountId: number,
 ) {

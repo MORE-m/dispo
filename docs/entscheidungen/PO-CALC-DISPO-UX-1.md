@@ -175,7 +175,7 @@ Gemergt (PR #254, `bc59dcd`):
 
 ## Umsetzungsstand PR3
 
-Implementiert in Branch `feat/po-calc-dispo-ux-1-pr3-header` (Draft):
+Gemergt (PR #256, `86cafd6`):
 
 - Eigenständiger Header-Update-Pfad (`dispo-orders.update-header`).
 - CRM-Binder mit Dispo-RE-Null-Semantik; Kunde read-only.
@@ -183,4 +183,38 @@ Implementiert in Branch `feat/po-calc-dispo-ux-1-pr3-header` (Draft):
 - Revision erbt operative Kopfdaten vom Vorgänger.
 - Frontend: `DispoOrderHeaderEditor` in der Kopfdaten-Card; PR2-Layout unverändert.
 
-PR4–PR5 sind **nicht** Bestandteil dieses Slices.
+## Verbindliche PR4-Ergänzungen (PO-PR4-01…03)
+
+- **PO-PR4-01:** Kampagnenzeitraum bleibt bis PR5 im Kalkulations-Wizard
+  (Übergangsvariante A). `campaign_period`, Calc-Origin-Capture,
+  `derived_campaign_period_*` und OA-Flight unverändert.
+- **PO-PR4-02:** Neue Kalkulationen und Standardangebot-Adoptions speichern
+  `invoice_recipient = null` (kein stilles `customer`-Default). RE wird erst
+  im Dispoauftrag festgelegt; Draft ohne RE erlaubt, Einreichung verlangt RE.
+- **PO-PR4-03:** Agentur, Rechnungsempfänger und Briefing sind im Wizard weder
+  editierbar noch read-only sichtbar (neu und historisch). Gespeicherte Werte
+  bleiben erhalten (Ausblenden ≠ Löschen).
+
+### Preserve-on-absent (verbindlich)
+
+- Fehlender Payload-Key für Briefing/Agentur/RE überschreibt historische Werte nicht.
+- Explizites Senden (inkl. `null`, wo der Vertrag es erlaubt) bleibt unterscheidbar.
+- Wiederholtes Speichern ohne operative Keys führt nicht zu Datenverlust.
+
+### Calc→Dispo und Adoption
+
+- Neue Calc→Dispo: Agentur leer, RE=`null`, Briefing leer; Kunde übernommen.
+- Historische Calc→Dispo: vorhandene operative Werte weiterhin übernommen.
+- Standardangebot-Adoption: keine operative Agenturvorbelegung, RE=`null`,
+  Quell-Standardangebot unverändert.
+- Revisionen: unverändert vom Vorgänger-Dispo (PR3).
+
+## Umsetzungsstand PR4
+
+Implementiert in Branch `feat/po-calc-dispo-ux-1-pr4-calc-cleanup` (Draft):
+
+- Wizard ohne Agentur/RE/Briefing; Kunde und Kampagnenzeitraum bleiben.
+- `CalculationWriter` mit `allowUnsetInvoiceRecipient` und Briefing
+  preserve-on-absent.
+- Standardangebot-Adoption ohne Agentur-/RE-Vorbelegung.
+- Abhängigkeit: endgültige Zeitraum-Verlagerung bleibt **PR5**.

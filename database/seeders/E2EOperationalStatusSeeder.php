@@ -108,6 +108,7 @@ class E2EOperationalStatusSeeder extends Seeder
         $calc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'BLP802A Operativ GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'positions' => [[

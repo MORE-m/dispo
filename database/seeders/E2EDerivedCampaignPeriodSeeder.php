@@ -125,6 +125,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $completeCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Complete GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => [
@@ -177,6 +178,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $partialCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Partial GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],
@@ -227,6 +229,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $openCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Open GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],
@@ -259,6 +262,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $conflictCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Conflict GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => [
@@ -293,6 +297,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $identicalCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Identical GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => [
@@ -327,6 +332,7 @@ class E2EDerivedCampaignPeriodSeeder extends Seeder
         $legacyCalc = $writer->create([
             'planning_mode' => 'manual',
             'customer_name' => 'DCP Legacy GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $schemaFp,
             'dynamic_field_values' => ['campaign_period' => null],

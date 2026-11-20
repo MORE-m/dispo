@@ -2,6 +2,7 @@
 
 namespace Tests\Concerns;
 
+use App\Enums\InvoiceRecipient;
 use App\Models\DispoOrder;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
@@ -20,13 +21,18 @@ trait EnsuresCustomerConfirmationException
         User $actor,
         string $reason = 'Kundenfreigabe liegt per E-Mail vor; Upload wird nachgereicht.',
     ): DispoOrder {
-        $order->forceFill([
+        // PO-PR4: Neue Calcs starten mit RE=null; Submit-Fixtures brauchen einen gültigen RE.
+        $fill = [
             'customer_confirmation_without_upload' => true,
             'customer_confirmation_exception_reason' => $reason,
             'customer_confirmation_exception_set_by_id' => $actor->id,
             'customer_confirmation_exception_set_by_name' => $actor->name,
             'customer_confirmation_exception_set_at' => now(),
-        ])->save();
+        ];
+        if ($order->invoice_recipient === null) {
+            $fill['invoice_recipient'] = InvoiceRecipient::Customer;
+        }
+        $order->forceFill($fill)->save();
 
         return $order->fresh();
     }

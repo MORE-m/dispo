@@ -54,6 +54,7 @@ class DispoOrderCompletionTest extends TestCase
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
             'customer_name' => 'Completion GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fpHeader,
             'dynamic_field_values' => ['campaign_period' => null],

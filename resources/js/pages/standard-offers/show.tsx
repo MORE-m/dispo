@@ -69,7 +69,6 @@ export default function StandardOfferShow({
 }) {
     const flash = usePage().props.flash;
     const [customerName, setCustomerName] = useState('');
-    const [agencyName, setAgencyName] = useState('');
     const [campaign, setCampaign] = useState('');
     const [title, setTitle] = useState(version.title);
     const [message, setMessage] = useState<string | null>(null);
@@ -143,7 +142,6 @@ export default function StandardOfferShow({
             `/standardangebote/${offer.id}/versionen/${version.id}/uebernehmen`,
             {
                 customer_name: customerName,
-                agency_name: agencyName || null,
                 campaign: campaign || null,
             },
             {
@@ -299,16 +297,6 @@ export default function StandardOfferShow({
                                 }
                                 required
                                 data-test="standard-offer-customer"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="agency">Agentur (optional)</Label>
-                            <Input
-                                id="agency"
-                                value={agencyName}
-                                onChange={(event) =>
-                                    setAgencyName(event.target.value)
-                                }
                             />
                         </div>
                         <div className="space-y-2">

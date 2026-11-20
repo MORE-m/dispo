@@ -38,7 +38,8 @@ final class CrmWizardPickerBindingTest extends TestCase
         $account = CrmAccount::query()->findOrFail($calc->customer_account_id);
         $this->assertTrue($account->is_provisional);
         $this->assertSame('Neue Firma GmbH', $calc->customer_name);
-        $this->assertSame(InvoiceRecipient::Customer, $calc->invoice_recipient);
+        // PO-PR4-02: Neue Calc ohne RE-Eingabe → null (kein stilles customer-Default).
+        $this->assertNull($calc->invoice_recipient);
         $this->assertNull($calc->customer_meridian_number);
     }
 
@@ -407,13 +408,12 @@ final class CrmWizardPickerBindingTest extends TestCase
      */
     private function headerPayload(string $customerName): array
     {
+        // PO-PR4: invoice_recipient/agency nicht mitsenden → Create: RE=null;
+        // Update: Preserve-on-absent für historische operative Felder.
         return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'customer_name' => $customerName,
             'customer_account_id' => null,
-            'agency_name' => null,
-            'agency_account_id' => null,
-            'invoice_recipient' => null,
             'campaign' => 'CRM Picker',
             'product_title' => 'Titel',
             'order_discount_percent' => '0',

@@ -377,7 +377,11 @@ final class StandardOfferWriter
             ]);
         }
 
-        return DB::transaction(function () use ($version, $customerName, $agencyName, $campaign, $user): Calculation {
+        // PO-PR4 / PO-UX-07: $agencyName bleibt in der Signatur für Aufrufer-Kompatibilität,
+        // wird aber bewusst nicht übernommen (keine operative Vorbelegung).
+        unset($agencyName);
+
+        return DB::transaction(function () use ($version, $customerName, $campaign, $user): Calculation {
             $locked = StandardOfferVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
 
             if (! $locked->status->isAdoptable() || ! is_array($locked->frozen_materialization)) {
@@ -390,12 +394,11 @@ final class StandardOfferWriter
             // Fail-closed vor Persistenz: unbekannte Version / unvollständige Frozen-Daten.
             $this->frozenPersistence->assertHydratable($materialization);
 
-            $agency = $agencyName !== null && trim($agencyName) !== '' ? trim($agencyName) : null;
             $campaignValue = $campaign !== null && trim($campaign) !== '' ? trim($campaign) : null;
 
             $fresh = $this->frozenPersistence->hydrateAdoptedCalculation($materialization, [
                 'customer_name' => $customerName,
-                'agency_name' => $agency,
+                'agency_name' => null,
                 'campaign' => $campaignValue,
                 'advisor' => $user,
                 'origin_version' => $locked,

@@ -77,6 +77,7 @@ class DispoOrderCompletedReopenCancellationTest extends TestCase
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
             'customer_name' => 'Reopen Cancel GmbH',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fpHeader,
             'dynamic_field_values' => ['campaign_period' => null],
@@ -399,6 +400,7 @@ class DispoOrderCompletedReopenCancellationTest extends TestCase
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
             'customer_name' => 'Draft Cancel Block',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fpHeader,
             'dynamic_field_values' => ['campaign_period' => null],

@@ -207,12 +207,14 @@ class StandardOfferBlP403aTest extends TestCase
             'version' => $published,
         ]), [
             'customer_name' => 'HTTP Kunde',
+            // Legacy-Clients dürfen agency_name mitsenden; Adoption ignoriert es.
             'agency_name' => 'HTTP Agentur',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('calculations', [
             'customer_name' => 'HTTP Kunde',
-            'agency_name' => 'HTTP Agentur',
+            'agency_name' => null,
+            'invoice_recipient' => null,
             'origin_standard_offer_version_id' => $published->id,
         ]);
     }

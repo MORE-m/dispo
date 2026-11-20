@@ -47,6 +47,7 @@ class DispoOrderCompletionConcurrencyTest extends TestCase
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
             'customer_name' => 'Completion Concurrency',
+            'invoice_recipient' => 'customer',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fpHeader,
             'dynamic_field_values' => ['campaign_period' => null],
