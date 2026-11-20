@@ -30,7 +30,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -154,12 +153,6 @@ class MasterDataTransferTest extends TestCase
             'version' => '1',
             'status' => PriceListStatus::Active,
         ]);
-        if (Schema::hasColumn('price_lists', 'active_inventory_id')) {
-            $active->forceFill([
-                'active_inventory_id' => $inventory->id,
-                'active_year' => 2026,
-            ])->save();
-        }
         PriceListItem::factory()->create([
             'price_list_id' => $active->id,
             'hour' => 0,
@@ -232,12 +225,6 @@ class MasterDataTransferTest extends TestCase
             ->firstOrFail();
 
         $draft->forceFill(['status' => PriceListStatus::Active])->save();
-        if (Schema::hasColumn('price_lists', 'active_inventory_id')) {
-            $draft->forceFill([
-                'active_inventory_id' => $inventory->id,
-                'active_year' => 2026,
-            ])->save();
-        }
 
         $before = PriceList::query()->where('inventory_id', $inventory->id)->where('year', 2026)->count();
         $again = app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
@@ -508,12 +495,6 @@ class MasterDataTransferTest extends TestCase
                     'version' => '1',
                     'status' => PriceListStatus::Active,
                 ]);
-                if (Schema::hasColumn('price_lists', 'active_inventory_id')) {
-                    $list->forceFill([
-                        'active_inventory_id' => $inventory->id,
-                        'active_year' => $year,
-                    ])->save();
-                }
                 PriceListItem::factory()->create([
                     'price_list_id' => $list->id,
                     'hour' => 8,
