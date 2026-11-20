@@ -38,7 +38,10 @@ return [
     | Mode „off“ (Default): kein Eingriff – Produktion unverändert.
     | Mode „allowlist“: nur exakte Adressen aus DISPO_MAIL_RECIPIENT_ALLOWLIST
     | (Komma-getrennt). To/Cc/Bcc vollständig; leere/ungültige Liste = fail-closed.
-    | Keine Domain-Wildcards. Siehe docs/betrieb/staging-mail-recipient-guard.md.
+    | Unbekannte Mode-Werte = invalid (Tippfehler).
+    | APP_ENV=staging + Live-Mailer (nicht log/array) erfordert Mode allowlist;
+    | off/fehlend/invalid → Versand gesperrt. Keine Domain-Wildcards.
+    | Siehe docs/betrieb/staging-mail-recipient-guard.md.
     |
     */
 

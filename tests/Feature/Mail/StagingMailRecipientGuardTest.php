@@ -47,9 +47,23 @@ class StagingMailRecipientGuardTest extends TestCase
         ]);
     }
 
+    private function setAppEnvironment(string $environment): void
+    {
+        $this->app['env'] = $environment;
+    }
+
+    /**
+     * Staging + Live-Mailer-Name (smtp), Versand über array-Mailer (kein Netzwerk).
+     */
+    private function configureStagingLiveMailIntent(): void
+    {
+        $this->setAppEnvironment('staging');
+        config(['mail.default' => 'smtp']);
+    }
+
     private function arrayTransport(): ArrayTransport
     {
-        $transport = Mail::mailer()->getSymfonyTransport();
+        $transport = Mail::mailer('array')->getSymfonyTransport();
         $this->assertInstanceOf(ArrayTransport::class, $transport);
 
         return $transport;
@@ -62,7 +76,8 @@ class StagingMailRecipientGuardTest extends TestCase
 
     private function sendRaw(string $to, ?string $cc = null, ?string $bcc = null): void
     {
-        Mail::mailer()->send([], [], function ($message) use ($to, $cc, $bcc): void {
+        // Immer array-Mailer: MessageSending läuft trotzdem; kein Netzwerk.
+        Mail::mailer('array')->send([], [], function ($message) use ($to, $cc, $bcc): void {
             $message->to($to)->subject('Guard-Test')->text('body');
             if ($cc !== null) {
                 $message->cc($cc);
@@ -172,7 +187,9 @@ class StagingMailRecipientGuardTest extends TestCase
 
     public function test_guard_off_allows_any_recipient_production_default(): void
     {
+        $this->setAppEnvironment('production');
         config([
+            'mail.default' => 'array',
             'dispo.mail_recipient_guard' => StagingMailRecipientGuard::MODE_OFF,
             'dispo.mail_recipient_allowlist' => [],
         ]);
@@ -181,6 +198,90 @@ class StagingMailRecipientGuardTest extends TestCase
 
         $this->assertSame(1, $this->sentCount());
         $this->assertFalse(app(StagingMailRecipientGuard::class)->isEnabled());
+        $this->assertFalse(app(StagingMailRecipientGuard::class)->mustEnforceAllowlist());
+    }
+
+    public function test_staging_live_mail_with_guard_off_is_blocked(): void
+    {
+        $this->configureStagingLiveMailIntent();
+        config([
+            'dispo.mail_recipient_guard' => StagingMailRecipientGuard::MODE_OFF,
+            'dispo.mail_recipient_allowlist' => ['allowed@example.test'],
+        ]);
+
+        try {
+            $this->sendRaw('allowed@example.test');
+            $this->fail('Erwartete StagingMailRecipientBlockedException.');
+        } catch (StagingMailRecipientBlockedException $exception) {
+            $this->assertStringContainsString('allowlist', $exception->getMessage());
+        }
+
+        $this->assertSame(0, $this->sentCount());
+    }
+
+    public function test_staging_live_mail_with_missing_guard_is_blocked(): void
+    {
+        $this->configureStagingLiveMailIntent();
+        config([
+            'dispo.mail_recipient_guard' => '',
+            'dispo.mail_recipient_allowlist' => ['allowed@example.test'],
+        ]);
+
+        try {
+            $this->sendRaw('allowed@example.test');
+            $this->fail('Erwartete StagingMailRecipientBlockedException.');
+        } catch (StagingMailRecipientBlockedException $exception) {
+            $this->assertStringContainsString('allowlist', $exception->getMessage());
+        }
+
+        $this->assertSame(0, $this->sentCount());
+    }
+
+    public function test_staging_live_mail_with_invalid_guard_mode_is_blocked(): void
+    {
+        $this->configureStagingLiveMailIntent();
+        config([
+            'dispo.mail_recipient_guard' => 'alowlist',
+            'dispo.mail_recipient_allowlist' => ['allowed@example.test'],
+        ]);
+
+        $this->assertSame(
+            StagingMailRecipientGuard::MODE_INVALID,
+            app(StagingMailRecipientGuard::class)->mode(),
+        );
+
+        try {
+            $this->sendRaw('allowed@example.test');
+            $this->fail('Erwartete StagingMailRecipientBlockedException.');
+        } catch (StagingMailRecipientBlockedException $exception) {
+            $this->assertStringContainsString('allowlist', $exception->getMessage());
+        }
+
+        $this->assertSame(0, $this->sentCount());
+    }
+
+    public function test_staging_live_mail_with_allowlist_allows_recipient(): void
+    {
+        $this->configureStagingLiveMailIntent();
+        $this->enableAllowlist(['allowed@example.test']);
+
+        $this->sendRaw('allowed@example.test');
+
+        $this->assertSame(1, $this->sentCount());
+    }
+
+    public function test_staging_safe_mailer_with_guard_off_allows_send(): void
+    {
+        $this->setAppEnvironment('staging');
+        config([
+            'mail.default' => 'log',
+            'dispo.mail_recipient_guard' => StagingMailRecipientGuard::MODE_OFF,
+            'dispo.mail_recipient_allowlist' => [],
+        ]);
+
+        $this->assertFalse(app(StagingMailRecipientGuard::class)->mustEnforceAllowlist());
+        $this->sendRaw('anyone@example.test');
+        $this->assertSame(1, $this->sentCount());
     }
 
     public function test_outbox_mail_allowed_marks_sent(): void

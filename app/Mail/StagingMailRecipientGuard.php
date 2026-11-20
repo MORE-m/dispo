@@ -11,6 +11,9 @@ use Symfony\Component\Mime\Email;
  * Fail-closed bei Mode „allowlist“: leere/ungültige Allowlist oder jeder
  * nicht freigegebene To/Cc/Bcc-Empfänger blockiert die gesamte Nachricht.
  * Keine Domain-Wildcards, keine Teilzustellung.
+ *
+ * Zusätzlich: APP_ENV=staging mit Live-Mailer (nicht log/array) erfordert
+ * explizit Mode „allowlist“. off, fehlend oder Tippfehler → kein Versand.
  */
 final class StagingMailRecipientGuard
 {
@@ -18,16 +21,58 @@ final class StagingMailRecipientGuard
 
     public const string MODE_ALLOWLIST = 'allowlist';
 
+    public const string MODE_INVALID = 'invalid';
+
+    /** @var list<string> */
+    private const array SAFE_MAILER_NAMES = ['log', 'array'];
+
     public function isEnabled(): bool
     {
         return $this->mode() === self::MODE_ALLOWLIST;
     }
 
+    /**
+     * Bekannte Modi: off | allowlist. Alles andere (Tippfehler) = invalid.
+     * Leerer Wert gilt als off (Default), wird aber unter Staging+Live gesperrt.
+     */
     public function mode(): string
     {
         $mode = strtolower(trim((string) config('dispo.mail_recipient_guard', self::MODE_OFF)));
 
-        return $mode === self::MODE_ALLOWLIST ? self::MODE_ALLOWLIST : self::MODE_OFF;
+        if ($mode === '' || $mode === self::MODE_OFF) {
+            return self::MODE_OFF;
+        }
+
+        if ($mode === self::MODE_ALLOWLIST) {
+            return self::MODE_ALLOWLIST;
+        }
+
+        return self::MODE_INVALID;
+    }
+
+    /**
+     * Staging + Live-Mailer (MAIL_MAILER nicht log/array) → Allowlist Pflicht.
+     */
+    public function mustEnforceAllowlist(): bool
+    {
+        return $this->isStagingEnvironment() && $this->usesLiveMailTransport();
+    }
+
+    public function isStagingEnvironment(): bool
+    {
+        return app()->environment('staging');
+    }
+
+    /**
+     * Live = konfigurierter Default-Mailer-Name ist nicht log/array.
+     * Bewusst der Mailer-Name (MAIL_MAILER), nicht der Symfony-Transport,
+     * damit Staging-SMTP auch bei Test-Transporten korrekt erkannt wird.
+     */
+    public function usesLiveMailTransport(): bool
+    {
+        $mailer = strtolower(trim((string) config('mail.default', 'smtp')));
+
+        return ! in_array($mailer, self::SAFE_MAILER_NAMES, true);
     }
 
     /**
@@ -62,7 +107,15 @@ final class StagingMailRecipientGuard
      */
     public function assertMessageAllowed(Email $message): void
     {
-        if (! $this->isEnabled()) {
+        $mode = $this->mode();
+
+        if ($this->mustEnforceAllowlist()) {
+            if ($mode !== self::MODE_ALLOWLIST) {
+                throw new StagingMailRecipientBlockedException(
+                    'Staging-Mailversand gesperrt: Live-Mail erfordert DISPO_MAIL_RECIPIENT_GUARD=allowlist.',
+                );
+            }
+        } elseif ($mode !== self::MODE_ALLOWLIST) {
             return;
         }
 

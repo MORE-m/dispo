@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Bewusst Exception statt return false: sonst würde Mail::send() null
  * zurückgeben und die Outbox fälschlich markSent aufrufen.
+ *
+ * Ruft den Guard immer auf (kein Early-Return bei Mode off), damit
+ * Staging+Live-Mail ohne Allowlist fail-closed bleibt.
  */
 final class EnforceStagingMailRecipientAllowlist
 {
@@ -25,10 +28,6 @@ final class EnforceStagingMailRecipientAllowlist
      */
     public function handle(MessageSending $event): void
     {
-        if (! $this->guard->isEnabled()) {
-            return;
-        }
-
         try {
             $this->guard->assertMessageAllowed($event->message);
         } catch (StagingMailRecipientBlockedException $exception) {
@@ -36,6 +35,8 @@ final class EnforceStagingMailRecipientAllowlist
                 'reason' => $exception->getMessage(),
                 'recipient_count' => count($this->guard->collectRecipients($event->message)),
                 'allowlist_count' => count($this->guard->normalizedAllowlist()),
+                'mode' => $this->guard->mode(),
+                'must_enforce' => $this->guard->mustEnforceAllowlist(),
                 // Keine Betreff-/Body-Inhalte, keine Roh-Allowlist-Dump in Logs.
             ]);
 
