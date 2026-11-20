@@ -223,13 +223,13 @@ Gemergt (PR #257, `eaa21ad`):
 - **PO-PR5-01:** Kein neues globales Submit-Gate für den operativen Zeitraum.
   Draft und Einreichung ohne Zeitraum bleiben zulässig; bestehende
   werbeform-/regelbedingte Pflichten (inkl. OA-Flight, Capture-Gaps, RE) unverändert.
-- **PO-PR5-02:** Einmaliges Prefill beim erstmaligen Calc→Dispo-Create nur für
-  historische Kalkulationen mit vollständigem gültigem Calc-Origin-Zeitraum.
-  Kriterium: `origin_standard_offer_version_id IS NULL` **und**
-  `created_at < OperationalCampaignPeriodContract::LEGACY_CALC_CREATED_BEFORE`
-  **und** vollständiges gültiges `campaign_period`. Adoption-Calcs und neue Calcs
-  nach Cutover erhalten kein Prefill. Keine spätere Synchronisierung.
-- **PO-PR5-03:** Kein Backfill bestehender Dispoaufträge; neue Spalten nullable.
+- **PO-PR5-02 (ersetzt / aktualisiert):** Kein Prefill. Jeder erstmalige
+  Dispo-Create startet mit `operational_campaign_* = null/null`. Der operative
+  Zeitraum wird ausschließlich im Dispoauftrag gepflegt. Keine Legacy-Erkennung,
+  keine Cutover-Konstante, keine automatische Übernahme aus Calc-Origin.
+  Frühere Prefill-/Cutover-Entscheidung ist damit gegenstandslos.
+- **PO-PR5-03:** Kein Backfill bestehender Dispoaufträge; neue Spalten nullable;
+  keine automatische Datenlöschung vorhandener Einträge.
 - **PO-PR5-04:** Paar `operational_campaign_starts_on` / `operational_campaign_ends_on`,
   Format `Y-m-d`; beide null oder beide gesetzt; Start ≤ Ende; gleiche Tage ok;
   keine offenen Zeiträume; keine TZ-Verschiebung.
@@ -256,9 +256,11 @@ Gemergt (PR #257, `eaa21ad`):
 
 ## Umsetzungsstand PR5
 
-Implementiert in Branch `feat/po-calc-dispo-ux-1-pr5-operational-period` (Draft):
+Implementiert in Branch `feat/po-calc-dispo-ux-1-pr5-operational-period` (Draft #258):
 
-- Migration + Modell + Header-Update + Create-Prefill + Revisionserbe.
+- Migration + Modell + Header-Update + Revisionserbe.
+- Create ohne Prefill (`null/null`); Calc-Origin-Capture unverändert.
 - Dispo-Header-Editor mit operativem Zeitraum; OA-Label präzisiert
   („Positions-Flight OA-TKP“).
 - Wizard ohne allgemeines Zeitraumfeld.
+- Keine rückwirkende Datenmigration.

@@ -11,9 +11,7 @@ use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
-use App\Support\DispoOrder\OperationalCampaignPeriodContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -55,31 +53,20 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
     }
 
     /**
-     * @param  array{start: string, end: string}|null  $period
+     * @param  array{start: string, end: string}  $period
      */
-    private function stampHistoricalCalc(
+    private function withCalcOriginPeriod(
         Calculation $calculation,
-        ?array $period,
-        ?User $actor = null,
+        array $period,
+        User $actor,
     ): Calculation {
-        $actor ??= User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $payload = $writer->payloadFromCalculation($calculation->fresh(['positions']));
+        $payload['dynamic_field_values']['campaign_period'] = $period;
+        $payload['lock_version'] = $calculation->fresh()->lock_version;
 
-        if ($period !== null) {
-            $writer = app(CalculationWriter::class);
-            $payload = $writer->payloadFromCalculation($calculation->fresh(['positions']));
-            $payload['dynamic_field_values']['campaign_period'] = $period;
-            $payload['lock_version'] = $calculation->fresh()->lock_version;
-            $calculation = $writer->update($calculation->fresh(['positions']), $payload, $actor);
-        }
-
-        $cutover = Carbon::parse(OperationalCampaignPeriodContract::LEGACY_CALC_CREATED_BEFORE);
-        $calculation->forceFill([
-            'created_at' => $cutover->copy()->subDay(),
-            'updated_at' => $cutover->copy()->subDay(),
-            'origin_standard_offer_version_id' => null,
-        ])->save();
-
-        return $calculation->fresh(['positions', 'fieldValues.snapshotFieldDefinition']);
+        return $writer->update($calculation->fresh(['positions']), $payload, $actor)
+            ->fresh(['positions', 'fieldValues.snapshotFieldDefinition']);
     }
 
     #[Test]
@@ -92,7 +79,7 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
     }
 
     #[Test]
-    public function historical_calc_with_complete_period_prefills_once_on_create(): void
+    public function calc_with_origin_period_still_creates_operational_period_null(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $creator = User::factory()->role(Role::Sales)->create();
@@ -101,7 +88,7 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
             [['inventory_id' => $catalog['hamburg']->id]],
             $creator,
         );
-        $calculation = $this->stampHistoricalCalc($calculation, [
+        $calculation = $this->withCalcOriginPeriod($calculation, [
             'start' => '2026-02-01',
             'end' => '2026-02-28',
         ], $creator);
@@ -115,80 +102,14 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
             ->order
             ->fresh();
 
-        $this->assertSame('2026-02-01', $order->operational_campaign_starts_on?->toDateString());
-        $this->assertSame('2026-02-28', $order->operational_campaign_ends_on?->toDateString());
+        $this->assertNull($order->operational_campaign_starts_on);
+        $this->assertNull($order->operational_campaign_ends_on);
 
         $header = $order->fieldValues()->with('snapshotFieldDefinition')->get()
             ->keyBy(fn ($row) => $row->snapshotFieldDefinition->key);
         $this->assertArrayHasKey('campaign_period', $header->all());
         $this->assertSame('2026-02-01', $header['campaign_period']->value_period_start?->toDateString());
         $this->assertSame('2026-02-28', $header['campaign_period']->value_period_end?->toDateString());
-    }
-
-    #[Test]
-    public function historical_calc_with_incomplete_period_does_not_prefill(): void
-    {
-        $catalog = $this->createSpotClassicCatalog();
-        $creator = User::factory()->role(Role::Sales)->create();
-        $calculation = $this->createSavedCalculation(
-            $catalog,
-            [['inventory_id' => $catalog['hamburg']->id]],
-            $creator,
-        );
-        $calculation = $this->stampHistoricalCalc($calculation, null, $creator);
-
-        // Unvollständiges Paar über Writer würde Validierung werfen – direkt leere Capture belassen.
-        $order = app(DispoOrderWriter::class)
-            ->createFromCalculation(
-                $calculation,
-                $calculation->positions()->pluck('id')->all(),
-                $creator,
-            )
-            ->order
-            ->fresh();
-
-        $this->assertNull($order->operational_campaign_starts_on);
-        $this->assertNull($order->operational_campaign_ends_on);
-    }
-
-    #[Test]
-    public function post_cutover_calc_with_period_does_not_prefill(): void
-    {
-        $catalog = $this->createSpotClassicCatalog();
-        $creator = User::factory()->role(Role::Sales)->create();
-        $calculation = $this->createSavedCalculation(
-            $catalog,
-            [['inventory_id' => $catalog['hamburg']->id]],
-            $creator,
-        );
-
-        $writer = app(CalculationWriter::class);
-        $payload = $writer->payloadFromCalculation($calculation->fresh(['positions']));
-        $payload['dynamic_field_values']['campaign_period'] = [
-            'start' => '2026-04-01',
-            'end' => '2026-04-30',
-        ];
-        $payload['lock_version'] = $calculation->fresh()->lock_version;
-        $calculation = $writer->update($calculation->fresh(['positions']), $payload, $creator);
-
-        $cutover = Carbon::parse(OperationalCampaignPeriodContract::LEGACY_CALC_CREATED_BEFORE);
-        $calculation->forceFill([
-            'created_at' => $cutover->copy()->addHour(),
-            'updated_at' => $cutover->copy()->addHour(),
-            'origin_standard_offer_version_id' => null,
-        ])->save();
-
-        $order = app(DispoOrderWriter::class)
-            ->createFromCalculation(
-                $calculation->fresh(['positions']),
-                $calculation->positions()->pluck('id')->all(),
-                $creator,
-            )
-            ->order
-            ->fresh();
-
-        $this->assertNull($order->operational_campaign_starts_on);
-        $this->assertNull($order->operational_campaign_ends_on);
     }
 
     #[Test]
@@ -431,7 +352,7 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
             [['inventory_id' => $catalog['hamburg']->id]],
             $creator,
         );
-        $calculation = $this->stampHistoricalCalc($calculation, [
+        $calculation = $this->withCalcOriginPeriod($calculation, [
             'start' => '2026-01-05',
             'end' => '2026-01-20',
         ], $creator);
@@ -447,5 +368,57 @@ class PoCalcDispoUx1Pr5OperationalPeriodTest extends TestCase
             ->headerValuesForPayload($updated->fresh(['positions', 'fieldValues']));
         $this->assertSame('2026-01-05', $values['campaign_period']['start'] ?? null);
         $this->assertSame('2026-01-20', $values['campaign_period']['end'] ?? null);
+    }
+
+    #[Test]
+    public function operational_period_is_not_synced_from_calc_origin_after_create(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $creator = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation(
+            $catalog,
+            [['inventory_id' => $catalog['hamburg']->id]],
+            $creator,
+        );
+        $calculation = $this->withCalcOriginPeriod($calculation, [
+            'start' => '2026-03-01',
+            'end' => '2026-03-31',
+        ], $creator);
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation,
+                $calculation->positions()->pluck('id')->all(),
+                $creator,
+            )
+            ->order
+            ->fresh();
+
+        $this->assertNull($order->operational_campaign_starts_on);
+
+        $this->actingAs($creator)->patch(route('dispo-orders.update-header', $order), [
+            'lock_version' => $order->lock_version,
+            'agency_name' => $order->agency_name,
+            'agency_account_id' => $order->agency_account_id,
+            'invoice_recipient' => 'customer',
+            'briefing' => null,
+            'operational_campaign_starts_on' => '2026-04-01',
+            'operational_campaign_ends_on' => '2026-04-15',
+        ])->assertRedirect();
+
+        // Calc-Origin erneut ändern – operativer Dispo-Zeitraum bleibt unberührt.
+        $calculation = $this->withCalcOriginPeriod($calculation->fresh(['positions']), [
+            'start' => '2026-12-01',
+            'end' => '2026-12-31',
+        ], $creator);
+
+        $order->refresh();
+        $this->assertSame('2026-04-01', $order->operational_campaign_starts_on?->toDateString());
+        $this->assertSame('2026-04-15', $order->operational_campaign_ends_on?->toDateString());
+
+        $calcValues = app(CalculationDynamicFieldWriter::class)
+            ->headerValuesForPayload($calculation->fresh(['positions', 'fieldValues']));
+        $this->assertSame('2026-12-01', $calcValues['campaign_period']['start'] ?? null);
+        $this->assertSame('2026-12-31', $calcValues['campaign_period']['end'] ?? null);
     }
 }
