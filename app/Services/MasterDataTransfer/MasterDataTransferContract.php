@@ -2,6 +2,9 @@
 
 namespace App\Services\MasterDataTransfer;
 
+use App\Support\Advertising\CanonicalAdvertisingCategories;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
+
 /**
  * EPIC-03-B: verbindlicher Scope und Formatvertrag für den selektiven Stammdaten-Transfer.
  */
@@ -33,7 +36,20 @@ final class MasterDataTransferContract
     ];
 
     /**
-     * Engine-Profile, die Online-Audio betreffen und in diesem Slice nicht importiert werden.
+     * Erlaubte Oberkategorien im Spot-Transfer (kein Online Audio).
+     *
+     * @var list<string>
+     */
+    public const ALLOWED_CATEGORY_KEYS = [
+        CanonicalAdvertisingCategories::SPOTS,
+        CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS,
+        CanonicalAdvertisingCategories::SOCIAL_ONLINE,
+        CanonicalAdvertisingCategories::EVENTS_PROMOTION,
+        CanonicalAdvertisingCategories::BARTER,
+    ];
+
+    /**
+     * Engine-Profile, die Online-Audio betreffen und ausgeschlossen sind.
      *
      * @var list<string>
      */
@@ -42,8 +58,6 @@ final class MasterDataTransferContract
     ];
 
     /**
-     * Dateien im Paket (relativ zum Paketroot).
-     *
      * @var list<string>
      */
     public const DATA_FILES = [
@@ -62,4 +76,19 @@ final class MasterDataTransferContract
     public const MANIFEST_FILE = 'manifest.json';
 
     public const CHECKSUMS_FILE = 'checksums.sha256';
+
+    public static function isExcludedMediumCode(string $code): bool
+    {
+        return OaTkpCoreMedia::contains($code) || $code === 'native_ad';
+    }
+
+    public static function isAllowedCategoryKey(string $key): bool
+    {
+        return in_array($key, self::ALLOWED_CATEGORY_KEYS, true);
+    }
+
+    public static function isExcludedEngineProfile(?string $key): bool
+    {
+        return $key !== null && $key !== '' && in_array($key, self::EXCLUDED_ENGINE_PROFILE_KEYS, true);
+    }
 }

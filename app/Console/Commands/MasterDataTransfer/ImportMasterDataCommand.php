@@ -13,7 +13,7 @@ class ImportMasterDataCommand extends Command
 {
     protected $signature = 'dispo:import-master-data
         {path : Pfad zum Exportpaket}
-        {--dry-run : Nur prüfen und berichten, Transaktion wird zurückgerollt}
+        {--dry-run : Nur prüfen und berichten (schreibfrei)}
         {--apply : Schreibenden Import ausführen}
         {--confirm-database= : Muss exakt dem aktiven DB-Namen entsprechen}';
 
@@ -31,7 +31,13 @@ class ImportMasterDataCommand extends Command
 
         $confirmOption = $this->option('confirm-database');
         $confirm = is_string($confirmOption) ? $confirmOption : '';
-        $path = (string) $this->argument('path');
+        $pathArgument = $this->argument('path');
+        if (! is_string($pathArgument) || $pathArgument === '') {
+            $this->error('Pfad zum Exportpaket fehlt oder ist ungültig.');
+
+            return self::FAILURE;
+        }
+        $path = $pathArgument;
 
         try {
             $report = $importer->import($path, $dryRun, $confirm);

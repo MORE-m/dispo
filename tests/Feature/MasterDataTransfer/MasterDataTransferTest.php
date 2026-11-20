@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\MasterDataTransfer;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\InventoryType;
 use App\Enums\PriceListStatus;
 use App\Enums\ProductionType;
@@ -9,6 +10,7 @@ use App\Enums\Role;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
+use App\Models\Calculation;
 use App\Models\CalculationMethod;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
@@ -22,9 +24,11 @@ use App\Services\MasterDataTransfer\Import\MasterDataImporter;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
@@ -210,6 +214,282 @@ class MasterDataTransferTest extends TestCase
         $this->assertStringNotContainsString('oa_', $joined);
         $this->assertStringNotContainsString('notification_outbox', $joined);
         $this->assertCount(8, MasterDataTransferContract::SPOT_INVENTORY_CODES);
+    }
+
+    #[Test]
+    public function repeated_import_after_price_list_activation_stays_idempotent(): void
+    {
+        $package = $this->writeMinimalPackage(inventoryCode: 'inv_radio_hamburg', year: 2026, revision: 1);
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+
+        app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
+
+        $inventory = Inventory::query()->where('code', 'inv_radio_hamburg')->firstOrFail();
+        $draft = PriceList::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('year', 2026)
+            ->where('status', PriceListStatus::Draft)
+            ->firstOrFail();
+
+        $draft->forceFill(['status' => PriceListStatus::Active])->save();
+        if (Schema::hasColumn('price_lists', 'active_inventory_id')) {
+            $draft->forceFill([
+                'active_inventory_id' => $inventory->id,
+                'active_year' => 2026,
+            ])->save();
+        }
+
+        $before = PriceList::query()->where('inventory_id', $inventory->id)->where('year', 2026)->count();
+        $again = app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
+
+        $this->assertSame(0, $again['created']);
+        $this->assertSame(
+            $before,
+            PriceList::query()->where('inventory_id', $inventory->id)->where('year', 2026)->count(),
+        );
+        $this->assertTrue(
+            collect($again['rows'])->contains(
+                fn ($r) => $r['entity'] === 'price_list' && $r['action'] === 'unchanged',
+            ),
+        );
+        $draft->refresh();
+        $this->assertSame(PriceListStatus::Active, $draft->status);
+    }
+
+    #[Test]
+    public function repeated_production_price_list_import_after_activation_stays_idempotent(): void
+    {
+        $package = $this->writeMinimalPackage(inventoryCode: 'inv_radio_hamburg', year: 2026, revision: 1);
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
+
+        $inventory = Inventory::query()->where('code', 'inv_radio_hamburg')->firstOrFail();
+        $draft = ProductionPriceList::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('production_type', ProductionType::SpotProduction)
+            ->where('year', 2026)
+            ->where('status', PriceListStatus::Draft)
+            ->firstOrFail();
+        $draft->forceFill(['status' => PriceListStatus::Active])->save();
+
+        $before = ProductionPriceList::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('production_type', ProductionType::SpotProduction)
+            ->where('year', 2026)
+            ->count();
+
+        $again = app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
+
+        $this->assertSame(
+            $before,
+            ProductionPriceList::query()
+                ->where('inventory_id', $inventory->id)
+                ->where('production_type', ProductionType::SpotProduction)
+                ->where('year', 2026)
+                ->count(),
+        );
+        $this->assertTrue(
+            collect($again['rows'])->contains(
+                fn ($r) => $r['entity'] === 'production_price_list' && $r['action'] === 'unchanged',
+            ),
+        );
+        $draft->refresh();
+        $this->assertSame(PriceListStatus::Active, $draft->status);
+    }
+
+    #[Test]
+    public function dry_run_has_no_persistent_writes_or_side_effects(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+
+        $beforeInventories = Inventory::query()->count();
+        $beforePriceLists = PriceList::query()->count();
+        $beforeMaxPriceListId = (int) (PriceList::query()->max('id') ?? 0);
+        $beforeMaxInventoryId = (int) (Inventory::query()->max('id') ?? 0);
+
+        $writes = [];
+        DB::listen(function ($query) use (&$writes): void {
+            $sql = strtolower($query->sql);
+            if (preg_match('/\b(insert|update|delete)\b/', $sql) === 1) {
+                $writes[] = $sql;
+            }
+        });
+
+        $report = app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+
+        $this->assertTrue($report['dry_run']);
+        $this->assertGreaterThan(0, $report['created']);
+        $this->assertSame([], $writes);
+        $this->assertSame($beforeInventories, Inventory::query()->count());
+        $this->assertSame($beforePriceLists, PriceList::query()->count());
+        $this->assertSame($beforeMaxPriceListId, (int) (PriceList::query()->max('id') ?? 0));
+        $this->assertSame($beforeMaxInventoryId, (int) (Inventory::query()->max('id') ?? 0));
+    }
+
+    #[Test]
+    public function export_does_not_use_exclusive_row_locks(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->seedSpotPricesForCodes(['inv_radio_hamburg']);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        app(MasterDataExporter::class)->export(
+            $this->tmp.'/export-nolock',
+            ['inv_radio_hamburg'],
+            'testsha',
+        );
+
+        foreach ($queries as $sql) {
+            $this->assertStringNotContainsString('for update', $sql);
+            $this->assertStringNotContainsString('lock in share mode', $sql);
+        }
+    }
+
+    #[Test]
+    public function export_excludes_online_audio_even_when_assigned_to_spot_inventory(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->seedSpotPricesForCodes(['inv_radio_hamburg']);
+
+        $inventory = Inventory::query()->where('code', 'inv_radio_hamburg')->firstOrFail();
+        $spots = AdvertisingCategory::query()->where('key', 'spots')->firstOrFail();
+        $oaCode = OaTkpCoreMedia::CODES[0];
+
+        $oaMedium = AdvertisingMedium::query()->where('code', $oaCode)->first();
+        if ($oaMedium === null) {
+            $oaMedium = new AdvertisingMedium;
+            $oaMedium->forceFill([
+                'code' => $oaCode,
+                'category_id' => $spots->id,
+                'name' => 'OA Pre-Stream (test)',
+                'calculation_method_mode' => 'inherit',
+                'default_length_seconds' => 30,
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'is_active' => true,
+                'sort' => 99,
+                'lock_version' => 1,
+            ])->save();
+        }
+
+        $ruleExists = InventoryMediumRule::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('advertising_medium_id', $oaMedium->id)
+            ->exists();
+        if (! $ruleExists) {
+            $rule = new InventoryMediumRule;
+            $rule->forceFill([
+                'inventory_id' => $inventory->id,
+                'advertising_medium_id' => $oaMedium->id,
+                'is_active' => true,
+                'sort' => 0,
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength,
+                'lock_version' => 1,
+            ])->save();
+        }
+
+        $exportPath = $this->tmp.'/export-no-oa';
+        app(MasterDataExporter::class)->export($exportPath, ['inv_radio_hamburg'], 'testsha');
+
+        $media = json_decode(File::get($exportPath.'/data/advertising_media.json'), true);
+        $rules = json_decode(File::get($exportPath.'/data/inventory_medium_rules.json'), true);
+        $mediaCodes = collect($media)->pluck('code')->all();
+        $ruleMedia = collect($rules)->pluck('advertising_medium_code')->all();
+
+        $this->assertNotContains($oaCode, $mediaCodes);
+        $this->assertNotContains($oaCode, $ruleMedia);
+        $this->assertNotContains('native_ad', $mediaCodes);
+    }
+
+    #[Test]
+    public function manipulated_package_outside_spot_allowlist_is_rejected(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $mediaPath = $package.'/data/advertising_media.json';
+        $media = json_decode(File::get($mediaPath), true);
+        $media[] = [
+            'code' => OaTkpCoreMedia::CODES[0],
+            'name' => 'OA eingeschmuggelt',
+            'category_key' => 'spots',
+            'kind' => null,
+            'component_profile' => null,
+            'calculation_method_mode' => 'inherit',
+            'default_calculation_method_key' => null,
+            'default_length_seconds' => 30,
+            'is_discountable' => true,
+            'is_ae_eligible' => true,
+            'is_active' => true,
+            'sort' => 99,
+        ];
+        $json = json_encode($media, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
+        File::put($mediaPath, $json);
+
+        $checksums = [];
+        foreach (MasterDataTransferContract::DATA_FILES as $relative) {
+            $checksums[] = hash_file('sha256', $package.'/'.$relative).'  '.$relative;
+        }
+        File::put($package.'/checksums.sha256', implode("\n", $checksums)."\n");
+
+        $manifest = json_decode(File::get($package.'/manifest.json'), true);
+        foreach (MasterDataTransferContract::DATA_FILES as $relative) {
+            $absolute = $package.'/'.$relative;
+            $manifest['files'][$relative] = [
+                'sha256' => hash_file('sha256', $absolute),
+                'bytes' => filesize($absolute),
+            ];
+        }
+        // Manifest behält includes_online_audio=false — Scope-Guard muss trotzdem ablehnen.
+        $manifest['scope']['includes_online_audio'] = false;
+        File::put(
+            $package.'/manifest.json',
+            json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function existing_users_calculations_remain_unchanged_on_import(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+
+        $user = User::factory()->create([
+            'email' => 'keep-me@example.test',
+            'role' => Role::Admin,
+            'is_active' => true,
+        ]);
+        $calc = Calculation::factory()->create([
+            'advisor_id' => $user->id,
+            'number' => 'K-2026-42421',
+            'number_year' => 2026,
+            'number_seq' => 42421,
+        ]);
+        $userEmail = $user->email;
+        $userRole = $user->role;
+        $calcNumber = $calc->number;
+        $calcAdvisorId = $calc->advisor_id;
+
+        app(MasterDataImporter::class)->import($package, dryRun: false, confirmDatabase: $db);
+
+        $user->refresh();
+        $calc->refresh();
+        $this->assertSame($userEmail, $user->email);
+        $this->assertSame($userRole, $user->role);
+        $this->assertSame($calcNumber, $calc->number);
+        $this->assertSame($calcAdvisorId, $calc->advisor_id);
+        $this->assertSame(1, User::query()->where('email', 'keep-me@example.test')->count());
+        $this->assertSame(1, Calculation::query()->where('number', 'K-2026-42421')->count());
     }
 
     /**

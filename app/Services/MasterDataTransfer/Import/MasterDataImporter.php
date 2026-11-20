@@ -24,15 +24,18 @@ use App\Models\User;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
+use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
+use App\Services\MasterDataTransfer\Support\SpotScopeGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
- * EPIC-03-B: fail-closed Import (Dry-Run / Apply) ohne ID-Übernahme und ohne Auto-Activate.
+ * EPIC-03-B: fail-closed Import (schreibfreier Dry-Run / Apply) ohne ID-Übernahme und ohne Auto-Activate.
  */
 final class MasterDataImporter
 {
     public function __construct(
         private readonly MasterDataPackage $packages,
+        private readonly SpotScopeGuard $spotScope,
     ) {}
 
     /**
@@ -55,88 +58,104 @@ final class MasterDataImporter
             );
         }
 
-        $usersBefore = User::query()->orderBy('id')->get(['id', 'email', 'role', 'is_active'])->map(
-            fn (User $u) => [
-                'id' => $u->id,
-                'email' => $u->email,
-                'role' => $u->role->value,
-                'is_active' => (bool) $u->is_active,
-            ],
-        )->all();
-
+        $usersBefore = $this->snapshotUsers();
         $package = $this->packages->load($packagePath);
+        $this->spotScope->assertPackage($package['data']);
+
         $report = new MasterDataImportReport;
+        $ops = $this->plan($package['data'], $report);
 
-        $run = function () use ($package, $report, $dryRun, $usersBefore): array {
-            $data = $package['data'];
-            $this->importOrganization($data['data/organization.json'], $report, $dryRun);
-            $this->importCalculationMethods($data['data/calculation_methods.json'], $report, $dryRun);
-            $this->importCategories($data['data/advertising_categories.json'], $report, $dryRun);
-            $this->importInventories($data['data/inventories.json'], $report, $dryRun);
-            $this->importMedia($data['data/advertising_media.json'], $report, $dryRun);
-            $this->importCategoryMethods($data['data/advertising_category_calculation_methods.json'], $report, $dryRun);
-            $this->importMediumMethods($data['data/advertising_medium_calculation_methods.json'], $report, $dryRun);
-            $this->importRules($data['data/inventory_medium_rules.json'], $report, $dryRun);
-            $this->importPriceLists($data['data/price_lists.json'], $report, $dryRun);
-            $this->importProductionPriceLists($data['data/production_price_lists.json'], $report, $dryRun);
+        if ($report->hasConflicts()) {
+            throw new MasterDataTransferException('Import fail-closed wegen Konflikten.', $report->conflictMessages());
+        }
 
-            if ($report->hasConflicts()) {
-                throw new MasterDataTransferException('Import fail-closed wegen Konflikten.', $report->conflicts);
-            }
+        if ($this->snapshotUsers() !== $usersBefore) {
+            throw new MasterDataTransferException('Benutzerbestand wurde verändert — Abbruch.');
+        }
 
-            $usersAfter = User::query()->orderBy('id')->get(['id', 'email', 'role', 'is_active'])->map(
-                fn (User $u) => [
-                    'id' => $u->id,
-                    'email' => $u->email,
-                    'role' => $u->role->value,
-                    'is_active' => (bool) $u->is_active,
-                ],
-            )->all();
+        if ($dryRun) {
+            return $report->toArray(true);
+        }
 
-            if ($usersBefore !== $usersAfter) {
+        return DB::transaction(function () use ($ops, $report, $usersBefore): array {
+            $this->apply($ops);
+            if ($this->snapshotUsers() !== $usersBefore) {
                 throw new MasterDataTransferException('Benutzerbestand wurde verändert — Abbruch.');
             }
 
-            return $report->toArray($dryRun);
-        };
+            return $report->toArray(false);
+        });
+    }
 
-        if ($dryRun) {
-            $result = $report->toArray(true);
-            try {
-                DB::transaction(function () use ($run, &$result): void {
-                    $result = $run();
-                    throw new MasterDataTransferDryRunRollback;
-                });
-            } catch (MasterDataTransferDryRunRollback) {
-                return $result;
-            }
-
-            return $result;
+    /**
+     * @return list<array{id: int, email: string, role: string, is_active: bool}>
+     */
+    private function snapshotUsers(): array
+    {
+        $rows = [];
+        foreach (User::query()->orderBy('id')->get(['id', 'email', 'role', 'is_active']) as $u) {
+            $rows[] = [
+                'id' => (int) $u->id,
+                'email' => (string) $u->email,
+                'role' => (string) $u->role->value,
+                'is_active' => (bool) $u->is_active,
+            ];
         }
 
-        return DB::transaction($run);
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<callable(): void>
+     */
+    private function plan(array $data, MasterDataImportReport $report): array
+    {
+        $ops = [];
+        $ops = array_merge($ops, $this->planOrganization($data['data/organization.json'], $report));
+        $this->planCalculationMethods($data['data/calculation_methods.json'], $report);
+        $ops = array_merge($ops, $this->planCategories($data['data/advertising_categories.json'], $report));
+        $ops = array_merge($ops, $this->planInventories($data['data/inventories.json'], $report));
+        $ops = array_merge($ops, $this->planMedia($data['data/advertising_media.json'], $report));
+        $ops = array_merge($ops, $this->planCategoryMethods($data['data/advertising_category_calculation_methods.json'], $report));
+        $ops = array_merge($ops, $this->planMediumMethods($data['data/advertising_medium_calculation_methods.json'], $report));
+        $ops = array_merge($ops, $this->planRules($data['data/inventory_medium_rules.json'], $report));
+        $ops = array_merge($ops, $this->planPriceLists($data['data/price_lists.json'], $report));
+        $ops = array_merge($ops, $this->planProductionPriceLists($data['data/production_price_lists.json'], $report));
+
+        return $ops;
+    }
+
+    /**
+     * @param  list<callable(): void>  $ops
+     */
+    private function apply(array $ops): void
+    {
+        foreach ($ops as $op) {
+            $op();
+        }
     }
 
     /**
      * @param  array<string, mixed>  $row
+     * @return list<callable(): void>
      */
-    private function importOrganization(array $row, MasterDataImportReport $report, bool $dryRun): void
+    private function planOrganization(array $row, MasterDataImportReport $report): array
     {
         $name = trim((string) ($row['name'] ?? ''));
         if ($name === '') {
             $report->conflict('organization.name fehlt.');
 
-            return;
+            return [];
         }
 
         $existing = Organization::query()->orderBy('id')->first();
         if ($existing === null) {
             $report->add('organization', $name, 'create');
-            if (true) { // apply writes; dry-run transaction rolls back
-                Organization::query()->create(['name' => $name]);
-            }
 
-            return;
+            return [function () use ($name): void {
+                Organization::query()->create(['name' => $name]);
+            }];
         }
 
         if ($existing->name !== $name) {
@@ -146,16 +165,18 @@ final class MasterDataImporter
                 $name,
             ));
 
-            return;
+            return [];
         }
 
         $report->add('organization', $name, 'unchanged');
+
+        return [];
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
      */
-    private function importCalculationMethods(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planCalculationMethods(array $rows, MasterDataImportReport $report): void
     {
         foreach ($rows as $row) {
             $key = (string) ($row['key'] ?? '');
@@ -166,7 +187,6 @@ final class MasterDataImporter
             }
             $existing = CalculationMethod::query()->where('key', $key)->first();
             if ($existing === null) {
-                // Methoden kommen aus Migrationen; fehlende Keys sind ein Stop.
                 $report->conflict('Berechnungsmethode fehlt in Ziel-DB: '.$key);
 
                 continue;
@@ -192,13 +212,20 @@ final class MasterDataImporter
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importCategories(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planCategories(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $key = (string) ($row['key'] ?? '');
             if ($key === '') {
                 $report->conflict('category.key fehlt.');
+
+                continue;
+            }
+            if (! MasterDataTransferContract::isAllowedCategoryKey($key)) {
+                $report->conflict('Kategorie außerhalb Spot-Scope: '.$key);
 
                 continue;
             }
@@ -223,10 +250,10 @@ final class MasterDataImporter
 
             if ($existing === null) {
                 $report->add('advertising_category', $key, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($key, $payload): void {
                     $category = new AdvertisingCategory;
                     $category->forceFill(['key' => $key, ...$payload, 'lock_version' => 1])->save();
-                }
+                };
 
                 continue;
             }
@@ -238,36 +265,33 @@ final class MasterDataImporter
                 'default_calculation_method_id' => $existing->default_calculation_method_id,
             ];
             if ($actual !== $payload) {
-                // Migration liefert Kategorien bereits; abweichende Defaults (z. B. SWF) dürfen gesetzt werden,
-                // wenn nur default_calculation_method_id/name/sort/is_active soft-updatable und key gleich.
-                // Fail-closed bei key-Kollision mit anderem fachlichen Kern: hier nur conflict wenn name/key mismatch hard.
                 if ($existing->name !== $payload['name']) {
                     $report->conflict('advertising_category Namenskonflikt: '.$key);
 
                     continue;
                 }
                 $report->add('advertising_category', $key, 'update', 'nicht-destruktives Angleichen von Metadaten');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($existing, $payload): void {
                     $existing->forceFill($payload)->save();
-                }
+                };
 
                 continue;
             }
             $report->add('advertising_category', $key, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importInventories(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planInventories(array $rows, MasterDataImportReport $report): array
     {
-        $organization = Organization::query()->orderBy('id')->first();
-        if ($organization === null && ! $dryRun) {
-            $report->conflict('Organisation fehlt vor Inventar-Import.');
-
-            return;
-        }
+        $ops = [];
+        $organizationExists = Organization::query()->orderBy('id')->exists();
+        $willCreateOrganization = ! $organizationExists;
 
         foreach ($rows as $row) {
             $code = (string) ($row['code'] ?? '');
@@ -290,8 +314,17 @@ final class MasterDataImporter
             ];
             $existing = Inventory::query()->where('code', $code)->first();
             if ($existing === null) {
+                if (! $organizationExists && ! $willCreateOrganization) {
+                    $report->conflict('Organisation fehlt vor Inventar-Import.');
+
+                    continue;
+                }
                 $report->add('inventory', $code, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($code, $payload): void {
+                    $organization = Organization::query()->orderBy('id')->first();
+                    if ($organization === null) {
+                        throw new MasterDataTransferException('Organisation fehlt vor Inventar-Import.');
+                    }
                     $inventory = new Inventory;
                     $inventory->forceFill([
                         'organization_id' => $organization->id,
@@ -299,7 +332,7 @@ final class MasterDataImporter
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                }
+                };
 
                 continue;
             }
@@ -310,24 +343,28 @@ final class MasterDataImporter
             }
             if ((bool) $existing->is_active !== $payload['is_active'] || (int) $existing->sort !== $payload['sort']) {
                 $report->add('inventory', $code, 'update', 'is_active/sort');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($existing, $payload): void {
                     $existing->forceFill([
                         'is_active' => $payload['is_active'],
                         'sort' => $payload['sort'],
                     ])->save();
-                }
+                };
 
                 continue;
             }
             $report->add('inventory', $code, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importMedia(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planMedia(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $code = (string) ($row['code'] ?? '');
             $categoryKey = (string) ($row['category_key'] ?? '');
@@ -336,12 +373,17 @@ final class MasterDataImporter
 
                 continue;
             }
-            $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
-            if ($category === null) {
-                $report->conflict('Kategorie für Medium fehlt: '.$categoryKey);
+            if (MasterDataTransferContract::isExcludedMediumCode($code)) {
+                $report->conflict('Ausgeschlossenes Werbemittel im Paket: '.$code);
 
                 continue;
             }
+            if (! MasterDataTransferContract::isAllowedCategoryKey($categoryKey)) {
+                $report->conflict('Werbemittel-Kategorie außerhalb Spot-Scope: '.$code);
+
+                continue;
+            }
+            $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
             $kind = ($row['kind'] ?? null) === null || $row['kind'] === ''
                 ? null
                 : CalculationKind::tryFrom((string) $row['kind']);
@@ -375,6 +417,41 @@ final class MasterDataImporter
                 }
             }
 
+            $existing = AdvertisingMedium::query()->where('code', $code)->first();
+            if ($existing === null) {
+                $report->add('advertising_medium', $code, 'create');
+                $ops[] = function () use ($code, $categoryKey, $kind, $profile, $mode, $defaultMethodId, $row): void {
+                    $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
+                    if ($category === null) {
+                        throw new MasterDataTransferException('Kategorie für Medium fehlt: '.$categoryKey);
+                    }
+                    $medium = new AdvertisingMedium;
+                    $medium->forceFill([
+                        'code' => $code,
+                        'category_id' => $category->id,
+                        'name' => (string) $row['name'],
+                        'kind' => $kind,
+                        'component_profile' => $profile,
+                        'calculation_method_mode' => $mode,
+                        'default_calculation_method_id' => $defaultMethodId,
+                        'default_length_seconds' => (int) $row['default_length_seconds'],
+                        'is_discountable' => (bool) $row['is_discountable'],
+                        'is_ae_eligible' => (bool) $row['is_ae_eligible'],
+                        'is_active' => (bool) $row['is_active'],
+                        'sort' => (int) $row['sort'],
+                        'lock_version' => 1,
+                    ])->save();
+                };
+
+                continue;
+            }
+
+            if ($category === null) {
+                $report->conflict('Kategorie für Medium fehlt: '.$categoryKey);
+
+                continue;
+            }
+
             $payload = [
                 'category_id' => $category->id,
                 'name' => (string) $row['name'],
@@ -388,17 +465,6 @@ final class MasterDataImporter
                 'is_active' => (bool) $row['is_active'],
                 'sort' => (int) $row['sort'],
             ];
-
-            $existing = AdvertisingMedium::query()->where('code', $code)->first();
-            if ($existing === null) {
-                $report->add('advertising_medium', $code, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
-                    $medium = new AdvertisingMedium;
-                    $medium->forceFill(['code' => $code, ...$payload, 'lock_version' => 1])->save();
-                }
-
-                continue;
-            }
 
             $same = $existing->name === $payload['name']
                 && $existing->category_id === $payload['category_id']
@@ -419,54 +485,52 @@ final class MasterDataImporter
             }
             $report->add('advertising_medium', $code, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importCategoryMethods(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planCategoryMethods(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $engine = (string) ($row['engine_profile_key'] ?? '');
-            if (in_array($engine, MasterDataTransferContract::EXCLUDED_ENGINE_PROFILE_KEYS, true)) {
-                $report->skip('OA category method übersprungen: '.$engine);
+            if (MasterDataTransferContract::isExcludedEngineProfile($engine)) {
+                $report->conflict('OA-Kategorie-Methode im Paket: '.$engine);
 
                 continue;
             }
             $categoryKey = (string) ($row['category_key'] ?? '');
             $methodKey = (string) ($row['calculation_method_key'] ?? '');
+            if ($categoryKey !== '' && ! MasterDataTransferContract::isAllowedCategoryKey($categoryKey)) {
+                $report->conflict('Kategorie-Methode außerhalb Spot-Scope: '.$categoryKey);
+
+                continue;
+            }
             $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
             $method = CalculationMethod::query()->where('key', $methodKey)->first();
-            if ($category === null || $method === null) {
+            if ($method === null) {
                 $report->conflict(sprintf('category method Referenz fehlt: %s/%s', $categoryKey, $methodKey));
 
                 continue;
             }
             $key = $categoryKey.'|'.$methodKey.'|'.$engine;
-            $existing = AdvertisingCategoryCalculationMethod::query()
-                ->where('advertising_category_id', $category->id)
-                ->where('calculation_method_id', $method->id)
-                ->where('engine_profile_key', $engine === '' ? null : $engine)
-                ->first();
-
-            // engine_profile_key may be stored as string; also try exact
-            if ($existing === null && $engine !== '') {
-                $existing = AdvertisingCategoryCalculationMethod::query()
-                    ->where('advertising_category_id', $category->id)
-                    ->where('calculation_method_id', $method->id)
-                    ->where('engine_profile_key', $engine)
-                    ->first();
-            }
-
             $payload = [
                 'engine_profile_key' => $engine === '' ? null : $engine,
                 'is_active' => (bool) $row['is_active'],
                 'sort' => (int) $row['sort'],
             ];
 
-            if ($existing === null) {
+            if ($category === null) {
                 $report->add('category_method', $key, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($categoryKey, $method, $payload): void {
+                    $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
+                    if ($category === null) {
+                        throw new MasterDataTransferException('category method Kategorie fehlt: '.$categoryKey);
+                    }
                     $model = new AdvertisingCategoryCalculationMethod;
                     $model->forceFill([
                         'advertising_category_id' => $category->id,
@@ -474,7 +538,28 @@ final class MasterDataImporter
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                }
+                };
+
+                continue;
+            }
+
+            $existing = AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $category->id)
+                ->where('calculation_method_id', $method->id)
+                ->where('engine_profile_key', $payload['engine_profile_key'])
+                ->first();
+
+            if ($existing === null) {
+                $report->add('category_method', $key, 'create');
+                $ops[] = function () use ($category, $method, $payload): void {
+                    $model = new AdvertisingCategoryCalculationMethod;
+                    $model->forceFill([
+                        'advertising_category_id' => $category->id,
+                        'calculation_method_id' => $method->id,
+                        ...$payload,
+                        'lock_version' => 1,
+                    ])->save();
+                };
 
                 continue;
             }
@@ -488,43 +573,52 @@ final class MasterDataImporter
             }
             $report->add('category_method', $key, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importMediumMethods(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planMediumMethods(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $engine = (string) ($row['engine_profile_key'] ?? '');
-            if (in_array($engine, MasterDataTransferContract::EXCLUDED_ENGINE_PROFILE_KEYS, true)) {
-                $report->skip('OA medium method übersprungen: '.$engine);
+            if (MasterDataTransferContract::isExcludedEngineProfile($engine)) {
+                $report->conflict('OA-Engine-Zuordnung im Paket: '.$engine);
 
                 continue;
             }
             $mediumCode = (string) ($row['advertising_medium_code'] ?? '');
             $methodKey = (string) ($row['calculation_method_key'] ?? '');
-            $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
+            if (MasterDataTransferContract::isExcludedMediumCode($mediumCode)) {
+                $report->conflict('Medium-Methodenzuordnung für ausgeschlossenes Medium: '.$mediumCode);
+
+                continue;
+            }
             $method = CalculationMethod::query()->where('key', $methodKey)->first();
-            if ($medium === null || $method === null) {
+            if ($method === null) {
                 $report->conflict(sprintf('medium method Referenz fehlt: %s/%s', $mediumCode, $methodKey));
 
                 continue;
             }
+            $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
             $key = $mediumCode.'|'.$methodKey.'|'.$engine;
-            $existing = AdvertisingMediumCalculationMethod::query()
-                ->where('advertising_medium_id', $medium->id)
-                ->where('calculation_method_id', $method->id)
-                ->where('engine_profile_key', $engine)
-                ->first();
             $payload = [
                 'engine_profile_key' => $engine,
                 'is_active' => (bool) $row['is_active'],
                 'sort' => (int) $row['sort'],
             ];
-            if ($existing === null) {
+
+            if ($medium === null) {
                 $report->add('medium_method', $key, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($mediumCode, $method, $payload): void {
+                    $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
+                    if ($medium === null) {
+                        throw new MasterDataTransferException('medium method Medium fehlt: '.$mediumCode);
+                    }
                     $model = new AdvertisingMediumCalculationMethod;
                     $model->forceFill([
                         'advertising_medium_id' => $medium->id,
@@ -532,7 +626,27 @@ final class MasterDataImporter
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                }
+                };
+
+                continue;
+            }
+
+            $existing = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $medium->id)
+                ->where('calculation_method_id', $method->id)
+                ->where('engine_profile_key', $engine)
+                ->first();
+            if ($existing === null) {
+                $report->add('medium_method', $key, 'create');
+                $ops[] = function () use ($medium, $method, $payload): void {
+                    $model = new AdvertisingMediumCalculationMethod;
+                    $model->forceFill([
+                        'advertising_medium_id' => $medium->id,
+                        'calculation_method_id' => $method->id,
+                        ...$payload,
+                        'lock_version' => 1,
+                    ])->save();
+                };
 
                 continue;
             }
@@ -543,20 +657,22 @@ final class MasterDataImporter
             }
             $report->add('medium_method', $key, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importRules(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planRules(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $inventoryCode = (string) ($row['inventory_code'] ?? '');
             $mediumCode = (string) ($row['advertising_medium_code'] ?? '');
-            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
-            $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
-            if ($inventory === null || $medium === null) {
-                $report->conflict(sprintf('rule Referenz fehlt: %s/%s', $inventoryCode, $mediumCode));
+            if (MasterDataTransferContract::isExcludedMediumCode($mediumCode)) {
+                $report->conflict('Regel mit ausgeschlossenem Medium: '.$mediumCode);
 
                 continue;
             }
@@ -580,13 +696,18 @@ final class MasterDataImporter
                 'component_calculation_strategy' => $strategy,
                 'swf_allonge_confirmed_at' => $row['swf_allonge_confirmed_at'] ?? null,
             ];
-            $existing = InventoryMediumRule::query()
-                ->where('inventory_id', $inventory->id)
-                ->where('advertising_medium_id', $medium->id)
-                ->first();
-            if ($existing === null) {
+
+            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+            $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
+
+            if ($inventory === null || $medium === null) {
                 $report->add('inventory_medium_rule', $key, 'create');
-                if (true) { // apply writes; dry-run transaction rolls back
+                $ops[] = function () use ($inventoryCode, $mediumCode, $payload): void {
+                    $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+                    $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
+                    if ($inventory === null || $medium === null) {
+                        throw new MasterDataTransferException(sprintf('rule Referenz fehlt: %s/%s', $inventoryCode, $mediumCode));
+                    }
                     $rule = new InventoryMediumRule;
                     $rule->forceFill([
                         'inventory_id' => $inventory->id,
@@ -594,23 +715,30 @@ final class MasterDataImporter
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                }
+                };
 
                 continue;
             }
 
-            $same = (bool) $existing->is_active === $payload['is_active']
-                && (string) $existing->booking_code === (string) $payload['booking_code']
-                && (string) $existing->planning_responsibility_key === (string) $payload['planning_responsibility_key']
-                && (string) $existing->hint_text === (string) $payload['hint_text']
-                && (int) $existing->sort === $payload['sort']
-                && $existing->default_length_seconds === $payload['default_length_seconds']
-                && (string) $existing->surcharge_percent === (string) ($payload['surcharge_percent'] ?? '')
-                && (bool) $existing->is_discountable === $payload['is_discountable']
-                && (bool) $existing->is_ae_eligible === $payload['is_ae_eligible']
-                && $existing->component_calculation_strategy === $payload['component_calculation_strategy'];
+            $existing = InventoryMediumRule::query()
+                ->where('inventory_id', $inventory->id)
+                ->where('advertising_medium_id', $medium->id)
+                ->first();
+            if ($existing === null) {
+                $report->add('inventory_medium_rule', $key, 'create');
+                $ops[] = function () use ($inventory, $medium, $payload): void {
+                    $rule = new InventoryMediumRule;
+                    $rule->forceFill([
+                        'inventory_id' => $inventory->id,
+                        'advertising_medium_id' => $medium->id,
+                        ...$payload,
+                        'lock_version' => 1,
+                    ])->save();
+                };
 
-            // surcharge null vs "0.0000" — compare normalized
+                continue;
+            }
+
             $existingSurcharge = $existing->surcharge_percent === null ? null : (string) $existing->surcharge_percent;
             $payloadSurcharge = $payload['surcharge_percent'];
             $same = (bool) $existing->is_active === $payload['is_active']
@@ -631,125 +759,168 @@ final class MasterDataImporter
             }
             $report->add('inventory_medium_rule', $key, 'unchanged');
         }
+
+        return $ops;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importPriceLists(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planPriceLists(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $inventoryCode = (string) ($row['inventory_code'] ?? '');
             $year = (int) ($row['year'] ?? 0);
             $revision = (int) ($row['revision_number'] ?? 0);
             $version = (string) ($row['version'] ?? '');
-            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
-            if ($inventory === null) {
-                $report->conflict('price_list Inventar fehlt: '.$inventoryCode);
-
-                continue;
-            }
             if (($row['import_status'] ?? null) !== 'draft') {
                 $report->conflict('price_list import_status muss draft sein: '.$inventoryCode.'/'.$year);
 
                 continue;
             }
-            $key = sprintf('%s|%d|r%d', $inventoryCode, $year, $revision);
             $items = $row['items'] ?? null;
             if (! is_array($items) || $items === []) {
-                $report->conflict('price_list items fehlen: '.$key);
+                $report->conflict('price_list items fehlen: '.$inventoryCode.'/'.$year);
 
                 continue;
             }
 
-            $existing = PriceList::query()
-                ->where('inventory_id', $inventory->id)
-                ->where('year', $year)
-                ->where('revision_number', $revision)
-                ->first();
-
+            /** @var list<array{hour: int, day_group: string, second_price: string}> $incoming */
             $incoming = collect($items)->map(fn ($i) => [
                 'hour' => (int) $i['hour'],
                 'day_group' => (string) $i['day_group'],
                 'second_price' => (string) $i['second_price'],
-            ])->sortBy(fn ($i) => $i['day_group'].'|'.$i['hour'])->values()->all();
+            ])->values()->all();
+            $fingerprint = PriceListFingerprint::forSpotItems($incoming);
+            $key = sprintf('%s|%d|r%d', $inventoryCode, $year, $revision);
 
-            if ($existing !== null && $existing->status === PriceListStatus::Draft) {
-                $existingSorted = $existing->items()->orderBy('day_group')->orderBy('hour')->get()
-                    ->map(fn (PriceListItem $i) => [
-                        'hour' => (int) $i->hour,
-                        'day_group' => $i->day_group instanceof \BackedEnum
-                            ? $i->day_group->value
-                            : (string) $i->day_group,
-                        'second_price' => (string) $i->second_price,
-                    ])->sortBy(fn ($i) => $i['day_group'].'|'.$i['hour'])->values()->all();
-                if ($existingSorted === $incoming && (string) $existing->version === $version) {
-                    $report->add('price_list', $key, 'unchanged');
+            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+            if ($inventory !== null) {
+                $match = $this->findMatchingSpotPriceList($inventory->id, $year, $fingerprint);
+                if ($match !== null) {
+                    // Aktive/archivierte/Draft mit gleichem Inhalt → unverändert, keine neue Draft-Revision.
+                    $report->add(
+                        'price_list',
+                        sprintf('%s|%d|r%d', $inventoryCode, $year, $match->revision_number),
+                        'unchanged',
+                        'fingerprint-match status='.$match->status->value,
+                    );
 
                     continue;
                 }
-                $report->conflict('price_list draft Inhalt abweichend: '.$key);
 
-                continue;
-            }
-
-            if ($existing !== null) {
-                // Aktive/archivierte Revision bleibt unberührt; neue Draft-Revision.
-                $revision = (int) PriceList::query()
+                $sameRevision = PriceList::query()
                     ->where('inventory_id', $inventory->id)
                     ->where('year', $year)
-                    ->max('revision_number') + 1;
-                $version = (string) $revision;
-                $key = sprintf('%s|%d|r%d', $inventoryCode, $year, $revision);
-                $report->add(
-                    'price_list',
-                    $key,
-                    'create',
-                    'status=draft; neue Revision weil Quellrevision bereits active/archived',
-                );
+                    ->where('revision_number', $revision)
+                    ->first();
+
+                if ($sameRevision !== null && $sameRevision->status === PriceListStatus::Draft) {
+                    $report->conflict('price_list draft Inhalt abweichend: '.$key);
+
+                    continue;
+                }
+
+                if ($sameRevision !== null) {
+                    // Quellrevision existiert als active/archived mit anderem Inhalt → neue Draft-Revision.
+                    $revision = (int) PriceList::query()
+                        ->where('inventory_id', $inventory->id)
+                        ->where('year', $year)
+                        ->max('revision_number') + 1;
+                    $version = (string) $revision;
+                    $key = sprintf('%s|%d|r%d', $inventoryCode, $year, $revision);
+                    $report->add(
+                        'price_list',
+                        $key,
+                        'create',
+                        'status=draft; neue Revision weil Quellinhalt abweicht',
+                    );
+                } else {
+                    $report->add('price_list', $key, 'create', 'status=draft; keine Aktivierung');
+                }
             } else {
                 $report->add('price_list', $key, 'create', 'status=draft; keine Aktivierung');
             }
 
-            if (true) { // apply writes; dry-run transaction rolls back
+            $name = (string) $row['name'];
+            $validFrom = $row['valid_from'] ?? null;
+            $ops[] = function () use ($inventoryCode, $year, $revision, $version, $name, $validFrom, $incoming, $fingerprint): void {
+                $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+                if ($inventory === null) {
+                    throw new MasterDataTransferException('price_list Inventar fehlt: '.$inventoryCode);
+                }
+                // Apply-Zeit erneut prüfen (Race / paralleler Import).
+                $match = $this->findMatchingSpotPriceList($inventory->id, $year, $fingerprint);
+                if ($match !== null) {
+                    return;
+                }
                 $list = new PriceList;
                 $list->forceFill([
                     'inventory_id' => $inventory->id,
-                    'name' => (string) $row['name'],
+                    'name' => $name,
                     'year' => $year,
                     'version' => $version,
                     'revision_number' => $revision,
                     'status' => PriceListStatus::Draft,
-                    'valid_from' => $row['valid_from'] ?? null,
+                    'valid_from' => $validFrom,
                     'lock_version' => 1,
                     'published_at' => null,
                     'archived_at' => null,
                 ])->save();
-                foreach ($items as $item) {
+                foreach ($incoming as $item) {
                     PriceListItem::query()->create([
                         'price_list_id' => $list->id,
-                        'hour' => (int) $item['hour'],
-                        'day_group' => (string) $item['day_group'],
-                        'second_price' => (string) $item['second_price'],
+                        'hour' => $item['hour'],
+                        'day_group' => $item['day_group'],
+                        'second_price' => $item['second_price'],
                     ]);
                 }
+            };
+        }
+
+        return $ops;
+    }
+
+    private function findMatchingSpotPriceList(int $inventoryId, int $year, string $fingerprint): ?PriceList
+    {
+        $lists = PriceList::query()
+            ->with(['items' => fn ($q) => $q->orderBy('day_group')->orderBy('hour')])
+            ->where('inventory_id', $inventoryId)
+            ->where('year', $year)
+            ->orderBy('revision_number')
+            ->get();
+
+        foreach ($lists as $list) {
+            /** @var list<array{hour: int, day_group: string, second_price: string}> $items */
+            $items = $list->items->map(fn (PriceListItem $i) => [
+                'hour' => (int) $i->hour,
+                'day_group' => $i->day_group->value,
+                'second_price' => (string) $i->second_price,
+            ])->values()->all();
+            if (PriceListFingerprint::forSpotItems($items) === $fingerprint) {
+                return $list;
             }
         }
+
+        return null;
     }
 
     /**
      * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
      */
-    private function importProductionPriceLists(array $rows, MasterDataImportReport $report, bool $dryRun): void
+    private function planProductionPriceLists(array $rows, MasterDataImportReport $report): array
     {
+        $ops = [];
         foreach ($rows as $row) {
             $inventoryCode = (string) ($row['inventory_code'] ?? '');
             $year = (int) ($row['year'] ?? 0);
             $revision = (int) ($row['revision_number'] ?? 0);
             $type = ProductionType::tryFrom((string) ($row['production_type'] ?? ''));
-            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
-            if ($inventory === null || $type === null) {
-                $report->conflict('production_price_list Referenz ungültig: '.$inventoryCode);
+            if ($type === null) {
+                $report->conflict('production_price_list production_type ungültig: '.$inventoryCode);
 
                 continue;
             }
@@ -758,60 +929,124 @@ final class MasterDataImporter
 
                 continue;
             }
-            $key = sprintf('%s|%s|%d|r%d', $inventoryCode, $type->value, $year, $revision);
-            $existing = ProductionPriceList::query()
-                ->where('inventory_id', $inventory->id)
-                ->where('production_type', $type)
-                ->where('year', $year)
-                ->where('revision_number', $revision)
-                ->first();
 
             $payloadUnit = (string) $row['unit_price'];
+            $isDiscountable = (bool) $row['is_discountable'];
+            $isAeEligible = (bool) $row['is_ae_eligible'];
+            $fingerprint = PriceListFingerprint::forProduction($payloadUnit, $isDiscountable, $isAeEligible);
             $version = (string) $row['version'];
-            if ($existing !== null && $existing->status === PriceListStatus::Draft) {
-                if ((string) $existing->unit_price === $payloadUnit
-                    && (bool) $existing->is_discountable === (bool) $row['is_discountable']
-                    && (bool) $existing->is_ae_eligible === (bool) $row['is_ae_eligible']) {
-                    $report->add('production_price_list', $key, 'unchanged');
+            $key = sprintf('%s|%s|%d|r%d', $inventoryCode, $type->value, $year, $revision);
+            $name = (string) $row['name'];
+
+            $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+            if ($inventory !== null) {
+                $match = $this->findMatchingProductionPriceList($inventory->id, $type, $year, $fingerprint);
+                if ($match !== null) {
+                    $report->add(
+                        'production_price_list',
+                        sprintf('%s|%s|%d|r%d', $inventoryCode, $type->value, $year, $match->revision_number),
+                        'unchanged',
+                        'fingerprint-match status='.$match->status->value,
+                    );
 
                     continue;
                 }
-                $report->conflict('production_price_list draft abweichend: '.$key);
 
-                continue;
-            }
-
-            if ($existing !== null) {
-                $revision = (int) ProductionPriceList::query()
+                $sameRevision = ProductionPriceList::query()
                     ->where('inventory_id', $inventory->id)
                     ->where('production_type', $type)
                     ->where('year', $year)
-                    ->max('revision_number') + 1;
-                $version = (string) $revision;
-                $key = sprintf('%s|%s|%d|r%d', $inventoryCode, $type->value, $year, $revision);
-                $report->add('production_price_list', $key, 'create', 'status=draft; neue Revision');
+                    ->where('revision_number', $revision)
+                    ->first();
+
+                if ($sameRevision !== null && $sameRevision->status === PriceListStatus::Draft) {
+                    $report->conflict('production_price_list draft abweichend: '.$key);
+
+                    continue;
+                }
+
+                if ($sameRevision !== null) {
+                    $revision = (int) ProductionPriceList::query()
+                        ->where('inventory_id', $inventory->id)
+                        ->where('production_type', $type)
+                        ->where('year', $year)
+                        ->max('revision_number') + 1;
+                    $version = (string) $revision;
+                    $key = sprintf('%s|%s|%d|r%d', $inventoryCode, $type->value, $year, $revision);
+                    $report->add('production_price_list', $key, 'create', 'status=draft; neue Revision');
+                } else {
+                    $report->add('production_price_list', $key, 'create', 'status=draft');
+                }
             } else {
                 $report->add('production_price_list', $key, 'create', 'status=draft');
             }
 
-            if (true) { // apply writes; dry-run transaction rolls back
+            $ops[] = function () use (
+                $inventoryCode,
+                $type,
+                $year,
+                $revision,
+                $version,
+                $name,
+                $payloadUnit,
+                $isDiscountable,
+                $isAeEligible,
+                $fingerprint,
+            ): void {
+                $inventory = Inventory::query()->where('code', $inventoryCode)->first();
+                if ($inventory === null) {
+                    throw new MasterDataTransferException('production_price_list Inventar fehlt: '.$inventoryCode);
+                }
+                $match = $this->findMatchingProductionPriceList($inventory->id, $type, $year, $fingerprint);
+                if ($match !== null) {
+                    return;
+                }
                 $list = new ProductionPriceList;
                 $list->forceFill([
                     'inventory_id' => $inventory->id,
                     'production_type' => $type,
                     'year' => $year,
-                    'name' => (string) $row['name'],
+                    'name' => $name,
                     'version' => $version,
                     'revision_number' => $revision,
                     'status' => PriceListStatus::Draft,
                     'unit_price' => $payloadUnit,
-                    'is_discountable' => (bool) $row['is_discountable'],
-                    'is_ae_eligible' => (bool) $row['is_ae_eligible'],
+                    'is_discountable' => $isDiscountable,
+                    'is_ae_eligible' => $isAeEligible,
                     'lock_version' => 1,
                     'published_at' => null,
                     'archived_at' => null,
                 ])->save();
+            };
+        }
+
+        return $ops;
+    }
+
+    private function findMatchingProductionPriceList(
+        int $inventoryId,
+        ProductionType $type,
+        int $year,
+        string $fingerprint,
+    ): ?ProductionPriceList {
+        $lists = ProductionPriceList::query()
+            ->where('inventory_id', $inventoryId)
+            ->where('production_type', $type)
+            ->where('year', $year)
+            ->orderBy('revision_number')
+            ->get();
+
+        foreach ($lists as $list) {
+            $fp = PriceListFingerprint::forProduction(
+                (string) $list->unit_price,
+                (bool) $list->is_discountable,
+                (bool) $list->is_ae_eligible,
+            );
+            if ($fp === $fingerprint) {
+                return $list;
             }
         }
+
+        return null;
     }
 }

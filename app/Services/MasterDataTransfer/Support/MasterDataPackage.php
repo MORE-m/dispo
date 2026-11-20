@@ -160,15 +160,20 @@ final class MasterDataPackage
 
                 continue;
             }
-            $actual = hash_file('sha256', $absolute);
+            $actualHash = hash_file('sha256', $absolute);
+            if ($actualHash === false) {
+                $errors[] = 'SHA256 nicht lesbar: '.$relative;
+
+                continue;
+            }
             $expectedFile = $fromFile[$relative] ?? null;
             $expectedManifest = $manifest['files'][$relative]['sha256'] ?? null;
-            if ($expectedFile === null || $expectedManifest === null) {
+            if (! is_string($expectedFile) || ! is_string($expectedManifest)) {
                 $errors[] = 'Checksum-Eintrag fehlt: '.$relative;
 
                 continue;
             }
-            if (! hash_equals($expectedFile, $actual) || ! hash_equals($expectedManifest, $actual)) {
+            if (! hash_equals($expectedFile, $actualHash) || ! hash_equals($expectedManifest, $actualHash)) {
                 $errors[] = 'SHA256-Mismatch: '.$relative;
             }
         }

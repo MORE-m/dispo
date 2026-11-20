@@ -41,6 +41,14 @@ final class MasterDataImportReport
     }
 
     /**
+     * @return list<string>
+     */
+    public function conflictMessages(): array
+    {
+        return $this->conflicts;
+    }
+
+    /**
      * @return array{
      *     dry_run: bool,
      *     created: int,

@@ -2,6 +2,7 @@
 
 namespace App\Services\MasterDataTransfer\Export;
 
+use App\Enums\DayGroup;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
@@ -15,8 +16,8 @@ use App\Models\ProductionPriceList;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * EPIC-03-B: read-only Export der Spot-Stammdaten inkl. Draft-Preispayload.
@@ -76,266 +77,318 @@ final class MasterDataExporter
      */
     private function buildPayload(array $inventoryCodes): array
     {
-        return DB::transaction(function () use ($inventoryCodes) {
-            $inventories = Inventory::query()
-                ->whereIn('code', $inventoryCodes)
-                ->orderBy('code')
-                ->lockForUpdate()
-                ->get();
+        // Read-only Snapshot ohne exklusive Sperren (kein lockForUpdate).
+        $inventories = Inventory::query()
+            ->whereIn('code', $inventoryCodes)
+            ->orderBy('code')
+            ->get();
 
-            if ($inventories->count() !== count($inventoryCodes)) {
-                $found = $inventories->pluck('code')->all();
-                $missing = array_values(array_diff($inventoryCodes, $found));
-                throw new MasterDataTransferException(
-                    'Inventare fehlen für Export.',
-                    array_map(fn (string $code) => 'Inventar fehlt: '.$code, $missing),
-                );
-            }
+        if ($inventories->count() !== count($inventoryCodes)) {
+            $found = $inventories->pluck('code')->all();
+            $missing = array_values(array_diff($inventoryCodes, $found));
+            throw new MasterDataTransferException(
+                'Inventare fehlen für Export.',
+                array_map(fn (string $code) => 'Inventar fehlt: '.$code, $missing),
+            );
+        }
 
-            $organizationIds = $inventories->pluck('organization_id')->unique()->values();
-            if ($organizationIds->count() !== 1) {
-                throw new MasterDataTransferException('Export erwartet genau eine Organisation für den Spot-Scope.');
-            }
+        $organizationIds = $inventories->pluck('organization_id')->unique()->values();
+        if ($organizationIds->count() !== 1) {
+            throw new MasterDataTransferException('Export erwartet genau eine Organisation für den Spot-Scope.');
+        }
 
-            $organization = Organization::query()->whereKey($organizationIds->first())->firstOrFail();
+        $organization = Organization::query()->whereKey($organizationIds->first())->firstOrFail();
 
-            $inventoryIds = $inventories->pluck('id')->all();
-            $rules = InventoryMediumRule::query()
-                ->whereIn('inventory_id', $inventoryIds)
-                ->orderBy('inventory_id')
-                ->orderBy('advertising_medium_id')
-                ->get();
+        $inventoryIds = $inventories->pluck('id')->all();
+        $allowedCategoryIds = AdvertisingCategory::query()
+            ->whereIn('key', MasterDataTransferContract::ALLOWED_CATEGORY_KEYS)
+            ->pluck('id')
+            ->all();
 
-            $mediumIds = $rules->pluck('advertising_medium_id')->unique()->values()->all();
-            $media = AdvertisingMedium::query()
-                ->whereIn('id', $mediumIds)
-                ->orderBy('code')
-                ->get();
+        $candidateMedia = AdvertisingMedium::query()
+            ->whereIn('category_id', $allowedCategoryIds)
+            ->whereNotIn('code', array_merge(
+                OaTkpCoreMedia::codes(),
+                ['native_ad'],
+            ))
+            ->orderBy('code')
+            ->get();
+        $allowedMediumIds = $candidateMedia->pluck('id')->all();
 
-            if ($media->count() !== count($mediumIds)) {
-                throw new MasterDataTransferException('Werbemittel-Referenzen in Regeln sind unvollständig.');
-            }
+        $rules = InventoryMediumRule::query()
+            ->whereIn('inventory_id', $inventoryIds)
+            ->whereIn('advertising_medium_id', $allowedMediumIds)
+            ->orderBy('inventory_id')
+            ->orderBy('advertising_medium_id')
+            ->get();
 
-            $categoryIds = $media->pluck('category_id')->unique()->values()->all();
-            $categories = AdvertisingCategory::query()
-                ->whereIn('id', $categoryIds)
-                ->orderBy('key')
-                ->get();
+        $mediumIds = $rules->pluck('advertising_medium_id')->unique()->values()->all();
+        $media = $candidateMedia->whereIn('id', $mediumIds)->values();
 
-            $methods = CalculationMethod::query()->orderBy('key')->get();
-            $methodById = $methods->keyBy('id');
+        $categoryIds = $media->pluck('category_id')->unique()->values()->all();
+        $categories = AdvertisingCategory::query()
+            ->whereIn('id', $categoryIds)
+            ->orderBy('key')
+            ->get();
 
-            $categoryMethods = AdvertisingCategoryCalculationMethod::query()
-                ->whereIn('advertising_category_id', $categoryIds)
-                ->orderBy('advertising_category_id')
-                ->orderBy('calculation_method_id')
-                ->get()
-                ->filter(function (AdvertisingCategoryCalculationMethod $row) {
-                    $key = (string) ($row->engine_profile_key ?? '');
+        $methods = CalculationMethod::query()->orderBy('key')->get();
+        $methodById = $methods->keyBy('id');
 
-                    return ! in_array($key, MasterDataTransferContract::EXCLUDED_ENGINE_PROFILE_KEYS, true);
-                })
-                ->values();
+        $categoryMethods = AdvertisingCategoryCalculationMethod::query()
+            ->whereIn('advertising_category_id', $categoryIds)
+            ->orderBy('advertising_category_id')
+            ->orderBy('calculation_method_id')
+            ->get()
+            ->filter(fn (AdvertisingCategoryCalculationMethod $row) => ! MasterDataTransferContract::isExcludedEngineProfile($row->engine_profile_key))
+            ->values();
 
-            $mediumMethods = AdvertisingMediumCalculationMethod::query()
-                ->whereIn('advertising_medium_id', $mediumIds)
-                ->orderBy('advertising_medium_id')
-                ->orderBy('calculation_method_id')
-                ->get()
-                ->filter(function (AdvertisingMediumCalculationMethod $row) {
-                    $key = (string) ($row->engine_profile_key ?? '');
+        $mediumMethods = AdvertisingMediumCalculationMethod::query()
+            ->whereIn('advertising_medium_id', $mediumIds)
+            ->orderBy('advertising_medium_id')
+            ->orderBy('calculation_method_id')
+            ->get()
+            ->filter(fn (AdvertisingMediumCalculationMethod $row) => ! MasterDataTransferContract::isExcludedEngineProfile($row->engine_profile_key))
+            ->values();
 
-                    return ! in_array($key, MasterDataTransferContract::EXCLUDED_ENGINE_PROFILE_KEYS, true);
-                })
-                ->values();
+        $priceLists = PriceList::query()
+            ->with(['items' => fn ($q) => $q->orderBy('day_group')->orderBy('hour')])
+            ->whereIn('inventory_id', $inventoryIds)
+            ->whereIn('year', MasterDataTransferContract::PRICE_YEARS)
+            ->where('status', 'active')
+            ->orderBy('inventory_id')
+            ->orderBy('year')
+            ->orderBy('revision_number')
+            ->get();
 
-            $priceLists = PriceList::query()
-                ->with(['items' => fn ($q) => $q->orderBy('day_group')->orderBy('hour')])
-                ->whereIn('inventory_id', $inventoryIds)
-                ->whereIn('year', MasterDataTransferContract::PRICE_YEARS)
-                ->where('status', 'active')
-                ->orderBy('inventory_id')
-                ->orderBy('year')
-                ->orderBy('revision_number')
-                ->get();
+        $this->assertPriceCoverage($inventories, $priceLists);
 
-            $this->assertPriceCoverage($inventories, $priceLists);
+        $productionLists = ProductionPriceList::query()
+            ->whereIn('inventory_id', $inventoryIds)
+            ->whereIn('year', MasterDataTransferContract::PRICE_YEARS)
+            ->where('status', 'active')
+            ->orderBy('inventory_id')
+            ->orderBy('production_type')
+            ->orderBy('year')
+            ->orderBy('revision_number')
+            ->get();
 
-            $productionLists = ProductionPriceList::query()
-                ->whereIn('inventory_id', $inventoryIds)
-                ->whereIn('year', MasterDataTransferContract::PRICE_YEARS)
-                ->where('status', 'active')
-                ->orderBy('inventory_id')
-                ->orderBy('production_type')
-                ->orderBy('year')
-                ->orderBy('revision_number')
-                ->get();
+        $inventoryById = $inventories->keyBy('id');
+        $mediaById = $media->keyBy('id');
+        $categoryById = $categories->keyBy('id');
 
-            $inventoryById = $inventories->keyBy('id');
-            $mediaById = $media->keyBy('id');
-            $categoryById = $categories->keyBy('id');
+        return $this->assembleFiles(
+            $organization,
+            $categories,
+            $methods,
+            $methodById,
+            $inventories,
+            $media,
+            $rules,
+            $categoryMethods,
+            $mediumMethods,
+            $priceLists,
+            $productionLists,
+            $inventoryById,
+            $mediaById,
+            $categoryById,
+        );
+    }
 
-            $files = [
-                'data/organization.json' => [
-                    'name' => $organization->name,
-                ],
-                'data/advertising_categories.json' => $categories->map(fn (AdvertisingCategory $c) => [
-                    'key' => $c->key,
-                    'name' => $c->name,
-                    'is_active' => (bool) $c->is_active,
-                    'sort' => (int) $c->sort,
-                    'default_calculation_method_key' => $c->default_calculation_method_id === null
-                        ? null
-                        : $methodById->get($c->default_calculation_method_id)?->key,
-                ])->values()->all(),
-                'data/calculation_methods.json' => $methods->map(fn (CalculationMethod $m) => [
-                    'key' => $m->key,
+    /**
+     * @param  Collection<int, AdvertisingCategory>  $categories
+     * @param  Collection<int, CalculationMethod>  $methods
+     * @param  Collection<int|string, CalculationMethod>  $methodById
+     * @param  Collection<int, Inventory>  $inventories
+     * @param  Collection<int, AdvertisingMedium>  $media
+     * @param  Collection<int, InventoryMediumRule>  $rules
+     * @param  Collection<int, AdvertisingCategoryCalculationMethod>  $categoryMethods
+     * @param  Collection<int, AdvertisingMediumCalculationMethod>  $mediumMethods
+     * @param  Collection<int, PriceList>  $priceLists
+     * @param  Collection<int, ProductionPriceList>  $productionLists
+     * @param  Collection<int|string, Inventory>  $inventoryById
+     * @param  Collection<int|string, AdvertisingMedium>  $mediaById
+     * @param  Collection<int|string, AdvertisingCategory>  $categoryById
+     * @return array{files: array<string, mixed>, counts: array<string, int>}
+     */
+    private function assembleFiles(
+        Organization $organization,
+        Collection $categories,
+        Collection $methods,
+        Collection $methodById,
+        Collection $inventories,
+        Collection $media,
+        Collection $rules,
+        Collection $categoryMethods,
+        Collection $mediumMethods,
+        Collection $priceLists,
+        Collection $productionLists,
+        Collection $inventoryById,
+        Collection $mediaById,
+        Collection $categoryById,
+    ): array {
+        $files = [
+            'data/organization.json' => [
+                'name' => $organization->name,
+            ],
+            'data/advertising_categories.json' => $categories->map(fn (AdvertisingCategory $c) => [
+                'key' => $c->key,
+                'name' => $c->name,
+                'is_active' => (bool) $c->is_active,
+                'sort' => (int) $c->sort,
+                'default_calculation_method_key' => $c->default_calculation_method_id === null
+                    ? null
+                    : $methodById->get($c->default_calculation_method_id)?->key,
+            ])->values()->all(),
+            'data/calculation_methods.json' => $methods->map(fn (CalculationMethod $m) => [
+                'key' => $m->key,
+                'name' => $m->name,
+                'help_text' => $m->help_text,
+                'is_active' => (bool) $m->is_active,
+                'sort' => (int) $m->sort,
+            ])->values()->all(),
+            'data/inventories.json' => $inventories->map(fn (Inventory $i) => [
+                'code' => $i->code,
+                'name' => $i->name,
+                'type' => $i->type->value,
+                'is_active' => (bool) $i->is_active,
+                'sort' => (int) $i->sort,
+            ])->values()->all(),
+            'data/advertising_media.json' => $media->map(function (AdvertisingMedium $m) use ($categoryById, $methodById) {
+                $category = $categoryById->get($m->category_id);
+                if ($category === null) {
+                    throw new MasterDataTransferException('Kategorie fehlt für Medium '.$m->code);
+                }
+
+                return [
+                    'code' => $m->code,
                     'name' => $m->name,
-                    'help_text' => $m->help_text,
+                    'category_key' => $category->key,
+                    'kind' => $m->kind?->value,
+                    'component_profile' => $m->component_profile?->value,
+                    'calculation_method_mode' => $m->calculation_method_mode->value,
+                    'default_calculation_method_key' => $m->default_calculation_method_id === null
+                        ? null
+                        : $methodById->get($m->default_calculation_method_id)?->key,
+                    'default_length_seconds' => (int) $m->default_length_seconds,
+                    'is_discountable' => (bool) $m->is_discountable,
+                    'is_ae_eligible' => (bool) $m->is_ae_eligible,
                     'is_active' => (bool) $m->is_active,
                     'sort' => (int) $m->sort,
-                ])->values()->all(),
-                'data/inventories.json' => $inventories->map(fn (Inventory $i) => [
-                    'code' => $i->code,
-                    'name' => $i->name,
-                    'type' => $i->type->value,
-                    'is_active' => (bool) $i->is_active,
-                    'sort' => (int) $i->sort,
-                ])->values()->all(),
-                'data/advertising_media.json' => $media->map(function (AdvertisingMedium $m) use ($categoryById, $methodById) {
-                    $category = $categoryById->get($m->category_id);
-                    if ($category === null) {
-                        throw new MasterDataTransferException('Kategorie fehlt für Medium '.$m->code);
-                    }
+                ];
+            })->values()->all(),
+            'data/inventory_medium_rules.json' => $rules->map(function (InventoryMediumRule $rule) use ($inventoryById, $mediaById) {
+                $inventory = $inventoryById->get($rule->inventory_id);
+                $medium = $mediaById->get($rule->advertising_medium_id);
+                if ($inventory === null || $medium === null) {
+                    throw new MasterDataTransferException('Regelreferenz unauflösbar.');
+                }
 
-                    return [
-                        'code' => $m->code,
-                        'name' => $m->name,
-                        'category_key' => $category->key,
-                        'kind' => $m->kind?->value,
-                        'component_profile' => $m->component_profile?->value,
-                        'calculation_method_mode' => $m->calculation_method_mode->value,
-                        'default_calculation_method_key' => $m->default_calculation_method_id === null
-                            ? null
-                            : $methodById->get($m->default_calculation_method_id)?->key,
-                        'default_length_seconds' => (int) $m->default_length_seconds,
-                        'is_discountable' => (bool) $m->is_discountable,
-                        'is_ae_eligible' => (bool) $m->is_ae_eligible,
-                        'is_active' => (bool) $m->is_active,
-                        'sort' => (int) $m->sort,
-                    ];
-                })->values()->all(),
-                'data/inventory_medium_rules.json' => $rules->map(function (InventoryMediumRule $rule) use ($inventoryById, $mediaById) {
-                    $inventory = $inventoryById->get($rule->inventory_id);
-                    $medium = $mediaById->get($rule->advertising_medium_id);
-                    if ($inventory === null || $medium === null) {
-                        throw new MasterDataTransferException('Regelreferenz unauflösbar.');
-                    }
+                return [
+                    'inventory_code' => $inventory->code,
+                    'advertising_medium_code' => $medium->code,
+                    'is_active' => (bool) $rule->is_active,
+                    'booking_code' => $rule->booking_code,
+                    'planning_responsibility_key' => $rule->planning_responsibility_key,
+                    'hint_text' => $rule->hint_text,
+                    'sort' => (int) $rule->sort,
+                    'default_length_seconds' => $rule->default_length_seconds === null ? null : (int) $rule->default_length_seconds,
+                    'surcharge_percent' => $rule->surcharge_percent === null ? null : (string) $rule->surcharge_percent,
+                    'is_discountable' => (bool) $rule->is_discountable,
+                    'is_ae_eligible' => (bool) $rule->is_ae_eligible,
+                    'component_calculation_strategy' => $rule->component_calculation_strategy->value,
+                    'swf_allonge_confirmed_at' => $rule->swf_allonge_confirmed_at?->utc()->toIso8601String(),
+                ];
+            })->values()->all(),
+            'data/advertising_category_calculation_methods.json' => $categoryMethods->map(function (AdvertisingCategoryCalculationMethod $row) use ($categoryById, $methodById) {
+                $category = $categoryById->get($row->advertising_category_id);
+                $method = $methodById->get($row->calculation_method_id);
+                if ($category === null || $method === null) {
+                    throw new MasterDataTransferException('Kategorie-Methodenzuordnung unauflösbar.');
+                }
 
-                    return [
-                        'inventory_code' => $inventory->code,
-                        'advertising_medium_code' => $medium->code,
-                        'is_active' => (bool) $rule->is_active,
-                        'booking_code' => $rule->booking_code,
-                        'planning_responsibility_key' => $rule->planning_responsibility_key,
-                        'hint_text' => $rule->hint_text,
-                        'sort' => (int) $rule->sort,
-                        'default_length_seconds' => $rule->default_length_seconds === null ? null : (int) $rule->default_length_seconds,
-                        'surcharge_percent' => $rule->surcharge_percent === null ? null : (string) $rule->surcharge_percent,
-                        'is_discountable' => (bool) $rule->is_discountable,
-                        'is_ae_eligible' => (bool) $rule->is_ae_eligible,
-                        'component_calculation_strategy' => $rule->component_calculation_strategy->value,
-                        'swf_allonge_confirmed_at' => $rule->swf_allonge_confirmed_at?->utc()->toIso8601String(),
-                    ];
-                })->values()->all(),
-                'data/advertising_category_calculation_methods.json' => $categoryMethods->map(function (AdvertisingCategoryCalculationMethod $row) use ($categoryById, $methodById) {
-                    $category = $categoryById->get($row->advertising_category_id);
-                    $method = $methodById->get($row->calculation_method_id);
-                    if ($category === null || $method === null) {
-                        throw new MasterDataTransferException('Kategorie-Methodenzuordnung unauflösbar.');
-                    }
+                return [
+                    'category_key' => $category->key,
+                    'calculation_method_key' => $method->key,
+                    'engine_profile_key' => $row->engine_profile_key,
+                    'is_active' => (bool) $row->is_active,
+                    'sort' => (int) $row->sort,
+                ];
+            })->values()->all(),
+            'data/advertising_medium_calculation_methods.json' => $mediumMethods->map(function (AdvertisingMediumCalculationMethod $row) use ($mediaById, $methodById) {
+                $medium = $mediaById->get($row->advertising_medium_id);
+                $method = $methodById->get($row->calculation_method_id);
+                if ($medium === null || $method === null) {
+                    throw new MasterDataTransferException('Medium-Methodenzuordnung unauflösbar.');
+                }
 
-                    return [
-                        'category_key' => $category->key,
-                        'calculation_method_key' => $method->key,
-                        'engine_profile_key' => $row->engine_profile_key,
-                        'is_active' => (bool) $row->is_active,
-                        'sort' => (int) $row->sort,
-                    ];
-                })->values()->all(),
-                'data/advertising_medium_calculation_methods.json' => $mediumMethods->map(function (AdvertisingMediumCalculationMethod $row) use ($mediaById, $methodById) {
-                    $medium = $mediaById->get($row->advertising_medium_id);
-                    $method = $methodById->get($row->calculation_method_id);
-                    if ($medium === null || $method === null) {
-                        throw new MasterDataTransferException('Medium-Methodenzuordnung unauflösbar.');
-                    }
+                return [
+                    'advertising_medium_code' => $medium->code,
+                    'calculation_method_key' => $method->key,
+                    'engine_profile_key' => $row->engine_profile_key,
+                    'is_active' => (bool) $row->is_active,
+                    'sort' => (int) $row->sort,
+                ];
+            })->values()->all(),
+            'data/price_lists.json' => $priceLists->map(function (PriceList $list) use ($inventoryById) {
+                $inventory = $inventoryById->get($list->inventory_id);
+                if ($inventory === null) {
+                    throw new MasterDataTransferException('Preisliste ohne Inventar.');
+                }
 
-                    return [
-                        'advertising_medium_code' => $medium->code,
-                        'calculation_method_key' => $method->key,
-                        'engine_profile_key' => $row->engine_profile_key,
-                        'is_active' => (bool) $row->is_active,
-                        'sort' => (int) $row->sort,
-                    ];
-                })->values()->all(),
-                'data/price_lists.json' => $priceLists->map(function (PriceList $list) use ($inventoryById) {
-                    $inventory = $inventoryById->get($list->inventory_id);
-                    if ($inventory === null) {
-                        throw new MasterDataTransferException('Preisliste ohne Inventar.');
-                    }
+                return [
+                    'inventory_code' => $inventory->code,
+                    'name' => $list->name,
+                    'year' => (int) $list->year,
+                    'version' => (string) $list->version,
+                    'revision_number' => (int) $list->revision_number,
+                    'source_status' => $list->status->value,
+                    'import_status' => 'draft',
+                    'valid_from' => $list->valid_from?->toDateString(),
+                    'items' => $list->items->map(function ($item): array {
+                        /** @var DayGroup $dayGroup */
+                        $dayGroup = $item->day_group;
 
-                    return [
-                        'inventory_code' => $inventory->code,
-                        'name' => $list->name,
-                        'year' => (int) $list->year,
-                        'version' => (string) $list->version,
-                        'revision_number' => (int) $list->revision_number,
-                        'source_status' => $list->status->value,
-                        'import_status' => 'draft',
-                        'valid_from' => $list->valid_from?->toDateString(),
-                        'items' => $list->items->map(fn ($item) => [
+                        return [
                             'hour' => (int) $item->hour,
-                            'day_group' => $item->day_group instanceof \BackedEnum
-                                ? $item->day_group->value
-                                : (string) $item->day_group,
+                            'day_group' => $dayGroup->value,
                             'second_price' => (string) $item->second_price,
-                        ])->values()->all(),
-                    ];
-                })->values()->all(),
-                'data/production_price_lists.json' => $productionLists->map(function (ProductionPriceList $list) use ($inventoryById) {
-                    $inventory = $inventoryById->get($list->inventory_id);
-                    if ($inventory === null) {
-                        throw new MasterDataTransferException('Produktionspreisliste ohne Inventar.');
-                    }
+                        ];
+                    })->values()->all(),
+                ];
+            })->values()->all(),
+            'data/production_price_lists.json' => $productionLists->map(function (ProductionPriceList $list) use ($inventoryById) {
+                $inventory = $inventoryById->get($list->inventory_id);
+                if ($inventory === null) {
+                    throw new MasterDataTransferException('Produktionspreisliste ohne Inventar.');
+                }
 
-                    return [
-                        'inventory_code' => $inventory->code,
-                        'production_type' => $list->production_type->value,
-                        'year' => (int) $list->year,
-                        'name' => $list->name,
-                        'version' => (string) $list->version,
-                        'revision_number' => (int) $list->revision_number,
-                        'source_status' => $list->status->value,
-                        'import_status' => 'draft',
-                        'unit_price' => (string) $list->unit_price,
-                        'is_discountable' => (bool) $list->is_discountable,
-                        'is_ae_eligible' => (bool) $list->is_ae_eligible,
-                    ];
-                })->values()->all(),
-            ];
+                return [
+                    'inventory_code' => $inventory->code,
+                    'production_type' => $list->production_type->value,
+                    'year' => (int) $list->year,
+                    'name' => $list->name,
+                    'version' => (string) $list->version,
+                    'revision_number' => (int) $list->revision_number,
+                    'source_status' => $list->status->value,
+                    'import_status' => 'draft',
+                    'unit_price' => (string) $list->unit_price,
+                    'is_discountable' => (bool) $list->is_discountable,
+                    'is_ae_eligible' => (bool) $list->is_ae_eligible,
+                ];
+            })->values()->all(),
+        ];
 
-            return [
-                'files' => $files,
-                'counts' => [
-                    'inventories' => $inventories->count(),
-                    'advertising_media' => $media->count(),
-                    'inventory_medium_rules' => $rules->count(),
-                    'price_lists' => $priceLists->count(),
-                    'price_list_items' => $priceLists->sum(fn (PriceList $l) => $l->items->count()),
-                    'production_price_lists' => $productionLists->count(),
-                ],
-            ];
-        });
+        return [
+            'files' => $files,
+            'counts' => [
+                'inventories' => $inventories->count(),
+                'advertising_media' => $media->count(),
+                'inventory_medium_rules' => $rules->count(),
+                'price_lists' => $priceLists->count(),
+                'price_list_items' => $priceLists->sum(fn (PriceList $l) => $l->items->count()),
+                'production_price_lists' => $productionLists->count(),
+            ],
+        ];
     }
 
     /**
