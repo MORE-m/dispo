@@ -25,4 +25,11 @@
 
 - **GO** für Draft-Chore-PR und CI-Prüfung
 - **STOP** für Merge ohne explizite PO-/Security-Freigabe der Ausnahme
-- PR #254 unverändert Draft
+- PR #254 unverändert Draft (Stand Readiness 18.11.2026)
+
+## Nachzug (20.11.2026) – historischer Snapshot
+
+Readiness-Snapshot vom 18.11. bleibt erhalten. **Aktueller Status:** PO-/Security-
+Freigabe erteilt; PR #255 gemergt (`ec26e42`, CI `44368007218`); PR #254 danach
+gemergt (`bc59dcd`). Ausnahme aktiv bis **2026-12-18**. Details:
+`docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md`.

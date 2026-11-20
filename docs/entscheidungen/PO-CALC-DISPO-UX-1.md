@@ -143,10 +143,9 @@ Umsetzung in **PR2**. Genehmigen/Ablehnen nicht ohne weitere Prüfung ändern.
 
 ## Technisch noch zu klären (nicht PR1)
 
-- Konkrete Field-Definition / Seed für operatives Dispo-Zeitraumfeld (PR5).
-- Statusmatrix für Editierbarkeit vor Freigabe (PR3).
-- Revisions-Erbe operativer Dispo-Kopfdaten im Detail (PR3/PR4).
-- UI-Label des operativen Zeitraums vs. Derived vs. OA-Flight (PR5).
+Historisch vor PR3–PR5 offen; **Nachzug 20.11.2026:** durch PR3–PR5 auf `main`
+geklärt (native Spalten, Draft-only Header, Revisionserbe, OA-Label). Verbleibend
+nur die drei Browser-E2E-Restpunkte der Gesamtabnahme (siehe unten).
 
 ---
 
@@ -256,7 +255,8 @@ Gemergt (PR #257, `eaa21ad`):
 
 ## Umsetzungsstand PR5
 
-Implementiert in Branch `feat/po-calc-dispo-ux-1-pr5-operational-period` (Draft #258):
+Gemergt (PR #258, `32852af`); Post-Merge-CI
+[`44758026058`](https://github.com/MORE-m/dispo/actions/runs/44758026058) SUCCESS:
 
 - Migration + Modell + Header-Update + Revisionserbe.
 - Create ohne Prefill (`null/null`); Calc-Origin-Capture unverändert.
@@ -264,3 +264,16 @@ Implementiert in Branch `feat/po-calc-dispo-ux-1-pr5-operational-period` (Draft 
   („Positions-Flight OA-TKP“).
 - Wizard ohne allgemeines Zeitraumfeld.
 - Keine rückwirkende Datenmigration.
+
+## Gesamtabnahme (20.11.2026)
+
+**GO mit nicht blockierenden Restpunkten.** PR1–PR5 vollständig auf `main`.
+
+Restpunkte (Browser-E2E, nicht Tag-1-Blocker):
+
+1. Standardangebot → Kalkulation → Dispoauftrag.
+2. OA-TKP-Positions-Flight vs. operativer Dispo-Kopfzeitraum.
+3. Agenturwechsel/-entfernung mit Rechnungsempfänger-Atomik.
+
+Specs vorhanden unter `tests/e2e/po-calc-dispo-ux-1-pr{2,3,4,5}-*.spec.ts`;
+isolierter CI-Step bisher nur für PR1 (`wizard-inventory-collapse`).
