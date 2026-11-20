@@ -80,7 +80,8 @@ jobs:
       - name: Composer audit
         run: composer audit
 
-      # Production audit helper from SEC-NPM-AUDIT / PR #255 (time-boxed GHSA exception).
+      # Production audit helper (fail-closed, no allow-list). Exception for
+      # GHSA-fc5q-39xc-vjpf removed after advisory withdrawal 2026-11-18.
       - name: npm audit (production)
         run: |
           node --test tests/security/npm-audit-production.test.mjs

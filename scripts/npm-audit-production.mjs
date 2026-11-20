@@ -1,157 +1,26 @@
 #!/usr/bin/env node
 /**
- * Production npm audit with a single, time-boxed GHSA exception.
+ * Production npm audit – fail-closed, no severity threshold, no allow-list.
  *
- * Runs `npm audit --omit=dev --json` and fails on any advisory that is not
- * explicitly allow-listed. Metavulnerabilities that only exist because of an
- * allow-listed advisory are also accepted.
+ * Runs `npm audit --omit=dev --json` and fails on any reported vulnerability.
+ * Invalid / incomplete audit reports also fail.
  *
- * This does NOT disable audits, raise severity thresholds, or rewrite the
- * lockfile. See docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md.
+ * Historical note: a time-boxed exception for GHSA-fc5q-39xc-vjpf (picomatch)
+ * existed until 2026-11-20. That advisory was withdrawn upstream on
+ * 2026-11-18 (`withdrawnAt`), so the exception was removed. See
+ * docs/readiness/SEC-DEPS-2026-11.md and the decision doc follow-up after
+ * Docs-PR #259.
  */
 
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-/** @typedef {{ source?: number, name?: string, title?: string, url?: string, severity?: string, range?: string }} AdvisoryVia */
-/** @typedef {{ via: Array<string|AdvisoryVia>, severity?: string }} VulnEntry */
+/** @typedef {{ via?: Array<unknown>, severity?: string }} VulnEntry */
 /** @typedef {{ vulnerabilities: Record<string, VulnEntry>, metadata?: unknown, error?: unknown, message?: unknown }} AuditReport */
-
-export const EXCEPTION = {
-    ghsa: 'GHSA-fc5q-39xc-vjpf',
-    /** npm advisory source id observed in audit JSON for this GHSA */
-    sourceIds: new Set([1247710]),
-    /** PO-/Security-Freigabe erteilt am 18.11.2026 (siehe Entscheidungsdok). */
-    approvedOn: '2026-11-18',
-    /** Inclusive calendar date (UTC) – after this the exception must be re-approved. */
-    expiresOn: '2026-12-18',
-    packageName: 'picomatch',
-};
 
 /** npm audit: 0 = clean, 1 = vulnerabilities reported. Other codes are tool failures. */
 const ACCEPTED_NPM_AUDIT_STATUSES = new Set([0, 1]);
-
-/**
- * @param {string} expiresOn
- * @param {Date} [now]
- */
-export function isExceptionExpired(expiresOn, now = new Date()) {
-    const end = Date.parse(`${expiresOn}T23:59:59.999Z`);
-    if (Number.isNaN(end)) {
-        throw new Error(`Invalid exception expiry date: ${expiresOn}`);
-    }
-    return now.getTime() > end;
-}
-
-/**
- * @param {AdvisoryVia} advisory
- */
-export function advisoryMatchesException(advisory) {
-    if (EXCEPTION.sourceIds.has(Number(advisory.source))) {
-        return true;
-    }
-    const haystack = `${advisory.url ?? ''} ${advisory.name ?? ''} ${advisory.title ?? ''}`;
-    return haystack.includes(EXCEPTION.ghsa);
-}
-
-/**
- * @param {Record<string, VulnEntry>} vulnerabilities
- * @param {string} packageName
- * @param {Set<string>} visiting
- * @returns {true|false|'cycle'}
- */
-function resolvePackageExemption(vulnerabilities, packageName, visiting) {
-    if (visiting.has(packageName)) {
-        // Signal cyclic edge to the caller; never treat as proven exemption.
-        return 'cycle';
-    }
-
-    const entry = vulnerabilities[packageName];
-    if (entry === undefined || entry === null || typeof entry !== 'object') {
-        return false;
-    }
-
-    const vias = entry.via;
-    if (!Array.isArray(vias) || vias.length === 0) {
-        return false;
-    }
-
-    visiting.add(packageName);
-
-    let sawConcreteProof = false;
-    let sawCycleOnlyChild = false;
-
-    for (const via of vias) {
-        if (typeof via === 'string') {
-            if (via.trim() === '') {
-                visiting.delete(packageName);
-                return false;
-            }
-
-            const child = resolvePackageExemption(
-                vulnerabilities,
-                via,
-                visiting,
-            );
-            if (child === 'cycle') {
-                // Back-edge / unresolved cycle: do not count as proof.
-                sawCycleOnlyChild = true;
-                continue;
-            }
-            if (child !== true) {
-                visiting.delete(packageName);
-                return false;
-            }
-            sawConcreteProof = true;
-            continue;
-        }
-
-        if (via === null || typeof via !== 'object') {
-            visiting.delete(packageName);
-            return false;
-        }
-
-        if (!advisoryMatchesException(via)) {
-            visiting.delete(packageName);
-            return false;
-        }
-        sawConcreteProof = true;
-    }
-
-    visiting.delete(packageName);
-
-    if (sawConcreteProof) {
-        return true;
-    }
-
-    // Propagate unresolved cycles to the parent so a sibling allow-listed
-    // advisory on the parent can still prove the chain.
-    if (sawCycleOnlyChild) {
-        return 'cycle';
-    }
-
-    return false;
-}
-
-/**
- * Returns whether every vulnerability path for `packageName` resolves only to the
- * allow-listed GHSA. Unknown references and unresolved cycles fail closed.
- *
- * @param {Record<string, VulnEntry>} vulnerabilities
- * @param {string} packageName
- * @param {Set<string>} [visiting] path-local recursion guard (do not reuse across roots)
- * @returns {boolean}
- */
-export function packageOnlyExempted(
-    vulnerabilities,
-    packageName,
-    visiting = new Set(),
-) {
-    return (
-        resolvePackageExemption(vulnerabilities, packageName, visiting) === true
-    );
-}
 
 /**
  * @param {unknown} report
@@ -195,9 +64,8 @@ export function assertValidAuditReport(report) {
 
 /**
  * @param {unknown} report
- * @param {{ now?: Date }} [options]
  */
-export function evaluateProductionAudit(report, options = {}) {
+export function evaluateProductionAudit(report) {
     try {
         assertValidAuditReport(report);
     } catch (error) {
@@ -208,49 +76,23 @@ export function evaluateProductionAudit(report, options = {}) {
                     ? error.message
                     : 'Invalid npm audit report',
             remaining: [],
-            exempted: [],
         };
     }
 
-    if (isExceptionExpired(EXCEPTION.expiresOn, options.now)) {
-        return {
-            ok: false,
-            reason: `Security exception for ${EXCEPTION.ghsa} expired on ${EXCEPTION.expiresOn}. Re-evaluate and remove or renew the exception.`,
-            remaining: [],
-            exempted: [],
-        };
-    }
-
-    const vulnerabilities = report.vulnerabilities;
-    const remaining = [];
-    const exempted = [];
-
-    for (const name of Object.keys(vulnerabilities).sort()) {
-        // Fresh visiting set per root package so independent paths do not leak state.
-        if (packageOnlyExempted(vulnerabilities, name, new Set())) {
-            exempted.push(name);
-        } else {
-            remaining.push(name);
-        }
-    }
+    const remaining = Object.keys(report.vulnerabilities).sort();
 
     if (remaining.length > 0) {
         return {
             ok: false,
-            reason: `Unapproved production npm vulnerabilities remain: ${remaining.join(', ')}`,
+            reason: `Production npm vulnerabilities remain: ${remaining.join(', ')}`,
             remaining,
-            exempted,
         };
     }
 
     return {
         ok: true,
-        reason:
-            exempted.length > 0
-                ? `Only allow-listed advisory ${EXCEPTION.ghsa} (expires ${EXCEPTION.expiresOn}) present via: ${exempted.join(', ')}`
-                : 'No production npm vulnerabilities.',
+        reason: 'No production npm vulnerabilities.',
         remaining,
-        exempted,
     };
 }
 
@@ -317,15 +159,9 @@ function main() {
     console.log(
         JSON.stringify(
             {
-                exception: {
-                    ghsa: EXCEPTION.ghsa,
-                    package: EXCEPTION.packageName,
-                    expiresOn: EXCEPTION.expiresOn,
-                },
                 ok: verdict.ok,
                 reason: verdict.reason,
                 remaining: verdict.remaining,
-                exempted: verdict.exempted,
                 metadata: report.metadata ?? null,
             },
             null,
