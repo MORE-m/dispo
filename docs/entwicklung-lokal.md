@@ -112,6 +112,10 @@ E2E-Katalog-Seeder laufen **nur** über isolierte Playwright-Configs
 Öffentliche Registrierung ist deaktiviert. Benutzer werden administrativ angelegt.
 Passwort-Reset nutzt lokal `MAIL_MAILER=log` (`storage/logs`).
 
+Staging-SMTP (SpeedIt): Empfänger-Allowlist über `DISPO_MAIL_RECIPIENT_GUARD` /
+`DISPO_MAIL_RECIPIENT_ALLOWLIST` – siehe `docs/betrieb/staging-mail-recipient-guard.md`.
+Produktion lässt den Guard auf `off` (Default).
+
 Node.js ist kein Produktionsprozess, nur Asset-Build und CI.
 
 ## Alle Prüfungen

@@ -5,6 +5,7 @@ namespace App\Services\Notification;
 use App\Enums\NotificationOutboxChannel;
 use App\Enums\NotificationOutboxStatus;
 use App\Exceptions\NotificationOutboxConflictException;
+use App\Exceptions\StagingMailRecipientBlockedException;
 use App\Jobs\DeliverSalesInquiryOutboxJob;
 use App\Mail\SalesInquiryOutboxMail;
 use App\Models\NotificationOutbox;
@@ -192,6 +193,14 @@ final class NotificationOutboxDeliveryService
             Mail::to($row->recipient_email, $row->recipient_name)
                 ->send(new SalesInquiryOutboxMail($row));
             $this->states->markSent($row);
+        } catch (StagingMailRecipientBlockedException $exception) {
+            // Allowlist-Block ist konfigurativ, kein transienter SMTP-Fehler → kein Retry.
+            $fresh = $row->fresh() ?? $row;
+            $message = mb_substr(trim($exception->getMessage()), 0, 2000);
+            $this->states->markFailed(
+                $fresh,
+                $message !== '' ? $message : 'Staging-Mailversand durch Empfänger-Guard gesperrt.',
+            );
         } catch (Throwable $exception) {
             $fresh = $row->fresh() ?? $row;
             $message = mb_substr(trim($exception->getMessage()), 0, 2000);

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Listeners\EnforceStagingMailRecipientAllowlist;
+use App\Mail\StagingMailRecipientGuard;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\StandardOffer;
@@ -13,8 +15,10 @@ use App\Policies\StandardOfferPolicy;
 use App\Services\OnlineAudio\Import\OaTkpPriceListYearLock;
 use App\Support\Calculation\EngineProfileRegistry;
 use Carbon\CarbonImmutable;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -29,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
         // PO-CALC-TKP-1D4c-4c: eine Lock-Instanz pro Request, damit AdminWriter →
         // DraftImportGuard / Activation denselben reentrant-Zustand teilen.
         $this->app->singleton(OaTkpPriceListYearLock::class);
+        $this->app->singleton(StagingMailRecipientGuard::class);
     }
 
     /**
@@ -39,6 +44,15 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureAuthorization();
         $this->configureE2EFreePositionPairFake();
+        $this->configureStagingMailRecipientGuard();
+    }
+
+    /**
+     * EPIC-01-MAIL-1: zentraler MessageSending-Guard (Default off).
+     */
+    protected function configureStagingMailRecipientGuard(): void
+    {
+        Event::listen(MessageSending::class, EnforceStagingMailRecipientAllowlist::class);
     }
 
     /**
