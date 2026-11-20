@@ -211,10 +211,54 @@ Gemergt (PR #256, `86cafd6`):
 
 ## Umsetzungsstand PR4
 
-Implementiert in Branch `feat/po-calc-dispo-ux-1-pr4-calc-cleanup` (Draft):
+Gemergt (PR #257, `eaa21ad`):
 
-- Wizard ohne Agentur/RE/Briefing; Kunde und Kampagnenzeitraum bleiben.
+- Wizard ohne Agentur/RE/Briefing; Kampagnenzeitraum blieb bis PR5 (PO-PR4-01).
 - `CalculationWriter` mit `allowUnsetInvoiceRecipient` und Briefing
   preserve-on-absent.
 - Standardangebot-Adoption ohne Agentur-/RE-Vorbelegung.
-- Abhängigkeit: endgültige Zeitraum-Verlagerung bleibt **PR5**.
+
+## Verbindliche PR5-Ergänzungen (PO-PR5-01…07)
+
+- **PO-PR5-01:** Kein neues globales Submit-Gate für den operativen Zeitraum.
+  Draft und Einreichung ohne Zeitraum bleiben zulässig; bestehende
+  werbeform-/regelbedingte Pflichten (inkl. OA-Flight, Capture-Gaps, RE) unverändert.
+- **PO-PR5-02:** Einmaliges Prefill beim erstmaligen Calc→Dispo-Create nur für
+  historische Kalkulationen mit vollständigem gültigem Calc-Origin-Zeitraum.
+  Kriterium: `origin_standard_offer_version_id IS NULL` **und**
+  `created_at < OperationalCampaignPeriodContract::LEGACY_CALC_CREATED_BEFORE`
+  **und** vollständiges gültiges `campaign_period`. Adoption-Calcs und neue Calcs
+  nach Cutover erhalten kein Prefill. Keine spätere Synchronisierung.
+- **PO-PR5-03:** Kein Backfill bestehender Dispoaufträge; neue Spalten nullable.
+- **PO-PR5-04:** Paar `operational_campaign_starts_on` / `operational_campaign_ends_on`,
+  Format `Y-m-d`; beide null oder beide gesetzt; Start ≤ Ende; gleiche Tage ok;
+  keine offenen Zeiträume; keine TZ-Verschiebung.
+- **PO-PR5-05:** Rein informativ; steuert keine Freigabe, OA-Disposition, Abschluss,
+  Abrechnung, Derived oder Flights.
+- **PO-PR5-06:** Integration in den PR3-Header-Editor; Draft-only; bestehende Policy
+  und `lock_version`; keine neuen Rollen.
+- **PO-PR5-07:** Revision erbt den operativen Zeitraum vom Vorgänger-Dispo
+  (inkl. `null/null`); kein erneutes Calc-Prefill.
+
+### Datenmodell PR5
+
+- Native Spalten an `dispo_orders`: `operational_campaign_starts_on`,
+  `operational_campaign_ends_on` (date, nullable, nicht fillable).
+- Calc-Origin `campaign_period`, `derived_campaign_period_*` und
+  OA-`operational_flight_*` bleiben eigenständig.
+- Capture-Zeile `campaign_period` weiterhin bei Create (auch null/null);
+  Gaps nur bei fehlender Zeile.
+
+### Wizard PR5
+
+- Allgemeine `campaign_period`-Eingabe entfernt (neu und historisch).
+- Key wird nicht gesendet (Preserve-on-absent); kein `campaign_period: null`.
+
+## Umsetzungsstand PR5
+
+Implementiert in Branch `feat/po-calc-dispo-ux-1-pr5-operational-period` (Draft):
+
+- Migration + Modell + Header-Update + Create-Prefill + Revisionserbe.
+- Dispo-Header-Editor mit operativem Zeitraum; OA-Label präzisiert
+  („Positions-Flight OA-TKP“).
+- Wizard ohne allgemeines Zeitraumfeld.

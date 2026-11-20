@@ -19,7 +19,7 @@ import { JsonPostError, jsonPut } from '@/lib/json-post';
 import { firstValidationMessage } from '@/lib/validation-errors';
 
 export const OPERATIONAL_FLIGHT_LABEL =
-    'Verbindlicher Kampagnenzeitraum (operativ)';
+    'Verbindlicher Positions-Flight (OA-TKP)';
 
 type ActionResponse = {
     message: string;

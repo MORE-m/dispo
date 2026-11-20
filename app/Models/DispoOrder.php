@@ -38,6 +38,8 @@ use Illuminate\Support\Carbon;
  * @property DispoOrderApprovalKind $approval_kind
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property int $configuration_snapshot_id
+ * @property string|null $operational_campaign_starts_on
+ * @property string|null $operational_campaign_ends_on
  * @property string|null $derived_campaign_period_start
  * @property string|null $derived_campaign_period_end
  * @property DerivedCampaignPeriodStatus $derived_campaign_period_status
@@ -101,6 +103,7 @@ class DispoOrder extends Model
         'source_calculation_totals_snapshot',
         'lock_version',
         'configuration_snapshot_id',
+        // operational_campaign_* bewusst nicht fillable (HeaderUpdate/Writer).
         // derived_campaign_period_* bewusst nicht fillable (nur Deriver).
     ];
 
@@ -127,6 +130,8 @@ class DispoOrder extends Model
             'order_discounts_snapshot' => 'array',
             'source_calculation_totals_snapshot' => 'array',
             'lock_version' => 'integer',
+            'operational_campaign_starts_on' => 'date:Y-m-d',
+            'operational_campaign_ends_on' => 'date:Y-m-d',
             'derived_campaign_period_start' => 'date:Y-m-d',
             'derived_campaign_period_end' => 'date:Y-m-d',
             'derived_campaign_period_status' => DerivedCampaignPeriodStatus::class,

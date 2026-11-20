@@ -8,14 +8,16 @@ use App\Models\DispoOrder;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Crm\CrmOrderHeaderBinder;
+use App\Support\DispoOrder\OperationalCampaignPeriodContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Atomare Aktualisierung operativer Dispo-Kopfdaten (PO-CALC-DISPO-UX-1 / PR3).
+ * Atomare Aktualisierung operativer Dispo-Kopfdaten (PO-CALC-DISPO-UX-1 / PR3+PR5).
  *
  * Kunde bleibt unverändert. CRM-Agentur-/RE-Regeln über {@see CrmOrderHeaderBinder}
  * mit Dispo-Semantik: RE darf im Draft null bleiben (kein stilles customer-Default).
+ * Operativer Kampagnenzeitraum: atomare Paar-Einheit (PO-PR5-01…06).
  */
 final class DispoOrderHeaderUpdateService
 {
@@ -64,6 +66,19 @@ final class DispoOrderHeaderUpdateService
             $briefingRaw = $briefingProvided ? $payload['briefing'] : $locked->briefing;
             unset($payload['briefing']);
 
+            $periodProvided = array_key_exists(OperationalCampaignPeriodContract::START_KEY, $payload)
+                && array_key_exists(OperationalCampaignPeriodContract::END_KEY, $payload);
+            $periodStart = $periodProvided
+                ? $payload[OperationalCampaignPeriodContract::START_KEY]
+                : null;
+            $periodEnd = $periodProvided
+                ? $payload[OperationalCampaignPeriodContract::END_KEY]
+                : null;
+            unset(
+                $payload[OperationalCampaignPeriodContract::START_KEY],
+                $payload[OperationalCampaignPeriodContract::END_KEY],
+            );
+
             // Agentur immer als „touched“ behandeln, wenn Agency-Keys fehlen:
             // Frontend sendet stets den vollständigen Agentur-Zustand.
             if (! $this->agencyTouched($payload)) {
@@ -93,6 +108,15 @@ final class DispoOrderHeaderUpdateService
 
             if ($briefingProvided) {
                 $locked->briefing = $this->normalizeBriefing($briefingRaw);
+            }
+
+            if ($periodProvided) {
+                $pair = OperationalCampaignPeriodContract::canonicalizeForPersist(
+                    $periodStart,
+                    $periodEnd,
+                );
+                $locked->operational_campaign_starts_on = $pair['start'];
+                $locked->operational_campaign_ends_on = $pair['end'];
             }
 
             if (! $locked->isDirty()) {
@@ -161,6 +185,12 @@ final class DispoOrderHeaderUpdateService
             'agency_salesforce_account_id' => $order->agency_salesforce_account_id,
             'invoice_recipient' => $order->invoice_recipient?->value,
             'briefing' => $order->briefing,
+            'operational_campaign_starts_on' => OperationalCampaignPeriodContract::dateToIso(
+                $order->operational_campaign_starts_on,
+            ),
+            'operational_campaign_ends_on' => OperationalCampaignPeriodContract::dateToIso(
+                $order->operational_campaign_ends_on,
+            ),
             'customer_name' => $order->customer_name,
             'customer_account_id' => $order->customer_account_id,
         ];

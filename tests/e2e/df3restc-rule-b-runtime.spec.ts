@@ -75,7 +75,7 @@ test.describe('DF-3-RULE-B runtime UI', () => {
         await activateCurrentDraft(page);
     });
 
-    test('02 calc set_visible keep value required and campaign_period', async ({
+    test('02 calc set_visible keep value required; campaign_period UI gone (PR5)', async ({
         page,
     }) => {
         test.setTimeout(240_000);
@@ -84,9 +84,10 @@ test.describe('DF-3-RULE-B runtime UI', () => {
         await expect(
             page.locator(`[data-test="calc-choice-${triggerKey}"]`),
         ).toBeVisible({ timeout: 20_000 });
+        // PO-PR5: allgemeines campaign_period ist im Wizard nicht mehr sichtbar.
         await expect(
             page.locator('[data-test="campaign-period-start"]'),
-        ).toBeVisible();
+        ).toHaveCount(0);
 
         await page.locator(`[data-test="calc-choice-${triggerKey}"]`).click();
         await page
@@ -126,32 +127,6 @@ test.describe('DF-3-RULE-B runtime UI', () => {
             { op: 'require_field', field_key: hiddenTextKey },
             105,
         );
-        await e2eUpsertSnapshotRule(
-            page,
-            { calculationId: calcId },
-            {
-                op: 'field_equals',
-                field_key: triggerKey,
-                value: 'show',
-            },
-            { op: 'require_field', field_key: 'campaign_period' },
-            110,
-        );
-        await e2eUpsertSnapshotRule(
-            page,
-            { calculationId: calcId },
-            {
-                op: 'field_equals',
-                field_key: triggerKey,
-                value: 'hide',
-            },
-            {
-                op: 'set_visible',
-                field_key: 'campaign_period',
-                value: false,
-            },
-            120,
-        );
 
         await page.reload();
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
@@ -162,7 +137,9 @@ test.describe('DF-3-RULE-B runtime UI', () => {
             page.locator(`[data-test="calc-custom-${hiddenTextKey}"]`),
         ).toHaveValue('regel-wert');
         await expect(page.getByText(/RULE-B Hidden Text.*\*/)).toBeVisible();
-        await expect(page.getByText(/Kampagnenzeitraum \*/)).toBeVisible();
+        await expect(
+            page.locator('[data-test="campaign-period-start"]'),
+        ).toHaveCount(0);
 
         await page.locator(`[data-test="calc-choice-${triggerKey}"]`).click();
         await page
@@ -170,9 +147,6 @@ test.describe('DF-3-RULE-B runtime UI', () => {
             .click();
         await expect(
             page.locator(`[data-test="calc-custom-${hiddenTextKey}"]`),
-        ).toHaveCount(0);
-        await expect(
-            page.locator('[data-test="campaign-period-start"]'),
         ).toHaveCount(0);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
@@ -194,7 +168,7 @@ test.describe('DF-3-RULE-B runtime UI', () => {
         ).toHaveValue('regel-wert');
         await expect(
             page.locator('[data-test="campaign-period-start"]'),
-        ).toBeVisible();
+        ).toHaveCount(0);
     });
 
     test('03 calc integrity blocks save and shows banner', async ({ page }) => {

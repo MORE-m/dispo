@@ -73,6 +73,8 @@ const baseOrder = {
     agency_meridian_number: 'M-1',
     invoice_recipient: 'agency' as const,
     briefing: 'Hallo',
+    operational_campaign_starts_on: null as string | null,
+    operational_campaign_ends_on: null as string | null,
 };
 
 describe('DispoOrderHeaderEditor', () => {
@@ -97,8 +99,31 @@ describe('DispoOrderHeaderEditor', () => {
             screen.getByTestId('dispo-order-briefing-readonly'),
         ).toHaveTextContent('Hallo');
         expect(
+            screen.getByTestId(
+                'dispo-order-operational-campaign-period-readonly',
+            ),
+        ).toBeInTheDocument();
+        expect(
             screen.queryByTestId('dispo-order-header-save'),
         ).not.toBeInTheDocument();
+    });
+
+    it('saves operational campaign period with header payload', () => {
+        render(<DispoOrderHeaderEditor order={baseOrder} canEdit />);
+
+        fireEvent.change(
+            screen.getByTestId('dispo-operational-campaign-starts-on'),
+            { target: { value: '2026-05-01' } },
+        );
+        fireEvent.change(
+            screen.getByTestId('dispo-operational-campaign-ends-on'),
+            { target: { value: '2026-05-10' } },
+        );
+        fireEvent.click(screen.getByTestId('dispo-order-header-save'));
+
+        const payload = mockPatch.mock.calls[0][1] as Record<string, unknown>;
+        expect(payload.operational_campaign_starts_on).toBe('2026-05-01');
+        expect(payload.operational_campaign_ends_on).toBe('2026-05-10');
     });
 
     it('clears invoice recipient when agency is cleared', () => {
@@ -135,6 +160,8 @@ describe('DispoOrderHeaderEditor', () => {
         expect(payload.lock_version).toBe(3);
         expect(payload.briefing).toBe('Neu');
         expect(payload.invoice_recipient).toBe('customer');
+        expect(payload.operational_campaign_starts_on).toBeNull();
+        expect(payload.operational_campaign_ends_on).toBeNull();
     });
 
     it('disables agency invoice option without agency and keeps customer read-only', () => {

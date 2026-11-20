@@ -13,6 +13,7 @@ import {
     formTextareaClass,
 } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { flushDispoOrderInertiaCache } from '@/lib/dispo-order-inertia-cache';
 import {
     firstValidationMessage,
@@ -29,6 +30,8 @@ export type DispoOrderHeaderEditorOrder = {
     agency_meridian_number?: string | null;
     invoice_recipient?: string | null;
     briefing: string | null;
+    operational_campaign_starts_on?: string | null;
+    operational_campaign_ends_on?: string | null;
 };
 
 function agencyIsSet(value: CrmAccountPickerValue): boolean {
@@ -47,6 +50,20 @@ function invoiceLabel(value: string | null | undefined): string {
         return 'Kunde';
     }
     return 'Noch nicht festgelegt';
+}
+
+function formatOperationalPeriod(
+    start: string | null | undefined,
+    end: string | null | undefined,
+): string | null {
+    if (!start && !end) {
+        return null;
+    }
+    if (start && end) {
+        return `${start} – ${end}`;
+    }
+
+    return start || end || null;
 }
 
 export function DispoOrderHeaderEditor({
@@ -73,6 +90,12 @@ export function DispoOrderHeaderEditor({
             : '',
     );
     const [briefing, setBriefing] = useState(order.briefing ?? '');
+    const [periodStart, setPeriodStart] = useState(
+        order.operational_campaign_starts_on ?? '',
+    );
+    const [periodEnd, setPeriodEnd] = useState(
+        order.operational_campaign_ends_on ?? '',
+    );
     const [saving, setSaving] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState<string | null>(null);
@@ -92,6 +115,8 @@ export function DispoOrderHeaderEditor({
                 : '',
         );
         setBriefing(order.briefing ?? '');
+        setPeriodStart(order.operational_campaign_starts_on ?? '');
+        setPeriodEnd(order.operational_campaign_ends_on ?? '');
         setFieldErrors({});
         setFormError(null);
     }, [
@@ -102,6 +127,8 @@ export function DispoOrderHeaderEditor({
         order.agency_meridian_number,
         order.invoice_recipient,
         order.briefing,
+        order.operational_campaign_starts_on,
+        order.operational_campaign_ends_on,
     ]);
 
     const agencySet = agencyIsSet(agencyPicker);
@@ -110,6 +137,8 @@ export function DispoOrderHeaderEditor({
         order.invoice_recipient === 'customer'
             ? order.invoice_recipient
             : '';
+    const initialStart = order.operational_campaign_starts_on ?? '';
+    const initialEnd = order.operational_campaign_ends_on ?? '';
     const dirty =
         JSON.stringify(crmPickerToPayload('agency', agencyPicker)) !==
             JSON.stringify(
@@ -123,7 +152,9 @@ export function DispoOrderHeaderEditor({
                 ),
             ) ||
         invoiceRecipient !== initialInvoice ||
-        briefing !== (order.briefing ?? '');
+        briefing !== (order.briefing ?? '') ||
+        periodStart !== initialStart ||
+        periodEnd !== initialEnd;
 
     function onAgencyChange(next: CrmAccountPickerValue) {
         setAgencyPicker(next);
@@ -141,6 +172,9 @@ export function DispoOrderHeaderEditor({
         setFieldErrors({});
         setFormError(null);
 
+        const start = periodStart.trim();
+        const end = periodEnd.trim();
+
         router.patch(
             `/dispoauftraege/${order.id}/kopfdaten`,
             {
@@ -149,6 +183,8 @@ export function DispoOrderHeaderEditor({
                 invoice_recipient:
                     invoiceRecipient === '' ? null : invoiceRecipient,
                 briefing: briefing.trim() === '' ? null : briefing,
+                operational_campaign_starts_on: start === '' ? null : start,
+                operational_campaign_ends_on: end === '' ? null : end,
             },
             {
                 preserveScroll: true,
@@ -206,6 +242,18 @@ export function DispoOrderHeaderEditor({
                         label="Briefing-Text"
                         value={order.briefing}
                         multiline
+                    />
+                </div>
+                <div
+                    className="sm:col-span-2"
+                    data-test="dispo-order-operational-campaign-period-readonly"
+                >
+                    <ReadOnlyDetail
+                        label="Kampagnenzeitraum (operativ)"
+                        value={formatOperationalPeriod(
+                            order.operational_campaign_starts_on,
+                            order.operational_campaign_ends_on,
+                        )}
                     />
                 </div>
             </div>
@@ -269,6 +317,35 @@ export function DispoOrderHeaderEditor({
                     onChange={(event) => setBriefing(event.target.value)}
                     placeholder="Operativer Briefing-Text – nicht die Upload-Kategorie Briefing."
                 />
+            </FormField>
+            <FormField
+                label="Kampagnenzeitraum (operativ)"
+                htmlFor="dispo-operational-campaign-starts-on"
+                error={
+                    fieldErrors.operational_campaign_starts_on ??
+                    fieldErrors.operational_campaign_ends_on
+                }
+                hint="Informativer Dispo-Kopfzeitraum. Getrennt vom Kalkulations-Capture, vom abgeleiteten Zeitraum und vom Positions-Flight OA-TKP."
+            >
+                <div
+                    className="grid grid-cols-2 gap-2"
+                    data-test="dispo-order-operational-campaign-period"
+                >
+                    <Input
+                        id="dispo-operational-campaign-starts-on"
+                        type="date"
+                        value={periodStart}
+                        onChange={(event) => setPeriodStart(event.target.value)}
+                        data-test="dispo-operational-campaign-starts-on"
+                    />
+                    <Input
+                        id="dispo-operational-campaign-ends-on"
+                        type="date"
+                        value={periodEnd}
+                        onChange={(event) => setPeriodEnd(event.target.value)}
+                        data-test="dispo-operational-campaign-ends-on"
+                    />
+                </div>
             </FormField>
             {formError ? <ErrorState message={formError} /> : null}
             <div className="flex justify-end">

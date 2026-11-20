@@ -57,6 +57,7 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\DispoOrder\DerivedCampaignPeriodPresenter;
 use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\DispoOrder\InvoiceEndMonthsContract;
+use App\Support\DispoOrder\OperationalCampaignPeriodContract;
 use App\Support\DispoOrder\OperationalFlightContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -881,6 +882,12 @@ class DispoOrderController extends Controller
             'campaign' => $order->campaign,
             'product_title' => $order->product_title,
             'briefing' => $order->briefing,
+            'operational_campaign_starts_on' => OperationalCampaignPeriodContract::dateToIso(
+                $order->operational_campaign_starts_on,
+            ),
+            'operational_campaign_ends_on' => OperationalCampaignPeriodContract::dateToIso(
+                $order->operational_campaign_ends_on,
+            ),
             'advisor_name' => $order->advisor_name,
             'order_discount_percent' => (string) $order->order_discount_percent,
             'ae_enabled' => (bool) $order->ae_enabled,
