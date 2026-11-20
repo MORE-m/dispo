@@ -14,20 +14,34 @@ async function login(page: Page, email: string) {
     );
 }
 
-async function waitHeaderSaveReady(page: Page) {
+async function waitHeaderIdle(page: Page) {
     const save = page.locator('[data-test="dispo-order-header-save"]');
     await expect(save).toBeVisible({ timeout: 15_000 });
-    await expect(save).toBeEnabled({ timeout: 30_000 });
     await expect(save).toHaveText('Kopfdaten speichern', { timeout: 30_000 });
 }
 
 async function saveHeader(page: Page) {
-    await waitHeaderSaveReady(page);
-    await page.locator('[data-test="dispo-order-header-save"]').click();
+    const save = page.locator('[data-test="dispo-order-header-save"]');
+    await waitHeaderIdle(page);
+    await expect(save).toBeEnabled({ timeout: 15_000 });
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.request().method() === 'PATCH' &&
+                response.url().includes('/kopfdaten') &&
+                (response.status() === 200 ||
+                    response.status() === 302 ||
+                    response.status() === 303 ||
+                    response.status() === 409 ||
+                    response.status() === 422),
+            { timeout: 30_000 },
+        ),
+        save.click(),
+    ]);
     await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
         timeout: 20_000,
     });
-    await waitHeaderSaveReady(page);
+    await waitHeaderIdle(page);
 }
 
 async function createDraftDispoOrder(page: Page) {
@@ -65,13 +79,11 @@ test.describe('PO-CALC-DISPO-UX-1 PR5 operativer Zeitraum', () => {
         await expect(
             page.locator('[data-test="dispo-operational-campaign-starts-on"]'),
         ).toHaveValue('');
-        await expect(
-            page.locator('[data-test="dispo-operational-campaign-ends-on"]'),
-        ).toHaveValue('');
 
         await page.locator('[data-test="dispo-invoice-recipient"]').selectOption(
             'customer',
         );
+        await page.locator('[data-test="dispo-briefing"]').fill('PR5 Briefing');
         await page
             .locator('[data-test="dispo-operational-campaign-starts-on"]')
             .fill('2026-11-01');
@@ -82,25 +94,33 @@ test.describe('PO-CALC-DISPO-UX-1 PR5 operativer Zeitraum', () => {
         await expect(
             page.locator('[data-test="dispo-operational-campaign-starts-on"]'),
         ).toHaveValue('2026-11-01');
+        await expect(
+            page.locator('[data-test="dispo-operational-campaign-ends-on"]'),
+        ).toHaveValue('2026-11-30');
 
         // Halbes Paar → Validierungsfehler
         await page
             .locator('[data-test="dispo-operational-campaign-ends-on"]')
             .fill('');
-        await waitHeaderSaveReady(page);
-        await page.locator('[data-test="dispo-order-header-save"]').click();
+        const save = page.locator('[data-test="dispo-order-header-save"]');
+        await expect(save).toBeEnabled({ timeout: 15_000 });
+        await save.click();
         await expect(page.getByRole('alert').first()).toBeVisible({
             timeout: 15_000,
         });
-        await waitHeaderSaveReady(page);
+        await waitHeaderIdle(page);
 
-        // Zeitraum vollständig löschen
+        // Zeitraum löschen (Start ebenfalls leeren)
         await page
             .locator('[data-test="dispo-operational-campaign-starts-on"]')
             .fill('');
         await page
             .locator('[data-test="dispo-operational-campaign-ends-on"]')
             .fill('');
+        // Briefing leicht ändern, falls Date-Clear dirty nicht setzt
+        await page
+            .locator('[data-test="dispo-briefing"]')
+            .fill('PR5 Briefing cleared');
         await saveHeader(page);
         await expect(
             page.locator('[data-test="dispo-operational-campaign-starts-on"]'),
