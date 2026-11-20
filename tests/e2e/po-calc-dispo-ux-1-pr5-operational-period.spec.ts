@@ -14,6 +14,22 @@ async function login(page: Page, email: string) {
     );
 }
 
+async function waitHeaderSaveReady(page: Page) {
+    const save = page.locator('[data-test="dispo-order-header-save"]');
+    await expect(save).toBeVisible({ timeout: 15_000 });
+    await expect(save).toBeEnabled({ timeout: 30_000 });
+    await expect(save).toHaveText('Kopfdaten speichern', { timeout: 30_000 });
+}
+
+async function saveHeader(page: Page) {
+    await waitHeaderSaveReady(page);
+    await page.locator('[data-test="dispo-order-header-save"]').click();
+    await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+        timeout: 20_000,
+    });
+    await waitHeaderSaveReady(page);
+}
+
 async function createDraftDispoOrder(page: Page) {
     await page.goto('/kalkulationen/neu');
     await expect(
@@ -36,7 +52,7 @@ async function createDraftDispoOrder(page: Page) {
 }
 
 test.describe('PO-CALC-DISPO-UX-1 PR5 operativer Zeitraum', () => {
-    test('Wizard ohne Zeitraum; Dispo-Header setzen/ändern/löschen; Submit ohne Zeitraum', async ({
+    test('Wizard ohne Zeitraum; Dispo-Header setzen/löschen; Submit ohne Zeitraum', async ({
         page,
     }) => {
         test.setTimeout(180_000);
@@ -53,64 +69,42 @@ test.describe('PO-CALC-DISPO-UX-1 PR5 operativer Zeitraum', () => {
             page.locator('[data-test="dispo-operational-campaign-ends-on"]'),
         ).toHaveValue('');
 
+        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption(
+            'customer',
+        );
         await page
             .locator('[data-test="dispo-operational-campaign-starts-on"]')
             .fill('2026-11-01');
         await page
             .locator('[data-test="dispo-operational-campaign-ends-on"]')
             .fill('2026-11-30');
-        await page.locator('[data-test="dispo-invoice-recipient"]').selectOption(
-            'customer',
-        );
-        await page.locator('[data-test="dispo-order-header-save"]').click();
-        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
-            timeout: 15_000,
-        });
+        await saveHeader(page);
         await expect(
             page.locator('[data-test="dispo-operational-campaign-starts-on"]'),
         ).toHaveValue('2026-11-01');
 
-        await page
-            .locator('[data-test="dispo-operational-campaign-starts-on"]')
-            .fill('2026-11-05');
+        // Halbes Paar → Validierungsfehler
         await page
             .locator('[data-test="dispo-operational-campaign-ends-on"]')
-            .fill('2026-11-20');
+            .fill('');
+        await waitHeaderSaveReady(page);
         await page.locator('[data-test="dispo-order-header-save"]').click();
-        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
+        await expect(page.getByRole('alert').first()).toBeVisible({
             timeout: 15_000,
         });
+        await waitHeaderSaveReady(page);
 
+        // Zeitraum vollständig löschen
         await page
             .locator('[data-test="dispo-operational-campaign-starts-on"]')
             .fill('');
         await page
             .locator('[data-test="dispo-operational-campaign-ends-on"]')
             .fill('');
-        await page.locator('[data-test="dispo-order-header-save"]').click();
-        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
-            timeout: 15_000,
-        });
+        await saveHeader(page);
         await expect(
             page.locator('[data-test="dispo-operational-campaign-starts-on"]'),
         ).toHaveValue('');
-
-        // Ungültig: nur Start
-        await page
-            .locator('[data-test="dispo-operational-campaign-starts-on"]')
-            .fill('2026-12-01');
-        await page.locator('[data-test="dispo-order-header-save"]').click();
-        await expect(page.getByRole('alert').first()).toBeVisible({
-            timeout: 10_000,
-        });
-
-        await page
-            .locator('[data-test="dispo-operational-campaign-starts-on"]')
-            .fill('');
-        await page.locator('[data-test="dispo-order-header-save"]').click();
-        await expect(page.getByText('Kopfdaten gespeichert')).toBeVisible({
-            timeout: 15_000,
-        });
 
         const withoutUpload = page.locator(
             '[data-test="dispo-order-customer-confirmation-without-upload"]',

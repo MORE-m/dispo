@@ -16,7 +16,7 @@ async function login(page: Page, email: string) {
 }
 
 test.describe('PO-CALC-DISPO-UX-1 PR4 Calc-Cleanup', () => {
-    test('Neue Calc: keine Agentur/RE/Briefing; Kunde + Zeitraum; Dispo leer', async ({
+    test('Neue Calc: keine Agentur/RE/Briefing; Kunde; kein Wizard-Zeitraum (PR5)', async ({
         page,
     }) => {
         test.setTimeout(120_000);
@@ -29,10 +29,10 @@ test.describe('PO-CALC-DISPO-UX-1 PR4 Calc-Cleanup', () => {
         await expect(page.locator('[data-test="crm-agency"]')).toHaveCount(0);
         await expect(page.locator('#invoice-recipient')).toHaveCount(0);
         await expect(page.locator('#briefing')).toHaveCount(0);
-        // PO-PR4-01: Kampagnenzeitraum bleibt bis PR5 im Wizard.
-        await expect(page.getByText('Kampagnenzeitraum').first()).toBeVisible({
-            timeout: 15_000,
-        });
+        // PO-PR5: allgemeiner Kampagnenzeitraum ist aus dem Wizard entfernt.
+        await expect(
+            page.locator('[data-test="campaign-period-start"]'),
+        ).toHaveCount(0);
 
         await ensureWizardCustomerFreitext(page);
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
