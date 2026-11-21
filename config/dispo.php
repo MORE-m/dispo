@@ -30,4 +30,26 @@ return [
 
     'oa_tkp_wizard_capability' => (bool) env('OA_TKP_WIZARD_CAPABILITY', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Staging-Mail-Empfänger-Guard (EPIC-01-MAIL-1)
+    |--------------------------------------------------------------------------
+    |
+    | Mode „off“ (Default): kein Eingriff – Produktion unverändert.
+    | Mode „allowlist“: nur exakte Adressen aus DISPO_MAIL_RECIPIENT_ALLOWLIST
+    | (Komma-getrennt). To/Cc/Bcc vollständig; leere/ungültige Liste = fail-closed.
+    | Unbekannte Mode-Werte = invalid (Tippfehler).
+    | APP_ENV=staging + Live-Mailer (nicht log/array) erfordert Mode allowlist;
+    | off/fehlend/invalid → Versand gesperrt. Keine Domain-Wildcards.
+    | Siehe docs/betrieb/staging-mail-recipient-guard.md.
+    |
+    */
+
+    'mail_recipient_guard' => env('DISPO_MAIL_RECIPIENT_GUARD', 'off'),
+
+    'mail_recipient_allowlist' => array_values(array_filter(array_map(
+        static fn (string $email): string => strtolower(trim($email)),
+        explode(',', (string) env('DISPO_MAIL_RECIPIENT_ALLOWLIST', '')),
+    ), static fn (string $email): bool => $email !== '')),
+
 ];

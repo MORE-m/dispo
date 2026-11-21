@@ -112,6 +112,10 @@ E2E-Katalog-Seeder laufen **nur** über isolierte Playwright-Configs
 Öffentliche Registrierung ist deaktiviert. Benutzer werden administrativ angelegt.
 Passwort-Reset nutzt lokal `MAIL_MAILER=log` (`storage/logs`).
 
+Staging-SMTP (SpeedIt): Empfänger-Allowlist über `DISPO_MAIL_RECIPIENT_GUARD` /
+`DISPO_MAIL_RECIPIENT_ALLOWLIST` – siehe `docs/betrieb/staging-mail-recipient-guard.md`.
+Produktion lässt den Guard auf `off` (Default).
+
 Node.js ist kein Produktionsprozess, nur Asset-Build und CI.
 
 ## Alle Prüfungen
@@ -134,8 +138,9 @@ node scripts/npm-audit-production.mjs
 ```
 
 `node scripts/npm-audit-production.mjs` führt `npm audit --omit=dev` aus und wertet
-das JSON aus. Nur die befristete Ausnahme `GHSA-fc5q-39xc-vjpf` (picomatch) darf
-bestehen; siehe `docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md`.
+das JSON fail-closed aus: jede Production-Vulnerability lässt den Check fehlschlagen
+(keine Allow-List). Historische Ausnahme `GHSA-fc5q-39xc-vjpf` entfiel nach
+Advisory-Withdrawal; Details in `docs/readiness/SEC-DEPS-2026-11.md`.
 
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
 MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
