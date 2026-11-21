@@ -36,16 +36,17 @@ final class MasterDataTransferContract
     ];
 
     /**
-     * Erlaubte Oberkategorien im Spot-Transfer (kein Online Audio).
+     * Erlaubte Oberkategorien im Spot-Transfer.
+     *
+     * Nur Spots + SWF: Social/Events/Barter sind nicht Teil des PO-Scopes EPIC-03-B
+     * (Stufe 3 / separate Readiness), auch wenn lokal Matrix-Regeln auf den acht
+     * Spot-Inventaren existieren.
      *
      * @var list<string>
      */
     public const ALLOWED_CATEGORY_KEYS = [
         CanonicalAdvertisingCategories::SPOTS,
         CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS,
-        CanonicalAdvertisingCategories::SOCIAL_ONLINE,
-        CanonicalAdvertisingCategories::EVENTS_PROMOTION,
-        CanonicalAdvertisingCategories::BARTER,
     ];
 
     /**
@@ -87,8 +88,36 @@ final class MasterDataTransferContract
         return in_array($key, self::ALLOWED_CATEGORY_KEYS, true);
     }
 
+    public static function isAllowedInventoryCode(string $code): bool
+    {
+        return in_array($code, self::SPOT_INVENTORY_CODES, true);
+    }
+
+    public static function isAllowedPriceYear(int $year): bool
+    {
+        return in_array($year, self::PRICE_YEARS, true);
+    }
+
     public static function isExcludedEngineProfile(?string $key): bool
     {
         return $key !== null && $key !== '' && in_array($key, self::EXCLUDED_ENGINE_PROFILE_KEYS, true);
+    }
+
+    /**
+     * @param  list<string>  $codes
+     * @return list<string> Codes außerhalb des freigegebenen Spot-Scopes
+     */
+    public static function inventoryCodesOutsideScope(array $codes): array
+    {
+        $outside = [];
+        foreach ($codes as $code) {
+            $normalized = (string) $code;
+            if ($normalized === '' || self::isAllowedInventoryCode($normalized)) {
+                continue;
+            }
+            $outside[] = $normalized;
+        }
+
+        return array_values(array_unique($outside));
     }
 }

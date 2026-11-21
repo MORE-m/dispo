@@ -42,6 +42,14 @@ final class MasterDataExporter
             throw new MasterDataTransferException('Keine Inventar-Codes für den Export.');
         }
 
+        $outside = MasterDataTransferContract::inventoryCodesOutsideScope($codes);
+        if ($outside !== []) {
+            throw new MasterDataTransferException(
+                'Export-Inventare außerhalb des freigegebenen Spot-Scopes.',
+                array_map(fn (string $code) => 'Inventar nicht freigegeben: '.$code, $outside),
+            );
+        }
+
         $payload = $this->buildPayload($codes);
         $manifest = [
             'format' => MasterDataTransferContract::FORMAT,

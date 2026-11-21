@@ -60,7 +60,7 @@ final class MasterDataImporter
 
         $usersBefore = $this->snapshotUsers();
         $package = $this->packages->load($packagePath);
-        $this->spotScope->assertPackage($package['data']);
+        $this->spotScope->assertPackage($package['data'], $package['manifest']);
 
         $report = new MasterDataImportReport;
         $ops = $this->plan($package['data'], $report);

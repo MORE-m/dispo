@@ -13,8 +13,11 @@
 | Schlüssel | `inventories.code`, `advertising_media.code`, `advertising_categories.key`, `calculation_methods.key`, Preise `(inventory_code, year, revision)` |
 | Preisstatus | Export speichert `import_status=draft`; Import erzeugt nur Drafts; keine Auto-Aktivierung |
 | OA | ausgeschlossen (`includes_online_audio=false`, Engine `oa_tkp` nicht importiert) |
+| Inventare | nur `SPOT_INVENTORY_CODES` (8 Codes); Export `--inventory` und Import-Guard fail-closed |
+| Preisjahre | nur `2026`/`2027` für Spot- und Produktionspreislisten (Export + Import) |
+| Kategorien | nur `spots` + `special_advertising_formats` (Social/Events/Barter nicht im PO-Scope) |
 | Bewegungsdaten | Users, CRM, Calcs, Dispo, Jobs, Outbox, Imports – nicht im Paket |
-| Guard | `--confirm-database`; Apply gegen `dispo_mat_core` / `dispo` blockiert |
+| Guard | `--confirm-database`; Apply gegen `dispo_mat_core` / `dispo` blockiert; Manifest↔Daten konsistent |
 
 ## CLI
 

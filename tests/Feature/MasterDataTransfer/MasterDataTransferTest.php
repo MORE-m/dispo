@@ -207,6 +207,11 @@ class MasterDataTransferTest extends TestCase
         $this->assertStringNotContainsString('oa_', $joined);
         $this->assertStringNotContainsString('notification_outbox', $joined);
         $this->assertCount(8, MasterDataTransferContract::SPOT_INVENTORY_CODES);
+        $this->assertSame([2026, 2027], MasterDataTransferContract::PRICE_YEARS);
+        $this->assertSame(
+            ['spots', 'special_advertising_formats'],
+            MasterDataTransferContract::ALLOWED_CATEGORY_KEYS,
+        );
     }
 
     #[Test]
@@ -415,29 +420,212 @@ class MasterDataTransferTest extends TestCase
             'is_active' => true,
             'sort' => 99,
         ];
-        $json = json_encode($media, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
-        File::put($mediaPath, $json);
-
-        $checksums = [];
-        foreach (MasterDataTransferContract::DATA_FILES as $relative) {
-            $checksums[] = hash_file('sha256', $package.'/'.$relative).'  '.$relative;
-        }
-        File::put($package.'/checksums.sha256', implode("\n", $checksums)."\n");
-
-        $manifest = json_decode(File::get($package.'/manifest.json'), true);
-        foreach (MasterDataTransferContract::DATA_FILES as $relative) {
-            $absolute = $package.'/'.$relative;
-            $manifest['files'][$relative] = [
-                'sha256' => hash_file('sha256', $absolute),
-                'bytes' => filesize($absolute),
-            ];
-        }
-        // Manifest behält includes_online_audio=false — Scope-Guard muss trotzdem ablehnen.
-        $manifest['scope']['includes_online_audio'] = false;
         File::put(
-            $package.'/manifest.json',
-            json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+            $mediaPath,
+            json_encode($media, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
         );
+        // Formal gültige Checksummen — Scope-Guard muss trotzdem ablehnen.
+        $this->rewritePackageChecksums($package, function (array $manifest): array {
+            $manifest['scope']['includes_online_audio'] = false;
+
+            return $manifest;
+        });
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function manipulated_inventory_outside_allowlist_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $inventories = json_decode(File::get($package.'/data/inventories.json'), true);
+        $inventories[] = [
+            'code' => 'inv_more_kombi_online_audio',
+            'name' => 'OA-Kombi eingeschmuggelt',
+            'type' => InventoryType::Kombi->value,
+            'is_active' => true,
+            'sort' => 99,
+        ];
+        File::put(
+            $package.'/data/inventories.json',
+            json_encode($inventories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
+        // Manifest behält nur freigegebene Codes; formal gültige Checksummen reichen nicht.
+        $this->rewritePackageChecksums($package);
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function manipulated_manifest_inventory_outside_allowlist_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $this->rewritePackageChecksums($package, function (array $manifest): array {
+            $manifest['scope']['inventory_codes'] = [
+                'inv_radio_hamburg',
+                'inv_more_kombi_online_audio',
+            ];
+
+            return $manifest;
+        });
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Manifest ungültig');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function manipulated_price_year_outside_allowlist_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $lists = json_decode(File::get($package.'/data/price_lists.json'), true);
+        $lists[0]['year'] = 2025;
+        File::put(
+            $package.'/data/price_lists.json',
+            json_encode($lists, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
+        $this->rewritePackageChecksums($package);
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function manipulated_production_price_year_outside_allowlist_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $lists = json_decode(File::get($package.'/data/production_price_lists.json'), true);
+        $lists[0]['year'] = 2028;
+        File::put(
+            $package.'/data/production_price_lists.json',
+            json_encode($lists, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
+        $this->rewritePackageChecksums($package);
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function manipulated_social_category_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $categories = json_decode(File::get($package.'/data/advertising_categories.json'), true);
+        $categories[] = [
+            'key' => 'social_online',
+            'name' => 'Social eingeschmuggelt',
+            'is_active' => true,
+            'sort' => 40,
+            'default_calculation_method_key' => null,
+        ];
+        File::put(
+            $package.'/data/advertising_categories.json',
+            json_encode($categories, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
+        $this->rewritePackageChecksums($package);
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scope');
+        app(MasterDataImporter::class)->import($package, dryRun: true, confirmDatabase: $db);
+    }
+
+    #[Test]
+    public function export_rejects_inventory_outside_spot_allowlist(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+
+        $this->expectException(MasterDataTransferException::class);
+        $this->expectExceptionMessage('Spot-Scopes');
+        app(MasterDataExporter::class)->export(
+            $this->tmp.'/export-out-of-scope',
+            ['inv_radio_hamburg', 'inv_more_kombi_online_audio'],
+            'testsha',
+        );
+    }
+
+    #[Test]
+    public function export_excludes_social_events_and_barter_media(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->seedSpotPricesForCodes(['inv_radio_hamburg']);
+
+        $inventory = Inventory::query()->where('code', 'inv_radio_hamburg')->firstOrFail();
+        foreach (['social_online', 'events_promotion', 'barter'] as $categoryKey) {
+            $category = AdvertisingCategory::query()->where('key', $categoryKey)->firstOrFail();
+            $code = 'mdt_'.$categoryKey.'_probe';
+            $medium = AdvertisingMedium::query()->where('code', $code)->first();
+            if ($medium === null) {
+                $medium = new AdvertisingMedium;
+                $medium->forceFill([
+                    'code' => $code,
+                    'category_id' => $category->id,
+                    'name' => 'Probe '.$categoryKey,
+                    'calculation_method_mode' => 'inherit',
+                    'default_length_seconds' => 30,
+                    'is_discountable' => false,
+                    'is_ae_eligible' => false,
+                    'is_active' => true,
+                    'sort' => 900,
+                    'lock_version' => 1,
+                ])->save();
+            }
+
+            $exists = InventoryMediumRule::query()
+                ->where('inventory_id', $inventory->id)
+                ->where('advertising_medium_id', $medium->id)
+                ->exists();
+            if (! $exists) {
+                $rule = new InventoryMediumRule;
+                $rule->forceFill([
+                    'inventory_id' => $inventory->id,
+                    'advertising_medium_id' => $medium->id,
+                    'is_active' => true,
+                    'sort' => 0,
+                    'is_discountable' => false,
+                    'is_ae_eligible' => false,
+                    'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength,
+                    'lock_version' => 1,
+                ])->save();
+            }
+        }
+
+        $exportPath = $this->tmp.'/export-no-social';
+        app(MasterDataExporter::class)->export($exportPath, ['inv_radio_hamburg'], 'testsha');
+
+        $media = json_decode(File::get($exportPath.'/data/advertising_media.json'), true);
+        $categories = json_decode(File::get($exportPath.'/data/advertising_categories.json'), true);
+        $categoryKeys = collect($categories)->pluck('key')->all();
+        $mediaCodes = collect($media)->pluck('code')->all();
+
+        $this->assertNotContains('social_online', $categoryKeys);
+        $this->assertNotContains('events_promotion', $categoryKeys);
+        $this->assertNotContains('barter', $categoryKeys);
+        $this->assertNotContains('mdt_social_online_probe', $mediaCodes);
+        $this->assertNotContains('mdt_events_promotion_probe', $mediaCodes);
+        $this->assertNotContains('mdt_barter_probe', $mediaCodes);
+    }
+
+    #[Test]
+    public function manifest_inventory_mismatch_is_rejected_despite_valid_checksums(): void
+    {
+        $package = $this->writeMinimalPackage();
+        $this->rewritePackageChecksums($package, function (array $manifest): array {
+            $manifest['scope']['inventory_codes'] = ['inv_radio_hamburg', 'inv_caravan_fm'];
+
+            return $manifest;
+        });
 
         $db = (string) config('database.connections.'.config('database.default').'.database');
         $this->expectException(MasterDataTransferException::class);
@@ -632,5 +820,38 @@ class MasterDataTransferTest extends TestCase
         app(MasterDataPackage::class)->write($path, $manifest, $files);
 
         return $path;
+    }
+
+    /**
+     * Schreibt formal gültige SHA256-Checksummen (Datei + Manifest), optional mit Manifest-Mutation.
+     *
+     * @param  callable(array<string, mixed>): array<string, mixed>|null  $mutateManifest
+     */
+    private function rewritePackageChecksums(string $package, ?callable $mutateManifest = null): void
+    {
+        $manifest = json_decode(File::get($package.'/manifest.json'), true);
+        $this->assertIsArray($manifest);
+
+        if ($mutateManifest !== null) {
+            $manifest = $mutateManifest($manifest);
+        }
+
+        $checksums = [];
+        foreach (MasterDataTransferContract::DATA_FILES as $relative) {
+            $absolute = $package.'/'.$relative;
+            $hash = hash_file('sha256', $absolute);
+            $this->assertNotFalse($hash);
+            $checksums[] = $hash.'  '.$relative;
+            $manifest['files'][$relative] = [
+                'sha256' => $hash,
+                'bytes' => filesize($absolute),
+            ];
+        }
+
+        File::put($package.'/checksums.sha256', implode("\n", $checksums)."\n");
+        File::put(
+            $package.'/manifest.json',
+            json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n",
+        );
     }
 }

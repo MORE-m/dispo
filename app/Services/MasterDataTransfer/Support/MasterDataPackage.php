@@ -123,10 +123,44 @@ final class MasterDataPackage
         if (($manifest['epic'] ?? null) !== MasterDataTransferContract::EPIC) {
             $errors[] = 'Ungültiges epic.';
         }
-        if (! is_array($manifest['scope'] ?? null)) {
+        $scope = $manifest['scope'] ?? null;
+        if (! is_array($scope)) {
             $errors[] = 'scope fehlt.';
-        } elseif (($manifest['scope']['includes_online_audio'] ?? null) !== false) {
-            $errors[] = 'includes_online_audio muss false sein (EPIC-03-B).';
+        } else {
+            if (($scope['includes_online_audio'] ?? null) !== false) {
+                $errors[] = 'includes_online_audio muss false sein (EPIC-03-B).';
+            }
+            if (($scope['price_lists_export_as_draft'] ?? null) !== true) {
+                $errors[] = 'price_lists_export_as_draft muss true sein (EPIC-03-B).';
+            }
+
+            $rawYears = $scope['price_years'] ?? null;
+            if (! is_array($rawYears)) {
+                $errors[] = 'scope.price_years fehlt.';
+            } else {
+                $years = array_values(array_map('intval', $rawYears));
+                sort($years);
+                $expected = MasterDataTransferContract::PRICE_YEARS;
+                $sortedExpected = $expected;
+                sort($sortedExpected);
+                if ($years !== $sortedExpected) {
+                    $errors[] = 'scope.price_years muss exakt '
+                        .implode('/', MasterDataTransferContract::PRICE_YEARS).' sein.';
+                }
+            }
+
+            $rawInventories = $scope['inventory_codes'] ?? null;
+            if (! is_array($rawInventories) || $rawInventories === []) {
+                $errors[] = 'scope.inventory_codes fehlt oder ist leer.';
+            } else {
+                foreach ($rawInventories as $code) {
+                    $normalized = (string) $code;
+                    if ($normalized === '' || ! MasterDataTransferContract::isAllowedInventoryCode($normalized)) {
+                        $errors[] = 'scope.inventory_codes enthält unzulässigen Code: '
+                            .($normalized === '' ? '(leer)' : $normalized);
+                    }
+                }
+            }
         }
         if ($errors !== []) {
             throw new MasterDataTransferException('Manifest ungültig.', $errors);
