@@ -21,11 +21,12 @@
 
 **Primär (verhindert den Stuck, ohne Retries):**
 - Generation-sicheres Clear des Loading-Flags.
-- Gültige HTTP-200-Antworten werden trotz Effect-Cleanup übernommen (`completePositionSchemaFetch`).
-- Extrahierte Orchestrierung in `position-schema-fetch.ts` inkl. Regressionstests (Cleanup, Mediumwechsel, Stale, Unmount, Fehler, Recovery-Limit).
+- Gültige HTTP-200-Antworten werden trotz Effect-Restart übernommen (`completePositionSchemaFetch`).
+- Echter Unmount: `endSchemaFetchSession` + `schemaWizardMountedRef` → keine State-Updates; Effect-Restarts bleiben generationsbasiert.
+- Extrahierte Orchestrierung in `position-schema-fetch.ts` inkl. Regressionstests.
 
 **Sekundär (Sicherheitsnetz, nicht der eigentliche Fix):**
-- Begrenzte Auto-Recovery (max. 3), wenn Fingerprint fehlt und kein Fetch läuft.
+- Begrenzte Auto-Recovery (max. 3) **pro** `positionsNeedingSchemaKey` (`syncSchemaRecoveryScope`).
 
 **CI-Infrastruktur (Run `45034649426` / e2e-spt008):**
 - `ubuntu-latest` → Ubuntu **26.04 (resolute)**; `playwright install --with-deps` Exit 100 (u. a. `fonts-tlwg-loma-otf`, `fonts-freefont-ttf` nicht verfügbar).

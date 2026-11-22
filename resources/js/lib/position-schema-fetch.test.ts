@@ -6,9 +6,11 @@ import {
 import {
     beginPositionSchemaFetch,
     completePositionSchemaFetch,
+    endSchemaFetchSession,
     planSchemaFetchRecovery,
     runOverlappingSchemaFetches,
     shouldClearLoadingAfterSchemaFetch,
+    syncSchemaRecoveryScope,
 } from './position-schema-fetch';
 
 const schema = (fingerprint: string) => ({
@@ -80,11 +82,11 @@ describe('position-schema-fetch primary path (ohne Recovery)', () => {
         }
     });
 
-    it('behandelt Unmount/Abbruch eines laufenden Requests als stale ohne Apply', () => {
+    it('behandelt echten Unmount via endSchemaFetchSession als stale ohne Apply', () => {
         const pending = new Map();
         const target = beginPositionSchemaFetch(pending, 'p1', 10);
-        // Unmount: Pending wird entfernt / überschrieben durch leeren Map-Zustand.
-        pending.delete('p1');
+        // Entspricht Wizard-Unmount-Cleanup (nicht Effect-Restart).
+        endSchemaFetchSession(pending);
 
         const completion = completePositionSchemaFetch(pending, target, {
             ok: true,
@@ -92,6 +94,27 @@ describe('position-schema-fetch primary path (ohne Recovery)', () => {
         });
         expect(completion.action).toBe('stale');
         expect(shouldClearLoadingAfterSchemaFetch(pending, target)).toBe(false);
+        expect(pending.size).toBe(0);
+    });
+
+    it('lässt Effect-Restart gültige Antworten der neuen Generation zu', () => {
+        const pending = new Map();
+        const first = beginPositionSchemaFetch(pending, 'p1', 10);
+        // Restart: kein endSchemaFetchSession – nur neue Generation.
+        const second = beginPositionSchemaFetch(pending, 'p1', 10);
+
+        expect(
+            completePositionSchemaFetch(pending, first, {
+                ok: true,
+                fieldSchema: schema('fp-old'),
+            }).action,
+        ).toBe('stale');
+        expect(
+            completePositionSchemaFetch(pending, second, {
+                ok: true,
+                fieldSchema: schema('fp-new'),
+            }),
+        ).toMatchObject({ action: 'apply', fingerprint: 'fp-new' });
     });
 
     it('markiert fehlgeschlagene Requests und leere 200-Bodies als error', () => {
@@ -196,5 +219,33 @@ describe('position-schema-fetch recovery safety net', () => {
                 attempts: 0,
             }),
         ).toEqual({ action: 'none' });
+    });
+
+    it('setzt Retry-Budget bei Scope-Wechsel (neues Medium/Position) zurück', () => {
+        const exhausted = syncSchemaRecoveryScope(
+            { scopeKey: 'p1:10', attempts: SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS },
+            'p1:10',
+        );
+        expect(exhausted.attempts).toBe(SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS);
+        expect(
+            planSchemaFetchRecovery({
+                needsSchema: true,
+                isLoading: false,
+                attempts: exhausted.attempts,
+            }).action,
+        ).toBe('fail');
+
+        const switched = syncSchemaRecoveryScope(
+            exhausted,
+            'p1:20',
+        );
+        expect(switched).toEqual({ scopeKey: 'p1:20', attempts: 0 });
+        expect(
+            planSchemaFetchRecovery({
+                needsSchema: true,
+                isLoading: false,
+                attempts: switched.attempts,
+            }),
+        ).toEqual({ action: 'retry', nextAttempts: 1 });
     });
 });

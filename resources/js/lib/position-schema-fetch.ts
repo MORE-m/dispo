@@ -108,6 +108,32 @@ export function shouldClearLoadingAfterSchemaFetch(
 }
 
 /**
+ * Beendet die Fetch-Session bei echtem Component-Unmount.
+ * Pending wird geleert → laufende Antworten werden als stale verworfen,
+ * ohne Effect-Restarts (Generation-Bump) zu blockieren.
+ */
+export function endSchemaFetchSession(
+    pendingMap: Map<string, PositionSchemaFetchTarget>,
+): void {
+    pendingMap.clear();
+}
+
+/**
+ * Recovery-Budget gilt pro fachlichem Scope (client_key:medium_id-Aggregation).
+ * Scope-Wechsel setzt Attempts zurück, damit neue Ladevorgänge nicht blockiert sind.
+ */
+export function syncSchemaRecoveryScope(
+    current: { scopeKey: string; attempts: number },
+    nextScopeKey: string,
+): { scopeKey: string; attempts: number } {
+    if (current.scopeKey === nextScopeKey) {
+        return current;
+    }
+
+    return { scopeKey: nextScopeKey, attempts: 0 };
+}
+
+/**
  * Recovery nur wenn Fingerprint fehlt und kein Fetch läuft.
  * Begrenzt auf SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS.
  */

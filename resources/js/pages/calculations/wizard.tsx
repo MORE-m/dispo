@@ -232,8 +232,10 @@ import {
 import {
     beginPositionSchemaFetch,
     completePositionSchemaFetch,
+    endSchemaFetchSession,
     planSchemaFetchRecovery,
     shouldClearLoadingAfterSchemaFetch,
+    syncSchemaRecoveryScope,
 } from '@/lib/position-schema-fetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1538,6 +1540,8 @@ export default function CalculationWizard({
         Map<string, PositionSchemaFetchTarget>
     >(new Map());
     const schemaRecoveryAttemptsRef = useRef(0);
+    const schemaRecoveryScopeRef = useRef('');
+    const schemaWizardMountedRef = useRef(true);
     const [schemaLoadingClientKeys, setSchemaLoadingClientKeys] = useState<
         Record<string, true>
     >({});
@@ -1555,11 +1559,23 @@ export default function CalculationWizard({
         [positions],
     );
 
+    // Echter Component-Unmount: Pending invalidieren. Effect-Restarts rühren
+    // diese Map nicht an (Generation-Guard reicht dort).
+    useEffect(() => {
+        schemaWizardMountedRef.current = true;
+
+        return () => {
+            schemaWizardMountedRef.current = false;
+            endSchemaFetchSession(schemaFetchPendingRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         const missing = positions.filter(positionNeedsFieldSchema);
 
         if (missing.length === 0) {
             schemaRecoveryAttemptsRef.current = 0;
+            schemaRecoveryScopeRef.current = '';
             return;
         }
 
@@ -1573,10 +1589,15 @@ export default function CalculationWizard({
                 }
             >();
             let loadError: string | null = null;
+            let abortedByUnmount = false;
 
             for (const position of missing) {
                 if (position.advertising_medium_id === null) {
                     continue;
+                }
+                if (!schemaWizardMountedRef.current) {
+                    abortedByUnmount = true;
+                    break;
                 }
 
                 const target = beginPositionSchemaFetch(
@@ -1605,8 +1626,8 @@ export default function CalculationWizard({
                                 : {}),
                         },
                     );
-                    // Primärpfad: gültige 200-Antwort trotz Effect-Cleanup anwenden
-                    // (kein cancelled-Drop). Stale Generationen verwirft complete*.
+                    // Primärpfad: gültige 200 trotz Effect-Restart anwenden
+                    // (Generation-Guard). Nach Unmount: stale via Session-Ende.
                     const completion = completePositionSchemaFetch(
                         schemaFetchPendingRef.current,
                         target,
@@ -1631,24 +1652,36 @@ export default function CalculationWizard({
                         loadError = completion.message;
                     }
                 } finally {
-                    setSchemaLoadingClientKeys((current) => {
-                        if (
-                            !shouldClearLoadingAfterSchemaFetch(
-                                schemaFetchPendingRef.current,
-                                target,
-                            )
-                        ) {
-                            return current;
-                        }
-                        const next = { ...current };
-                        delete next[position.client_key];
+                    if (schemaWizardMountedRef.current) {
+                        setSchemaLoadingClientKeys((current) => {
+                            if (
+                                !shouldClearLoadingAfterSchemaFetch(
+                                    schemaFetchPendingRef.current,
+                                    target,
+                                )
+                            ) {
+                                return current;
+                            }
+                            const next = { ...current };
+                            delete next[position.client_key];
 
-                        return next;
-                    });
+                            return next;
+                        });
+                    } else {
+                        abortedByUnmount = true;
+                    }
+                }
+
+                if (abortedByUnmount) {
+                    break;
                 }
             }
 
-            // Apply auch nach Cleanup: Generation-Guard in complete*/shouldApply.
+            if (abortedByUnmount || !schemaWizardMountedRef.current) {
+                return;
+            }
+
+            // Apply auch nach Effect-Restart: Generation-Guard in complete*/shouldApply.
             if (updates.size === 0) {
                 if (loadError) {
                     setSchemaLoadError(loadError);
@@ -1742,6 +1775,7 @@ export default function CalculationWizard({
             );
         })();
 
+        // Kein Effect-Cleanup, der Pending löscht: Restarts brauchen Generation-Guard.
         return undefined;
         // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
         // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
@@ -2162,9 +2196,21 @@ export default function CalculationWizard({
     const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
 
     // Recovery nur als begrenztes Sicherheitsnetz – Primärfix muss ohne Retries greifen.
+    // Retry-Budget gilt pro positionsNeedingSchemaKey (Position/Medium-Wechsel → Reset).
     useEffect(() => {
+        const scoped = syncSchemaRecoveryScope(
+            {
+                scopeKey: schemaRecoveryScopeRef.current,
+                attempts: schemaRecoveryAttemptsRef.current,
+            },
+            positionsNeedingSchemaKey,
+        );
+        schemaRecoveryScopeRef.current = scoped.scopeKey;
+        schemaRecoveryAttemptsRef.current = scoped.attempts;
+
         if (!schemaFingerprintMissing) {
             schemaRecoveryAttemptsRef.current = 0;
+            schemaRecoveryScopeRef.current = '';
             return;
         }
         if (schemaStillLoading) {
@@ -2172,6 +2218,9 @@ export default function CalculationWizard({
         }
 
         const handle = window.setTimeout(() => {
+            if (!schemaWizardMountedRef.current) {
+                return;
+            }
             const plan = planSchemaFetchRecovery({
                 needsSchema: true,
                 isLoading: false,
