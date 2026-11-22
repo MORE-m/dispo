@@ -4,6 +4,7 @@ import {
     positionNeedsFieldSchema,
     schemaLoadBlockMessage,
     shouldApplyPositionSchemaResponse,
+    shouldClearSchemaLoadingForGeneration,
 } from './position-field-schema';
 import {
     choiceValuesForPayload,
@@ -64,6 +65,34 @@ describe('position-field-schema stale responses', () => {
             schemaLoadBlockMessage(false, 'Feldschema konnte nicht geladen werden.'),
         ).toMatch(/nicht geladen/i);
         expect(schemaLoadBlockMessage(false, null)).toBeNull();
+    });
+
+    it('keeps loading flag when a newer generation is already pending', () => {
+        const completed = {
+            clientKey: 'p1',
+            advertisingMediumId: 10,
+            generation: 1,
+        };
+        expect(
+            shouldClearSchemaLoadingForGeneration(
+                {
+                    clientKey: 'p1',
+                    advertisingMediumId: 10,
+                    generation: 2,
+                },
+                completed,
+            ),
+        ).toBe(false);
+        expect(
+            shouldClearSchemaLoadingForGeneration(
+                {
+                    clientKey: 'p1',
+                    advertisingMediumId: 10,
+                    generation: 1,
+                },
+                completed,
+            ),
+        ).toBe(true);
     });
 });
 

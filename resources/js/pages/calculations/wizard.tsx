@@ -223,10 +223,13 @@ import {
 import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
+    SCHEMA_FETCH_FAILED_MESSAGE,
+    SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
     nextSchemaFetchGeneration,
     positionNeedsFieldSchema,
     schemaLoadBlockMessage,
     shouldApplyPositionSchemaResponse,
+    shouldClearSchemaLoadingForGeneration,
     type PositionSchemaFetchTarget,
 } from '@/lib/position-field-schema';
 import { Button } from '@/components/ui/button';
@@ -1531,6 +1534,7 @@ export default function CalculationWizard({
     const schemaFetchPendingRef = useRef<
         Map<string, PositionSchemaFetchTarget>
     >(new Map());
+    const schemaRecoveryAttemptsRef = useRef(0);
     const [schemaLoadingClientKeys, setSchemaLoadingClientKeys] = useState<
         Record<string, true>
     >({});
@@ -1552,10 +1556,9 @@ export default function CalculationWizard({
         const missing = positions.filter(positionNeedsFieldSchema);
 
         if (missing.length === 0) {
+            schemaRecoveryAttemptsRef.current = 0;
             return;
         }
-
-        let cancelled = false;
 
         void (async () => {
             const updates = new Map<
@@ -1609,11 +1612,11 @@ export default function CalculationWizard({
                     const pending = schemaFetchPendingRef.current.get(
                         position.client_key,
                     );
-                    if (
-                        !shouldApplyPositionSchemaResponse(pending, target) ||
-                        !fingerprint ||
-                        !nextSchema
-                    ) {
+                    if (!shouldApplyPositionSchemaResponse(pending, target)) {
+                        continue;
+                    }
+                    if (!fingerprint || !nextSchema) {
+                        loadError = SCHEMA_FETCH_FAILED_MESSAGE;
                         continue;
                     }
                     updates.set(position.client_key, {
@@ -1626,11 +1629,21 @@ export default function CalculationWizard({
                         position.client_key,
                     );
                     if (shouldApplyPositionSchemaResponse(pending, target)) {
-                        loadError =
-                            'Positions-Feldschema konnte nicht geladen werden. Speichern ist ohne Fingerprint nicht möglich.';
+                        loadError = SCHEMA_FETCH_FAILED_MESSAGE;
                     }
                 } finally {
                     setSchemaLoadingClientKeys((current) => {
+                        const pending = schemaFetchPendingRef.current.get(
+                            position.client_key,
+                        );
+                        if (
+                            !shouldClearSchemaLoadingForGeneration(
+                                pending,
+                                target,
+                            )
+                        ) {
+                            return current;
+                        }
                         const next = { ...current };
                         delete next[position.client_key];
 
@@ -1639,15 +1652,12 @@ export default function CalculationWizard({
                 }
             }
 
-            if (cancelled) {
-                return;
-            }
-
-            if (loadError) {
-                setSchemaLoadError(loadError);
-            }
-
+            // Kein cancelled-Abbruch vor setPositions: Generation-Guard reicht.
+            // Sonst verworfenes 200 + fehlender Effect-Restart → stuck Loading.
             if (updates.size === 0) {
+                if (loadError) {
+                    setSchemaLoadError(loadError);
+                }
                 return;
             }
 
@@ -1737,9 +1747,7 @@ export default function CalculationWizard({
             );
         })();
 
-        return () => {
-            cancelled = true;
-        };
+        return undefined;
         // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
         // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
@@ -2157,6 +2165,41 @@ export default function CalculationWizard({
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
     const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
+
+    // Recovery: Fingerprint fehlt, aber kein Fetch läuft mehr → begrenzter Retry.
+    // Deckt den CI-Fall „feldschema 200, Apply verworfen, Effect startet nicht neu“.
+    // setTimeout: Primär-Fetch im selben Commit zuerst Loading setzen lassen.
+    useEffect(() => {
+        if (!schemaFingerprintMissing) {
+            schemaRecoveryAttemptsRef.current = 0;
+            return;
+        }
+        if (schemaStillLoading) {
+            return;
+        }
+
+        const handle = window.setTimeout(() => {
+            if (
+                schemaRecoveryAttemptsRef.current >=
+                SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS
+            ) {
+                setSchemaLoadError(
+                    (current) => current ?? SCHEMA_FETCH_FAILED_MESSAGE,
+                );
+                return;
+            }
+            schemaRecoveryAttemptsRef.current += 1;
+            setSchemaRetryToken((token) => token + 1);
+        }, 150);
+
+        return () => {
+            window.clearTimeout(handle);
+        };
+    }, [
+        schemaFingerprintMissing,
+        schemaStillLoading,
+        positionsNeedingSchemaKey,
+    ]);
     const pageValidationErrors = mapValidationErrors(
         (usePage().props.errors ?? {}) as Record<string, string | string[]>,
     );
