@@ -223,7 +223,6 @@ import {
 import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
-    SCHEMA_FETCH_FAILED_MESSAGE,
     SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
     positionNeedsFieldSchema,
     schemaLoadBlockMessage,
