@@ -17,8 +17,10 @@ permissions:
   contents: read
 
 jobs:
+  # ubuntu-24.04: ubuntu-latest rollte auf 26.04 (resolute); Playwright
+  # --with-deps scheitert dort an fehlenden Font-Paketen (Exit 100).
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -411,7 +413,7 @@ jobs:
 
   e2e-spt008:
     name: e2e-spt008
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -470,7 +472,7 @@ jobs:
           done
 
   mysql:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       mysql:

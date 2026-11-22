@@ -19,13 +19,20 @@
 
 ## Fix (dieser Branch)
 
+**Primär (verhindert den Stuck, ohne Retries):**
 - Generation-sicheres Clear des Loading-Flags.
-- Kein hartes Verwerfen valider Applies nur wegen Effect-Cleanup; Guard bleibt `shouldApplyPositionSchemaResponse`.
+- Gültige HTTP-200-Antworten werden trotz Effect-Cleanup übernommen (`completePositionSchemaFetch`).
+- Extrahierte Orchestrierung in `position-schema-fetch.ts` inkl. Regressionstests (Cleanup, Mediumwechsel, Stale, Unmount, Fehler, Recovery-Limit).
+
+**Sekundär (Sicherheitsnetz, nicht der eigentliche Fix):**
 - Begrenzte Auto-Recovery (max. 3), wenn Fingerprint fehlt und kein Fetch läuft.
-- Leere/ungültige 200-Antworten setzen expliziten Fehler statt stillem Continue.
-- Unit-Tests für Generation-Clear.
+
+**CI-Infrastruktur (Run `45034649426` / e2e-spt008):**
+- `ubuntu-latest` → Ubuntu **26.04 (resolute)**; `playwright install --with-deps` Exit 100 (u. a. `fonts-tlwg-loma-otf`, `fonts-freefont-ttf` nicht verfügbar).
+- Jobs `ci` / `e2e-spt008` / `mysql` auf **`ubuntu-24.04`** gepinnt (kein Dependency-Upgrade).
 
 ## Nicht gemacht
 
 - Kein Timeout-Erhöhen, kein Test-Disable, keine Abschwächung der Fach-Assertions.
 - Keine Änderung an PR #263.
+- Kein Merge, kein Deploy, keine DB-Änderungen.

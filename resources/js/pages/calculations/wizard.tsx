@@ -225,13 +225,17 @@ import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
     SCHEMA_FETCH_FAILED_MESSAGE,
     SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
-    nextSchemaFetchGeneration,
     positionNeedsFieldSchema,
     schemaLoadBlockMessage,
     shouldApplyPositionSchemaResponse,
-    shouldClearSchemaLoadingForGeneration,
     type PositionSchemaFetchTarget,
 } from '@/lib/position-field-schema';
+import {
+    beginPositionSchemaFetch,
+    completePositionSchemaFetch,
+    planSchemaFetchRecovery,
+    shouldClearLoadingAfterSchemaFetch,
+} from '@/lib/position-schema-fetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1576,16 +1580,11 @@ export default function CalculationWizard({
                     continue;
                 }
 
-                const generation = nextSchemaFetchGeneration(
-                    schemaFetchPendingRef.current.get(position.client_key)
-                        ?.generation,
+                const target = beginPositionSchemaFetch(
+                    schemaFetchPendingRef.current,
+                    position.client_key,
+                    position.advertising_medium_id,
                 );
-                const target: PositionSchemaFetchTarget = {
-                    clientKey: position.client_key,
-                    advertisingMediumId: position.advertising_medium_id,
-                    generation,
-                };
-                schemaFetchPendingRef.current.set(position.client_key, target);
                 setSchemaLoadingClientKeys((current) => ({
                     ...current,
                     [position.client_key]: true,
@@ -1607,38 +1606,36 @@ export default function CalculationWizard({
                                 : {}),
                         },
                     );
-                    const nextSchema = response.fieldSchema;
-                    const fingerprint = nextSchema?.schema_fingerprint ?? null;
-                    const pending = schemaFetchPendingRef.current.get(
-                        position.client_key,
-                    );
-                    if (!shouldApplyPositionSchemaResponse(pending, target)) {
-                        continue;
-                    }
-                    if (!fingerprint || !nextSchema) {
-                        loadError = SCHEMA_FETCH_FAILED_MESSAGE;
-                        continue;
-                    }
-                    updates.set(position.client_key, {
-                        fingerprint,
-                        fieldSchema: nextSchema,
+                    // Primärpfad: gültige 200-Antwort trotz Effect-Cleanup anwenden
+                    // (kein cancelled-Drop). Stale Generationen verwirft complete*.
+                    const completion = completePositionSchemaFetch(
+                        schemaFetchPendingRef.current,
                         target,
-                    });
-                } catch {
-                    const pending = schemaFetchPendingRef.current.get(
-                        position.client_key,
+                        { ok: true, fieldSchema: response.fieldSchema },
                     );
-                    if (shouldApplyPositionSchemaResponse(pending, target)) {
-                        loadError = SCHEMA_FETCH_FAILED_MESSAGE;
+                    if (completion.action === 'apply') {
+                        updates.set(position.client_key, {
+                            fingerprint: completion.fingerprint,
+                            fieldSchema: completion.fieldSchema as FieldSchema,
+                            target,
+                        });
+                    } else if (completion.action === 'error') {
+                        loadError = completion.message;
+                    }
+                } catch {
+                    const completion = completePositionSchemaFetch(
+                        schemaFetchPendingRef.current,
+                        target,
+                        { ok: false },
+                    );
+                    if (completion.action === 'error') {
+                        loadError = completion.message;
                     }
                 } finally {
                     setSchemaLoadingClientKeys((current) => {
-                        const pending = schemaFetchPendingRef.current.get(
-                            position.client_key,
-                        );
                         if (
-                            !shouldClearSchemaLoadingForGeneration(
-                                pending,
+                            !shouldClearLoadingAfterSchemaFetch(
+                                schemaFetchPendingRef.current,
                                 target,
                             )
                         ) {
@@ -1652,8 +1649,7 @@ export default function CalculationWizard({
                 }
             }
 
-            // Kein cancelled-Abbruch vor setPositions: Generation-Guard reicht.
-            // Sonst verworfenes 200 + fehlender Effect-Restart → stuck Loading.
+            // Apply auch nach Cleanup: Generation-Guard in complete*/shouldApply.
             if (updates.size === 0) {
                 if (loadError) {
                     setSchemaLoadError(loadError);
@@ -2166,9 +2162,7 @@ export default function CalculationWizard({
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
     const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
 
-    // Recovery: Fingerprint fehlt, aber kein Fetch läuft mehr → begrenzter Retry.
-    // Deckt den CI-Fall „feldschema 200, Apply verworfen, Effect startet nicht neu“.
-    // setTimeout: Primär-Fetch im selben Commit zuerst Loading setzen lassen.
+    // Recovery nur als begrenztes Sicherheitsnetz – Primärfix muss ohne Retries greifen.
     useEffect(() => {
         if (!schemaFingerprintMissing) {
             schemaRecoveryAttemptsRef.current = 0;
@@ -2179,16 +2173,20 @@ export default function CalculationWizard({
         }
 
         const handle = window.setTimeout(() => {
-            if (
-                schemaRecoveryAttemptsRef.current >=
-                SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS
-            ) {
-                setSchemaLoadError(
-                    (current) => current ?? SCHEMA_FETCH_FAILED_MESSAGE,
-                );
+            const plan = planSchemaFetchRecovery({
+                needsSchema: true,
+                isLoading: false,
+                attempts: schemaRecoveryAttemptsRef.current,
+                maxAttempts: SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
+            });
+            if (plan.action === 'none') {
                 return;
             }
-            schemaRecoveryAttemptsRef.current += 1;
+            if (plan.action === 'fail') {
+                setSchemaLoadError((current) => current ?? plan.message);
+                return;
+            }
+            schemaRecoveryAttemptsRef.current = plan.nextAttempts;
             setSchemaRetryToken((token) => token + 1);
         }, 150);
 
