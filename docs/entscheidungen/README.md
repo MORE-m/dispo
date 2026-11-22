@@ -31,6 +31,7 @@ ohne die Entscheidung zu ersetzen.
 | [PO-MAT-BOOKING-VIS-1](PO-MAT-BOOKING-VIS-1-buchungskennzeichen-sichtbarkeit.md) | Buchungskennzeichen nur Dispo (Option A) | Akzeptiert |
 | [PO-MAT-CORE-MATRIX-1](PO-MAT-CORE-MATRIX-1-produktivmatrix-importvertrag.md) | Produktivmatrix Importvertrag (BL-P2-02b) | Akzeptiert |
 | [PO-MAT-CORE-CATALOG-1](PO-MAT-CORE-CATALOG-1-initialkatalog.md) | Initialkatalog 14 Inventare / 42 Werbemittel | Akzeptiert |
+| [EPIC-03-B](EPIC-03-B-master-data-transfer.md) | Selektiver Stammdaten-/Preislisten-Transfer | Implementiert (Draft-PR; STOP Merge/Staging/Activate) |
 | [PO-AUTH-RIGHTS-1](PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | Rechtekonflikte Sonderfreigabe / PM / Draft / Force-Complete | **Akzeptiert** |
 | [PO-APPROVAL-NOTIFY-1](PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md) | Freigabe erteilt/abgelehnt per Outbox/SMTP | **Akzeptiert** |
 | [PO-NOT002-ADMIN-1](PO-NOT002-ADMIN-1-admin-outbox-sicht.md) | Admin-Outbox-Sicht lesend | **Akzeptiert** (`main` PR #122) |
