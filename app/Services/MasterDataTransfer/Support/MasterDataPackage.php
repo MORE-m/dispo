@@ -24,20 +24,16 @@ final class MasterDataPackage
      */
     public function load(string $packagePath): array
     {
-        $root = rtrim($packagePath, DIRECTORY_SEPARATOR);
-        if (! is_dir($root)) {
-            throw new MasterDataTransferException('Paketverzeichnis fehlt: '.$root);
-        }
+        $canonicalRoot = $this->resolveCanonicalPackageRoot($packagePath);
 
-        $manifestPath = $root.DIRECTORY_SEPARATOR.MasterDataTransferContract::MANIFEST_FILE;
-        $checksumsPath = $root.DIRECTORY_SEPARATOR.MasterDataTransferContract::CHECKSUMS_FILE;
-
-        if (! is_file($manifestPath)) {
-            throw new MasterDataTransferException('manifest.json fehlt.');
-        }
-        if (! is_file($checksumsPath)) {
-            throw new MasterDataTransferException('checksums.sha256 fehlt.');
-        }
+        $manifestPath = $this->assertSafePackageFile(
+            $canonicalRoot,
+            MasterDataTransferContract::MANIFEST_FILE,
+        );
+        $checksumsPath = $this->assertSafePackageFile(
+            $canonicalRoot,
+            MasterDataTransferContract::CHECKSUMS_FILE,
+        );
 
         $manifest = $this->decodeJsonFile($manifestPath);
         $schemaVersion = $this->resolveSchemaVersion($manifest);
@@ -49,12 +45,13 @@ final class MasterDataPackage
             $this->assertManifestShapeV2($manifest);
         }
 
-        $this->assertChecksums($root, $checksumsPath, $manifest, $dataFiles);
-        $this->assertNoUnexpectedPackageFiles($root, $dataFiles);
+        $this->assertChecksums($canonicalRoot, $checksumsPath, $manifest, $dataFiles);
+        $this->assertNoUnexpectedPackageFiles($canonicalRoot, $dataFiles);
 
         $data = [];
         foreach ($dataFiles as $relative) {
-            $payload = $this->decodeJsonFile($root.DIRECTORY_SEPARATOR.$relative);
+            $absolute = $this->assertSafePackageFile($canonicalRoot, $relative);
+            $payload = $this->decodeJsonFile($absolute);
             if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
                 $this->assertDataFileShapeV2($relative, $payload);
             }
@@ -66,7 +63,7 @@ final class MasterDataPackage
         }
 
         return [
-            'root' => $root,
+            'root' => $canonicalRoot,
             'schema_version' => $schemaVersion,
             'manifest' => $manifest,
             'data' => $data,
@@ -78,11 +75,11 @@ final class MasterDataPackage
      */
     public function detectSchemaVersion(string $packagePath): string
     {
-        $root = rtrim($packagePath, DIRECTORY_SEPARATOR);
-        $manifestPath = $root.DIRECTORY_SEPARATOR.MasterDataTransferContract::MANIFEST_FILE;
-        if (! is_file($manifestPath)) {
-            throw new MasterDataTransferException('manifest.json fehlt.');
-        }
+        $canonicalRoot = $this->resolveCanonicalPackageRoot($packagePath);
+        $manifestPath = $this->assertSafePackageFile(
+            $canonicalRoot,
+            MasterDataTransferContract::MANIFEST_FILE,
+        );
 
         return $this->resolveSchemaVersion($this->decodeJsonFile($manifestPath));
     }
@@ -96,6 +93,17 @@ final class MasterDataPackage
         $schemaVersion = $this->resolveSchemaVersion($manifest);
         $dataFiles = $this->dataFilesForSchema($schemaVersion);
         $sortKeys = $schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION;
+
+        if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
+            $unknown = array_values(array_diff(array_keys($filePayloads), $dataFiles));
+            if ($unknown !== []) {
+                sort($unknown);
+                throw new MasterDataTransferException(
+                    'Export enthält unzulässige Dateischlüssel.',
+                    $unknown,
+                );
+            }
+        }
 
         File::ensureDirectoryExists($packagePath.DIRECTORY_SEPARATOR.'data');
 
@@ -432,7 +440,7 @@ final class MasterDataPackage
      * @param  array<string, mixed>  $manifest
      * @param  list<string>  $dataFiles
      */
-    private function assertChecksums(string $root, string $checksumsPath, array $manifest, array $dataFiles): void
+    private function assertChecksums(string $canonicalRoot, string $checksumsPath, array $manifest, array $dataFiles): void
     {
         $errors = [];
         $lines = preg_split('/\R/', trim(File::get($checksumsPath))) ?: [];
@@ -474,9 +482,10 @@ final class MasterDataPackage
         }
 
         foreach ($dataFiles as $relative) {
-            $absolute = $root.DIRECTORY_SEPARATOR.$relative;
-            if (! is_file($absolute)) {
-                $errors[] = 'Datei fehlt: '.$relative;
+            try {
+                $absolute = $this->assertSafePackageFile($canonicalRoot, $relative);
+            } catch (MasterDataTransferException $e) {
+                $errors[] = $e->getMessage().($e->errors !== [] ? ' ('.$e->errors[0].')' : '');
 
                 continue;
             }
@@ -515,7 +524,7 @@ final class MasterDataPackage
     /**
      * @param  list<string>  $dataFiles
      */
-    private function assertNoUnexpectedPackageFiles(string $root, array $dataFiles): void
+    private function assertNoUnexpectedPackageFiles(string $canonicalRoot, array $dataFiles): void
     {
         $errors = [];
         $allowed = array_fill_keys($dataFiles, true);
@@ -523,20 +532,35 @@ final class MasterDataPackage
         $allowed[MasterDataTransferContract::CHECKSUMS_FILE] = true;
 
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+            new \RecursiveDirectoryIterator(
+                $canonicalRoot,
+                \FilesystemIterator::SKIP_DOTS,
+            ),
+            \RecursiveIteratorIterator::SELF_FIRST,
         );
         foreach ($iterator as $fileInfo) {
-            if (! $fileInfo instanceof \SplFileInfo || ! $fileInfo->isFile()) {
+            if (! $fileInfo instanceof \SplFileInfo) {
                 continue;
             }
             $absolute = $fileInfo->getPathname();
-            $relative = ltrim(str_replace('\\', '/', substr($absolute, strlen($root))), '/');
-            if ($relative === '' || isset($allowed[$relative])) {
+            $relative = ltrim(str_replace('\\', '/', substr($absolute, strlen($canonicalRoot))), '/');
+            if ($relative === '') {
                 continue;
             }
             if (! $this->isSafeRelativePath($relative)) {
                 $errors[] = 'Unsicherer Dateipfad im Paket: '.$relative;
 
+                continue;
+            }
+            if ($fileInfo->isLink()) {
+                $errors[] = 'Symbolischer Link im Paket: '.$relative;
+
+                continue;
+            }
+            if (! $fileInfo->isFile()) {
+                continue;
+            }
+            if (isset($allowed[$relative])) {
                 continue;
             }
             $errors[] = 'Unerwartete Paketdatei: '.$relative;
@@ -545,6 +569,77 @@ final class MasterDataPackage
         if ($errors !== []) {
             throw new MasterDataTransferException('Paket enthält unzulässige Dateien.', $errors);
         }
+    }
+
+    private function resolveCanonicalPackageRoot(string $packagePath): string
+    {
+        $root = rtrim($packagePath, DIRECTORY_SEPARATOR);
+        if ($root === '' || ! is_dir($root)) {
+            throw new MasterDataTransferException('Paketverzeichnis fehlt: '.$root);
+        }
+        if (is_link($root)) {
+            throw new MasterDataTransferException('Paketverzeichnis darf kein symbolischer Link sein.');
+        }
+
+        $canonical = realpath($root);
+        if ($canonical === false || ! is_dir($canonical)) {
+            throw new MasterDataTransferException('Paketverzeichnis ist nicht auflösbar: '.$root);
+        }
+        if (is_link($canonical)) {
+            throw new MasterDataTransferException('Paketverzeichnis darf kein symbolischer Link sein.');
+        }
+
+        return $canonical;
+    }
+
+    /**
+     * Prüft relative Paketpfade vor dem Lesen/Hashing: keine Symlinks, keine Escape.
+     */
+    private function assertSafePackageFile(string $canonicalRoot, string $relative): string
+    {
+        if (! $this->isSafeRelativePath($relative)) {
+            throw new MasterDataTransferException('Unsicherer Dateipfad im Paket: '.$relative);
+        }
+
+        $parts = explode('/', $relative);
+        $current = $canonicalRoot;
+        $built = '';
+        foreach ($parts as $index => $part) {
+            $current .= DIRECTORY_SEPARATOR.$part;
+            $built = $built === '' ? $part : $built.'/'.$part;
+            $isLast = $index === count($parts) - 1;
+
+            if (is_link($current)) {
+                throw new MasterDataTransferException('Paket enthält symbolischen Link: '.$built);
+            }
+
+            if ($isLast) {
+                if (! is_file($current)) {
+                    throw new MasterDataTransferException(
+                        $relative === MasterDataTransferContract::MANIFEST_FILE
+                            ? 'manifest.json fehlt.'
+                            : ($relative === MasterDataTransferContract::CHECKSUMS_FILE
+                                ? 'checksums.sha256 fehlt.'
+                                : 'Datei fehlt: '.$relative),
+                    );
+                }
+            } elseif (! is_dir($current)) {
+                throw new MasterDataTransferException('Paketverzeichnis fehlt: '.$built);
+            }
+
+            $resolved = realpath($current);
+            if ($resolved === false) {
+                throw new MasterDataTransferException('Pfad ist nicht auflösbar: '.$built);
+            }
+            if ($resolved !== $canonicalRoot && ! str_starts_with($resolved, $canonicalRoot.DIRECTORY_SEPARATOR)) {
+                throw new MasterDataTransferException('Pfad außerhalb des Pakets: '.$built);
+            }
+            if (is_link($resolved)) {
+                throw new MasterDataTransferException('Paket enthält symbolischen Link: '.$built);
+            }
+        }
+
+        return $current;
     }
 
     private function isSafeRelativePath(string $relative): bool

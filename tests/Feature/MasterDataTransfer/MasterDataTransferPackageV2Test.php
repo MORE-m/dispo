@@ -150,6 +150,70 @@ class MasterDataTransferPackageV2Test extends TestCase
     }
 
     #[Test]
+    public function symlink_data_file_is_rejected_before_hashing(): void
+    {
+        $package = $this->writeMinimalV2Package();
+        $target = $package.'/data/oa_platforms.json';
+        $outside = $this->tmp.'/outside-oa_platforms.json';
+        File::move($target, $outside);
+        $this->assertTrue(symlink($outside, $target));
+
+        $this->assertSymlinkRejectedOnLoad($package);
+    }
+
+    #[Test]
+    public function symlink_data_directory_is_rejected(): void
+    {
+        $package = $this->writeMinimalV2Package();
+        $dataDir = $package.'/data';
+        $outside = $this->tmp.'/outside-data-'.uniqid('', true);
+        File::move($dataDir, $outside);
+        $this->assertTrue(symlink($outside, $dataDir));
+
+        $this->assertSymlinkRejectedOnLoad($package);
+    }
+
+    #[Test]
+    public function symlink_manifest_is_rejected(): void
+    {
+        $package = $this->writeMinimalV2Package();
+        $manifest = $package.'/manifest.json';
+        $outside = $this->tmp.'/outside-manifest.json';
+        File::move($manifest, $outside);
+        $this->assertTrue(symlink($outside, $manifest));
+
+        $this->assertSymlinkRejectedOnLoad($package);
+    }
+
+    #[Test]
+    public function symlink_checksums_is_rejected(): void
+    {
+        $package = $this->writeMinimalV2Package();
+        $checksums = $package.'/checksums.sha256';
+        $outside = $this->tmp.'/outside-checksums.sha256';
+        File::move($checksums, $outside);
+        $this->assertTrue(symlink($outside, $checksums));
+
+        $this->assertSymlinkRejectedOnLoad($package);
+    }
+
+    #[Test]
+    public function write_v2_rejects_unknown_payload_keys(): void
+    {
+        $files = $this->v2FilePayloads();
+        $files['data/users.json'] = [];
+        $manifest = $this->v2Manifest($this->v2FilePayloads());
+
+        try {
+            app(MasterDataPackage::class)->write($this->tmp.'/bad-write', $manifest, $files);
+            $this->fail('Unbekannte Write-Payload-Schlüssel müssen abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertSame('Export enthält unzulässige Dateischlüssel.', $e->getMessage());
+            $this->assertContains('data/users.json', $e->errors);
+        }
+    }
+
+    #[Test]
     public function unsafe_checksum_path_is_rejected(): void
     {
         $package = $this->writeMinimalV2Package();
@@ -256,6 +320,20 @@ class MasterDataTransferPackageV2Test extends TestCase
 
         $this->expectException(MasterDataTransferException::class);
         app(MasterDataPackage::class)->load($package);
+    }
+
+    private function assertSymlinkRejectedOnLoad(string $package): void
+    {
+        try {
+            app(MasterDataPackage::class)->load($package);
+            $this->fail('Symbolischer Link muss fail-closed abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(
+                str_contains($e->getMessage(), 'symbolischen Link')
+                || collect($e->errors)->contains(fn (string $error): bool => str_contains($error, 'symbolischen Link')),
+                'Erwartete Symlink-Ablehnung, erhalten: '.$e->getMessage().' '.json_encode($e->errors),
+            );
+        }
     }
 
     /**
