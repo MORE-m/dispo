@@ -3,8 +3,8 @@
 **Datum:** 2026-11-23
 **Lesung:** lokale Quelle `dispo_mat_core` und Staging `spn26jz7_dispo_staging`, nur lesend
 **Schema:** beide Seiten 79 Migrationen
-**Status:** Fachlicher Umfang vom PO am 23.11.2026 genehmigt. Technischer Vertrag: [`../entscheidungen/EPIC-03-F-master-data-transfer-2-0-0.md`](../entscheidungen/EPIC-03-F-master-data-transfer-2-0-0.md).
-**STOP:** kein Export, kein Import, keine Implementierung, kein Schreibvorgang bis zur technischen Abnahme und weiterem PO-GO
+**Status:** Fachlicher Umfang genehmigt. Technischer Vertrag 2.0.0 technisch abgenommen: [`../entscheidungen/EPIC-03-F-master-data-transfer-2-0-0.md`](../entscheidungen/EPIC-03-F-master-data-transfer-2-0-0.md).
+**STOP:** kein Export, kein Import, keine Implementierung, kein Schreibvorgang bis zu einem späteren Implementierungs-GO
 
 Ziel ist ein fachlich nutzbarer Staging-Bestand aus der Quelle. Kalkulationen, Dispoaufträge und ihre abhängigen Bewegungsdaten bleiben ausgenommen. Die drei vorhandenen Radio-Hamburg-Testvorgänge und der Staging-Admin bleiben unverändert. Eine Datenbankkopie ist nicht das Mittel, weil die numerischen IDs bereits auseinanderlaufen: Radio Hamburg ist in der Quelle Inventar 3 und auf Staging Inventar 1.
 

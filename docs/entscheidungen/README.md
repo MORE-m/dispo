@@ -34,7 +34,7 @@ ohne die Entscheidung zu ersetzen.
 | [EPIC-03-B](EPIC-03-B-master-data-transfer.md) | Selektiver Stammdaten-/Preislisten-Transfer | Historisch Schema `1.0.0` auf `main` (PR #263); RH-Pilot abgenommen |
 | [EPIC-03-C/D](../readiness/EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md) | Radio-Hamburg Staging-Pilot bis Dispo-Entwurf | **PASS** bis Entwurf; Status nach Entwurf nicht abgenommen |
 | [EPIC-03-F Readiness](../readiness/EPIC-03-F-full-master-data-readiness-2026-11-23.md) | Vollständiger Fachdatenbestand nach Staging | Fachumfang genehmigt; Transfer **STOP** |
-| [EPIC-03-F Vertrag 2.0.0](EPIC-03-F-master-data-transfer-2-0-0.md) | Technischer Importvertrag Gesamtbestand | Draft zur technischen Abnahme; **STOP** vor Implementierung |
+| [EPIC-03-F Vertrag 2.0.0](EPIC-03-F-master-data-transfer-2-0-0.md) | Technischer Importvertrag Gesamtbestand | Technisch abgenommen; Implementierung/Export/Apply **STOP** |
 | [PO-AUTH-RIGHTS-1](PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | Rechtekonflikte Sonderfreigabe / PM / Draft / Force-Complete | **Akzeptiert** |
 | [PO-APPROVAL-NOTIFY-1](PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md) | Freigabe erteilt/abgelehnt per Outbox/SMTP | **Akzeptiert** |
 | [PO-NOT002-ADMIN-1](PO-NOT002-ADMIN-1-admin-outbox-sicht.md) | Admin-Outbox-Sicht lesend | **Akzeptiert** (`main` PR #122) |

@@ -1,6 +1,6 @@
 # EPIC-03-F – Technischer Importvertrag 2.0.0
 
-- **Status:** Draft zur technischen Abnahme nach Review-Nachbesserung. **STOP** vor Implementierung, Export, Dry-Run, Apply, Aktivierung und Merge ohne weiteres PO-GO.
+- **Status:** Technisch abgenommen mit bedingtem Dokumentations-GO. Nach den drei Präzisierungen unten freigegeben für Merge. **STOP** vor Implementierung, Export, Dry-Run, Apply und Aktivierung.
 - **Datum:** 2026-11-23
 - **PO-Umfang:** genehmigt laut Readiness vom 23.11.2026
 - **Basis:** `docs/readiness/EPIC-03-F-full-master-data-readiness-2026-11-23.md`
@@ -122,7 +122,7 @@ Technische Felder sind nie Teil eines Fachvergleichs und nie Teil eines Fingerab
 | field_definition_revision_options | `(field_definition_revision_id, key)` | `field_definition_key` + `revision` + Options-`key` | `label`, `sort`, `is_active` | — |
 | field_sets | `key` | `key` | `name`, `is_system`, `applies_to`, `is_assignable` | aktive Version nur fachlich als `active_version` |
 | field_set_versions | `(field_set_id, version)` | `field_set_key` + `version` | `status` | — |
-| field_set_version_fields | `(field_set_version_id, field_definition_id)` | `field_set_key` + `version` + `field_definition_key` | `sort`, `required_override`, `visible_override`, referenzierte Feldrevision | `field_definition_key` + `revision` |
+| field_set_version_fields | `(field_set_version_id, field_definition_id)` | `field_set_key` + `version` + `field_definition_key` | `sort`, `required_override`, `visible_override`, referenzierte Feldrevision | `field_definition_key` + `revision`; `field_definition_revision_id` ist NOT NULL und wird bei Create sofort aufgelöst |
 | field_rules | kein fachliches Unique außer `id` | keine Zeilen-Identität über Fingerabdruck | vollständige, deterministisch sortierte Regelmenge je `field_set_key` + `version` | — |
 | field_set_assignments | `(field_set_id, applies_to_process, target_identity)` | `field_set_key` + `applies_to_process` + semantische Zielidentität | `target_layer`, `is_active`, `sort` | `category_key` / `medium_code` je Layer; `target_identity` wird auf Staging neu gebildet |
 
@@ -197,7 +197,7 @@ Fingerabdrücke sind deterministisch und kanonisch JSON-kodiert, Felder sortiert
 | field_definition_revision_options | ja | create / unchanged | gleicher Options-`key` unter derselben Revision, anderer Inhalt |
 | field_sets | ja | create / unchanged; aktive Version später auflösen | Inhalt abweichend |
 | field_set_versions | ja | create / unchanged | gleicher `(key, version)`, anderer Inhalt |
-| field_set_version_fields | ja | create / unchanged; Revisions-FK später auflösen | Inhalt oder Revisionsreferenz abweichend |
+| field_set_version_fields | ja | create / unchanged; Revisions-FK bei Create sofort gesetzt | Inhalt oder Revisionsreferenz abweichend; NULL-FK verboten |
 | field_rules | ja | Mengenvergleich je Version | abweichende vorhandene Menge |
 | field_set_assignments | ja | create / unchanged nach Remapping | gleicher fachlicher Zielschlüssel, anderer Inhalt |
 | users | nein | verboten | jede Inhalts- oder Referenzänderung |
@@ -261,6 +261,14 @@ Das schließt die drei Radio-Hamburg-Testvorgänge ein und gilt ebenso für jede
 
 Eigener PO-Schritt nach Apply.
 
+Die Status-Phase arbeitet ausschließlich mit demselben unveränderten Paket, das bereits Manifest- und SHA256-validiert wurde. Vor jedem Statuswechsel erneut prüfen:
+
+- Paket-SHA256 unverändert
+- Fingerabdruck und Metadaten der betroffenen Listen unverändert
+- fachliche Identität unverändert
+- kein Statuskonflikt zum geplanten Übergang
+- keine gepinnte Liste betroffen
+
 Erlaubt nur:
 
 - `draft` → `active`, wenn `source_status=active` und Fingerabdruck sowie Metadaten unverändert sind
@@ -271,6 +279,7 @@ Nicht erlaubt:
 - Statuswechsel an bereits `active` oder `archived` Listen
 - Statuswechsel an jeder gepinnten Liste
 - Aktivierung oder Archivierung als Seiteneffekt des Inhalts-Apply
+- Arbeiten gegen ein anderes oder nachträglich verändertes Paket
 
 ### 5.5 Erwartete Quelle laut Lesung vom 23.11.2026
 
@@ -293,15 +302,25 @@ Fehlende Produktionsjahre 2027 außer Kombi werden nicht erfunden.
 
 ## 6. Fremdschlüssel und zweite Auflösungsphase
 
-Keine numerische Quell-ID wird geschrieben.
+Keine numerische Quell-ID wird geschrieben. Fremdschlüssel-Constraints bleiben aktiv. Es gibt keine vorläufigen NULL-Werte für Pflicht-FKs und kein Deaktivieren von Constraints.
 
-Nach der ersten Anlagephase müssen folgende Referenzen über Fachschlüssel auf Staging-IDs aufgelöst werden:
+### 6.1 Sofort bei Create in Phase A
+
+`field_set_version_fields.field_definition_revision_id` ist NOT NULL.
+
+Die Revisionsreferenz wird bereits bei der Erstellung über `field_definition_key` + `revision` auf die Staging-ID der zuvor angelegten oder vorhandenen Feldrevision aufgelöst und mitgeschrieben. Eine Create-Zeile ohne gültige Revisions-ID ist verboten.
+
+Dieselbe Regel gilt für alle anderen Pflicht-FKs von Kindzeilen, sobald die Elternzeile in Phase A bereits existiert.
+
+### 6.2 Phase B nur Integrität und nachlaufende Zeiger
+
+Phase B setzt keine verspäteten Pflicht-FKs nach. Sie prüft und setzt nur Zeiger, die im Schema nullable sind oder erst nach vollständiger Kindmenge gelten:
 
 1. `field_definitions.current_revision_id` über `field_definition_key` + `revision`
 2. `field_sets.active_version_id` über `field_set_key` + `version`
-3. `field_set_version_fields.field_definition_revision_id` über `field_definition_key` + `revision`
-4. `field_set_assignments.target_identity` sowie optional gesetzte `advertising_category_id` / `advertising_medium_id` über Layer und fachische Zielschlüssel
-5. alle übrigen Inhalts-FKs der ersten Phase, falls sie verzögert gesetzt wurden
+3. abschließende Integritätsprüfung, dass jede `field_set_version_fields.field_definition_revision_id` zum fachlichen Schlüssel passt
+4. `field_set_assignments.target_identity` sowie `advertising_category_id` / `advertising_medium_id` über Layer und fachliche Zielschlüssel
+5. Fail-closed-Prüfung aller übrigen Referenzen
 
 Fail-closed, wenn:
 
@@ -309,17 +328,82 @@ Fail-closed, wenn:
 - eine Referenz mehrdeutig ist
 - die aufgelöste Zielzeile nicht zum erwarteten Fachschlüssel passt
 - `current_revision` oder `active_version` im Paket auf eine nicht vorhandene Kindzeile zeigt
+- ein Pflicht-FK NULL wäre oder nur durch Constraint-Deaktivierung schreibbar wäre
 
-## 7. Schutz ausgeschlossener Staging-Bestände
+## 7. Schreib-Whitelist und Schutz ausgeschlossener Bestände
+
+### 7.1 Geschlossene Schreib-Whitelist
+
+Nur diese Fachtabellen dürfen vom Inhalts-Apply geschrieben werden, und nur über den Importpfad:
+
+1. `organizations`
+2. `calculation_methods`
+3. `advertising_categories`
+4. `advertising_media`
+5. `advertising_category_calculation_methods`
+6. `advertising_medium_calculation_methods`
+7. `inventories`
+8. `inventory_medium_rules`
+9. `price_lists`
+10. `price_list_items`
+11. `production_price_lists`
+12. `oa_platforms`
+13. `oa_platform_medium_rules`
+14. `oa_targeting_definitions`
+15. `oa_tkp_price_lists`
+16. `oa_tkp_price_list_items`
+17. `oa_adserver_surcharges`
+18. `field_definitions`
+19. `field_definition_revisions`
+20. `field_definition_revision_options`
+21. `field_sets`
+22. `field_set_versions`
+23. `field_set_version_fields`
+24. `field_rules`
+25. `field_set_assignments`
+
+Die Status-Phase darf innerhalb derselben Whitelist ausschließlich Statusfelder bereits importierter Preislisten ändern, nie Inhalte, IDs oder Pins.
+
+Jeder Schreibversuch außerhalb dieser Whitelist ist STOP.
+
+### 7.2 Ausgeschlossene Geschäftstabellen
+
+Nicht veränderbar, einschließlich Kinder und Referenzen:
+
+- `users`
+- `crm_accounts`, `crm_account_versions`, `crm_imports`, `crm_conflicts`, `crm_shared_email_domains`
+- `calculations` und alle Calc-Kinder
+- `dispo_orders` und alle Dispo-Kinder
+- `configuration_snapshots` und Snapshot-Kinder
+- `snapshot_field_definitions`, `snapshot_field_rules`
+- `spot_classic_plan_rows`
+- `budget_proposals`
+- `standard_offers`, `standard_offer_versions`, `standard_offer_number_sequences`
+- `calculation_number_sequences`, `dispo_order_number_sequences`
+- `price_list_imports`
+- Preislisten-Pins und Preislisten-Referenzen bestehender Staging-Vorgänge
+
+### 7.3 Technische Tabellen
+
+Ebenfalls vom Import-Schreibpfad ausgeschlossen:
+
+- `sessions`, `password_reset_tokens`
+- `audit_events`, `notification_outbox`
+- `cache`, `cache_locks`
+- `jobs`, `job_batches`, `failed_jobs`
+- `migrations`
+
+### 7.4 Kanonische Schutz-Snapshots
 
 Zähler allein reichen nicht.
 
-Vor und nach dem Plan sowie nach dem Apply werden kanonische Schutz-Snapshots verglichen:
+Vor und nach dem Plan, nach dem Apply und erneut vor der Status-Phase werden kanonische Schutz-Snapshots verglichen:
 
 - `users`: alle fachlichen Spalten außer technischen Zeitstempeln, sortiert nach `id`
 - `crm_accounts` und `crm_account_versions`: Identität und Referenzfelder, ohne Secrets
 - `calculations` und direkte Kinder: IDs, fachliche Felder, Snapshot- und Preislisten-Referenzen
 - `dispo_orders` und direkte Kinder: IDs, fachliche Felder, Snapshot- und Preislisten-Referenzen
+- Preislisten-Pins sämtlicher Staging-Vorgänge
 
 Jede Änderung an Inhalt oder Referenz trotz gleicher Anzahl ist Konflikt und bricht ab.
 
@@ -355,7 +439,7 @@ Idempotenz:
 11. Felddefinitions-Options
 12. Feldsets ohne finale `active_version_id`
 13. Feldset-Versionen
-14. Feldset-Version-Felder ohne finale Revisions-FK oder mit vorläufiger Prüfung
+14. Feldset-Version-Felder mit sofort aufgelöster `field_definition_revision_id`
 15. Feldregeln als Mengen je Version
 16. OA-Plattformen
 17. OA-Plattform-Medien-Regeln
@@ -365,18 +449,18 @@ Idempotenz:
 21. OA-TKP-Drafts inkl. Items
 22. OA-Adserver-Aufschläge
 
-### Phase B – Referenzauflösung
+### Phase B – nachlaufende Zeiger und Integrität
 
-23. `field_definition_revisions` den Definitionen zuordnen und `current_revision_id` setzen
-24. `field_set_versions` den Sets zuordnen und `active_version_id` setzen
-25. `field_set_version_fields.field_definition_revision_id` auflösen
+23. `current_revision_id` setzen
+24. `active_version_id` setzen
+25. Integrität der bereits gesetzten `field_set_version_fields.field_definition_revision_id` prüfen
 26. Feldset-Zuordnungen anlegen oder prüfen, `target_identity` auf Staging neu bilden
 27. Referenzintegrität fail-closed prüfen
 
 ### Phase C – Schutz und Status
 
-28. Schutz-Snapshots und Pin-Prüfung
-29. getrennte Status-Phase nur nach eigenem PO-GO
+28. Schutz-Snapshots, Whitelist-Prüfung und Pin-Prüfung
+29. getrennte Status-Phase nur nach eigenem PO-GO und nur gegen dasselbe SHA256-validierte Paket
 
 Phase A und B laufen in einer Transaktion. Phase C Status ist eine zweite Transaktion.
 
@@ -385,10 +469,13 @@ Phase A und B laufen in einer Transaktion. Phase C Status ist eine zweite Transa
 Dry-Run:
 
 - lädt Paket, prüft Manifest und SHA256
-- plant Phasen A–C ohne Schreiben
+- plant Phasen A–C vollständig schreibfrei
+- führt eine virtuelle Planung: noch nicht existierende Zielobjekte und ihre späteren Referenzen werden im Plan so aufgelöst, als würden sie in Phase A entstehen
+- prüft dabei dieselben fachlichen Constraints und Pflicht-FKs wie der Apply, einschließlich NOT NULL für `field_set_version_fields.field_definition_revision_id`
 - liefert je Schlüssel `create`, `unchanged`, `update` nur für erlaubte Kategorie-Metadaten oder `conflict`
 - liefert Mengenstatus für Feldregeln
-- liefert Pin- und Schutz-Snapshot-Prüfung
+- liefert Pin-, Whitelist- und Schutz-Snapshot-Prüfung
+- Pflicht-Testfall: leeres Ziel für OA und neue Inventare muss eine vollständige erfolgreiche Planung ohne Datenbank-Writes ergeben
 - bricht bei jedem Konflikt ab
 
 Rollback:
@@ -408,13 +495,15 @@ Rollback:
 4. Geänderte Feldregeln: abweichende vorhandene Menge konfliktieren, keine doppelte Anlage.
 5. Remapping bei auseinanderlaufenden Quell- und Staging-IDs für Inventare, Medien, Kategorien, Feldrevisionen und Feldset-Zuordnungen.
 6. Korrektes Setzen von `field_definitions.current_revision_id` und `field_sets.active_version_id`.
-7. Korrektes Auflösen von `field_set_version_fields.field_definition_revision_id`.
-8. Erkennung von Inhalts- oder Referenzänderungen trotz identischer Tabellen-Zähler bei Users, CRM, Calcs und Dispo.
-9. RH-Preislisten-Pins und historische Revisionen: gleicher Fingerabdruck bleibt, abweichender Inhalt konfliktieren, keine stille neue Revision.
-10. Fail-Closed bei fehlender oder mehrdeutiger Referenz.
-11. Unveränderte Kompatibilität von Vertrag und Tests für Schema `1.0.0`.
-12. Idempotenz: zweiter Export/Import desselben Stands ohne zusätzliche Creates.
-13. Status-Phase fasst gepinnte und bereits aktive/archivierte Listen nicht an.
+7. `field_set_version_fields.field_definition_revision_id` wird bei Create sofort gesetzt; kein NULL, kein Constraint-Bypass.
+8. Virtueller Dry-Run: leeres Ziel für OA und neue Inventare plant vollständig erfolgreich ohne Writes.
+9. Erkennung von Inhalts- oder Referenzänderungen trotz identischer Tabellen-Zähler bei Users, CRM, Calcs und Dispo.
+10. RH-Preislisten-Pins und historische Revisionen: gleicher Fingerabdruck bleibt, abweichender Inhalt konfliktieren, keine stille neue Revision.
+11. Fail-Closed bei fehlender oder mehrdeutiger Referenz.
+12. Unveränderte Kompatibilität von Vertrag und Tests für Schema `1.0.0`.
+13. Idempotenz: zweiter Export/Import desselben Stands ohne zusätzliche Creates.
+14. Status-Phase arbeitet nur gegen dasselbe SHA256-Paket und fasst gepinnte sowie bereits aktive/archivierte Listen nicht an.
+15. Schreibversuch außerhalb der Whitelist wird abgewiesen.
 
 Operative Abnahme nach Implementierungs-GO:
 
@@ -486,7 +575,8 @@ Fachlich offen, nicht blockierend für die technische Vertragsabnahme:
 Technisch durch diesen Vertrag festgelegt und nicht mehr offen:
 
 - Fachschlüssel gemäß Unique-Constraints
-- zweite Referenzauflösungsphase
-- Mengenvergleich für Feldregeln
-- Schutz über Inhalts-Snapshots statt nur Zähler
+- Pflicht-FK `field_set_version_fields.field_definition_revision_id` bei Create
+- virtuelle Dry-Run-Planung
+- Schreib-Whitelist und Schutz-Snapshots
+- Status-Phase nur gegen dasselbe SHA256-Paket
 - abweichende Preislisteninhalte als Konflikt
