@@ -58,8 +58,16 @@ final class MasterDataImporter
             );
         }
 
-        $usersBefore = $this->snapshotUsers();
         $package = $this->packages->load($packagePath);
+        if ($package['schema_version'] !== MasterDataTransferContract::SCHEMA_VERSION) {
+            throw new MasterDataTransferException(sprintf(
+                'Import für schema_version=%s ist in diesem Slice nicht freigegeben (erwartet %s).',
+                $package['schema_version'],
+                MasterDataTransferContract::SCHEMA_VERSION,
+            ));
+        }
+
+        $usersBefore = $this->snapshotUsers();
         $this->spotScope->assertPackage($package['data'], $package['manifest']);
 
         $report = new MasterDataImportReport;
