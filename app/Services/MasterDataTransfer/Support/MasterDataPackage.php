@@ -107,7 +107,7 @@ final class MasterDataPackage
             $absolute = $packagePath.DIRECTORY_SEPARATOR.$relative;
             $payload = $filePayloads[$relative];
             if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
-                $this->assertDataFileShapeV2($relative, is_array($payload) ? $payload : []);
+                $this->assertDataFileShapeV2($relative, $payload);
             }
             $json = $this->encodeJson($payload, $sortKeys);
             File::ensureDirectoryExists(dirname($absolute));

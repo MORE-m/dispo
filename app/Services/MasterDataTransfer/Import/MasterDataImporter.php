@@ -59,10 +59,10 @@ final class MasterDataImporter
         }
 
         $package = $this->packages->load($packagePath);
-        if (($package['schema_version'] ?? null) !== MasterDataTransferContract::SCHEMA_VERSION) {
+        if ($package['schema_version'] !== MasterDataTransferContract::SCHEMA_VERSION) {
             throw new MasterDataTransferException(sprintf(
                 'Import für schema_version=%s ist in diesem Slice nicht freigegeben (erwartet %s).',
-                is_string($package['schema_version'] ?? null) ? $package['schema_version'] : '(fehlt)',
+                $package['schema_version'],
                 MasterDataTransferContract::SCHEMA_VERSION,
             ));
         }
