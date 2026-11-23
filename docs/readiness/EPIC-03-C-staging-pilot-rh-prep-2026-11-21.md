@@ -1,6 +1,6 @@
 # EPIC-03-C – Staging-Pilot Radio Hamburg – Readiness
 
-**Nachtrag 2026-11-23:** Dieser Text ist die Vorbereitung vor dem Apply. Der Pilot ist ausgeführt. Abnahme **PASS bis einschließlich Dispo-Entwurf**: [`EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md`](EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md). Die lokale Ausführungsnotiz bleibt unversioniert und wird hier nicht überschrieben.
+**Historischer Stand vom 2026-11-22.** Die Abschnitte 1–4 sind die Vorbereitung vor Export, Deploy und Apply. Sie sind nicht der Abnahmestand. Erwartungen aus diesem Stand, darunter „32 aktive Rules“, gelten nicht als Abnahmeergebnis. Abgenommen ist ausschließlich der Weg bis einschließlich Dispo-Entwurf: [`EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md`](EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md). Die lokale Ausführungsnotiz bleibt unversioniert und wird hier nicht überschrieben.
 
 **Datum:** 2026-11-22  
 **Scope:** `inv_radio_hamburg` (kontrollierter Stammdaten-/Preislistenimport auf Staging)  

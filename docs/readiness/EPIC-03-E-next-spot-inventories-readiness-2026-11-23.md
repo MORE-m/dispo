@@ -3,13 +3,13 @@
 **Datum:** 2026-11-23
 **Art:** reine Leseanalyse, kein Export, kein Import
 **Empfehlung:** nächstes Inventar `inv_rock_antenne_hamburg`
-**Rollout:** **STOP** bis separates PO-GO und ein frischer Dry-Run
+**Rollout:** **STOP**. Ein späteres Inventar durchläuft Quellprüfung, Export, Integritätsprüfung, Staging-Dry-Run und erst danach die PO-Entscheidung. Apply und Aktivierung gehören nicht zu dieser Reihenfolge.
 
 ## Datenstand
 
 Die Preis- und Produktionsfakten stammen aus der Live-Lesung vom 20.11.2026. Der Regel- und Medienvergleich stammt aus dem Katalogstand vom 15.11.2026 und passt für Radio Hamburg zum Export vom 22.11. (weiterhin 27 Regeln). Am 23.11. konnte die lokale Quelldatenbank nicht erneut gelesen werden, weil MariaDB nicht läuft.
 
-Deshalb sind die Zahlen eine Readiness, kein Apply-Soll. Vor jedem späteren Export ist ein Dry-Run gegen die laufende Quelle Pflicht.
+Deshalb sind die Zahlen Schätzungen, kein aktueller Quellstand und kein Apply-Soll.
 
 Nicht im Spot-Scope und ohne Spotlisten: OA-Kombi, Podcast-Kombi und die vier Event-Kombis.
 
@@ -56,7 +56,7 @@ Das sind Schätzungen aus dem Katalog, kein Dry-Run.
 | Kombi | 1 Inventar, 7 Regeln, 2 Spot-Drafts, 1 Produktions-Draft | alle Medien | niedrig; anderer Inventartyp |
 | Kombi+ | 1 Inventar, 6 Regeln, 2 Spot-Drafts, 1 Produktions-Draft | alle Medien | niedrig; Teilraster und Kombi |
 
-## Reihenfolge
+## Reihenfolge der Inventare
 
 1. `inv_rock_antenne_hamburg`
 2. `inv_80er_90er_oldie_antenne_hamburg`
@@ -68,7 +68,15 @@ Das sind Schätzungen aus dem Katalog, kein Dry-Run.
 
 ROCK zuerst, weil es denselben bereits abgenommenen Weg wiederholt: Sender, Buchungskennzeichen `Spots (L)`, volles 72er Raster, SWF-Anteil. Gleichzeitig ist es der erste echte Überschneidungstest mit 25 bereits importierten Medien. CARAVAN hätte keine neuen Medien, weicht aber beim Buchungskennzeichen ab. Die Kombis kommen zuletzt, weil sie ein anderer Inventartyp sind und Kombi+ kein volles Raster hat.
 
-Jedes Inventar einzeln: Dry-Run, PO-Freigabe des Berichts, Apply, Idempotenz, dann getrennte Aktivierung. Kein Sammelpaket.
+## Reihenfolge je Inventar
+
+1. Quellprüfung, ausschließlich lesend.
+2. Export.
+3. Integritätsprüfung.
+4. Staging-Dry-Run.
+5. PO-Entscheidung.
+
+Apply, Idempotenz, Aktivierung und weitere Schreibvorgänge folgen nicht aus dieser Reihenfolge. Sie bleiben **STOP**, bis eine spätere Entscheidung sie einzeln freigibt. Kein Sammelpaket.
 
 ## Offene Punkte
 

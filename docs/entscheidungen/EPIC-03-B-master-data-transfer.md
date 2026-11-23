@@ -33,4 +33,4 @@ Organisation → Berechnungsmethoden (nur Abgleich) → Kategorien → Inventare
 
 ## Aktivierung (separater PO-Schritt)
 
-Nicht Teil dieses Slices. Nach Staging-Pilot und RH-Fachprüfung gesondert freigeben.
+Nicht Teil dieses Slices. Nach Staging-Pilot und RH-Fachprüfung gesondert freigeben. Die für Radio Hamburg ausgeführte Aktivierung steht im Abschluss. Sie erweitert die Abnahme nicht über den Dispo-Entwurf hinaus.
