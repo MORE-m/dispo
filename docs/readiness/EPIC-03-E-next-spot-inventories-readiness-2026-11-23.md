@@ -1,5 +1,7 @@
 # EPIC-03-E – Readiness der sieben verbleibenden Spot-Inventare
 
+**Historischer Stand.** Die Beschränkung auf acht Spot-Inventare ist nicht mehr das Gesamtziel. Aktueller Vorschlag: [`EPIC-03-F-full-master-data-readiness-2026-11-23.md`](EPIC-03-F-full-master-data-readiness-2026-11-23.md). Dieser Text bleibt die damalige Schätzung.
+
 **Datum:** 2026-11-23
 **Art:** reine Leseanalyse, kein Export, kein Import
 **Empfehlung:** nächstes Inventar `inv_rock_antenne_hamburg`
