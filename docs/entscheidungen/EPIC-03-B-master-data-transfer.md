@@ -1,6 +1,6 @@
 # EPIC-03-B – Selektiver Stammdaten-/Preislisten-Transfer
 
-- **Status:** Auf `main` (PR #263). Radio-Hamburg-Pilot auf Staging abgenommen bis Dispo-Entwurf, siehe `docs/readiness/EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md`. Nächster Inventar-Rollout: **STOP** bis neues PO-GO.
+- **Status:** Historischer Vertrag Schema `1.0.0` auf `main` (PR #263). Radio-Hamburg-Pilot bis Dispo-Entwurf abgenommen, siehe `docs/readiness/EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md`. Vollständiger Fachdatenbestand: neuer Vertrag Schema `2.0.0` in `docs/entscheidungen/EPIC-03-F-master-data-transfer-2-0-0.md`. Dieser `1.0.0`-Text wird nicht still erweitert.
 - **Datum:** 2026-11-20
 - **Basis:** `32852af` + EPIC-03-A Readiness
 - **PO-Scope:** 8 Spot-Inventare, Produktionspreise, Draft-Import, kein Online Audio
