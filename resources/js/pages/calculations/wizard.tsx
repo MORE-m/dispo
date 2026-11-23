@@ -223,12 +223,20 @@ import {
 import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
-    nextSchemaFetchGeneration,
+    SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
     positionNeedsFieldSchema,
     schemaLoadBlockMessage,
     shouldApplyPositionSchemaResponse,
     type PositionSchemaFetchTarget,
 } from '@/lib/position-field-schema';
+import {
+    beginPositionSchemaFetch,
+    completePositionSchemaFetch,
+    endSchemaFetchSession,
+    planSchemaFetchRecovery,
+    shouldClearLoadingAfterSchemaFetch,
+    syncSchemaRecoveryScope,
+} from '@/lib/position-schema-fetch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1531,6 +1539,9 @@ export default function CalculationWizard({
     const schemaFetchPendingRef = useRef<
         Map<string, PositionSchemaFetchTarget>
     >(new Map());
+    const schemaRecoveryAttemptsRef = useRef(0);
+    const schemaRecoveryScopeRef = useRef('');
+    const schemaWizardMountedRef = useRef(true);
     const [schemaLoadingClientKeys, setSchemaLoadingClientKeys] = useState<
         Record<string, true>
     >({});
@@ -1548,14 +1559,25 @@ export default function CalculationWizard({
         [positions],
     );
 
+    // Echter Component-Unmount: Pending invalidieren. Effect-Restarts rühren
+    // diese Map nicht an (Generation-Guard reicht dort).
+    useEffect(() => {
+        schemaWizardMountedRef.current = true;
+
+        return () => {
+            schemaWizardMountedRef.current = false;
+            endSchemaFetchSession(schemaFetchPendingRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         const missing = positions.filter(positionNeedsFieldSchema);
 
         if (missing.length === 0) {
+            schemaRecoveryAttemptsRef.current = 0;
+            schemaRecoveryScopeRef.current = '';
             return;
         }
-
-        let cancelled = false;
 
         void (async () => {
             const updates = new Map<
@@ -1567,22 +1589,22 @@ export default function CalculationWizard({
                 }
             >();
             let loadError: string | null = null;
+            let abortedByUnmount = false;
 
             for (const position of missing) {
                 if (position.advertising_medium_id === null) {
                     continue;
                 }
+                if (!schemaWizardMountedRef.current) {
+                    abortedByUnmount = true;
+                    break;
+                }
 
-                const generation = nextSchemaFetchGeneration(
-                    schemaFetchPendingRef.current.get(position.client_key)
-                        ?.generation,
+                const target = beginPositionSchemaFetch(
+                    schemaFetchPendingRef.current,
+                    position.client_key,
+                    position.advertising_medium_id,
                 );
-                const target: PositionSchemaFetchTarget = {
-                    clientKey: position.client_key,
-                    advertisingMediumId: position.advertising_medium_id,
-                    generation,
-                };
-                schemaFetchPendingRef.current.set(position.client_key, target);
                 setSchemaLoadingClientKeys((current) => ({
                     ...current,
                     [position.client_key]: true,
@@ -1604,50 +1626,66 @@ export default function CalculationWizard({
                                 : {}),
                         },
                     );
-                    const nextSchema = response.fieldSchema;
-                    const fingerprint = nextSchema?.schema_fingerprint ?? null;
-                    const pending = schemaFetchPendingRef.current.get(
-                        position.client_key,
-                    );
-                    if (
-                        !shouldApplyPositionSchemaResponse(pending, target) ||
-                        !fingerprint ||
-                        !nextSchema
-                    ) {
-                        continue;
-                    }
-                    updates.set(position.client_key, {
-                        fingerprint,
-                        fieldSchema: nextSchema,
+                    // Primärpfad: gültige 200 trotz Effect-Restart anwenden
+                    // (Generation-Guard). Nach Unmount: stale via Session-Ende.
+                    const completion = completePositionSchemaFetch(
+                        schemaFetchPendingRef.current,
                         target,
-                    });
-                } catch {
-                    const pending = schemaFetchPendingRef.current.get(
-                        position.client_key,
+                        { ok: true, fieldSchema: response.fieldSchema },
                     );
-                    if (shouldApplyPositionSchemaResponse(pending, target)) {
-                        loadError =
-                            'Positions-Feldschema konnte nicht geladen werden. Speichern ist ohne Fingerprint nicht möglich.';
+                    if (completion.action === 'apply') {
+                        updates.set(position.client_key, {
+                            fingerprint: completion.fingerprint,
+                            fieldSchema: completion.fieldSchema as FieldSchema,
+                            target,
+                        });
+                    } else if (completion.action === 'error') {
+                        loadError = completion.message;
+                    }
+                } catch {
+                    const completion = completePositionSchemaFetch(
+                        schemaFetchPendingRef.current,
+                        target,
+                        { ok: false },
+                    );
+                    if (completion.action === 'error') {
+                        loadError = completion.message;
                     }
                 } finally {
-                    setSchemaLoadingClientKeys((current) => {
-                        const next = { ...current };
-                        delete next[position.client_key];
+                    if (schemaWizardMountedRef.current) {
+                        setSchemaLoadingClientKeys((current) => {
+                            if (
+                                !shouldClearLoadingAfterSchemaFetch(
+                                    schemaFetchPendingRef.current,
+                                    target,
+                                )
+                            ) {
+                                return current;
+                            }
+                            const next = { ...current };
+                            delete next[position.client_key];
 
-                        return next;
-                    });
+                            return next;
+                        });
+                    } else {
+                        abortedByUnmount = true;
+                    }
+                }
+
+                if (abortedByUnmount) {
+                    break;
                 }
             }
 
-            if (cancelled) {
+            if (abortedByUnmount || !schemaWizardMountedRef.current) {
                 return;
             }
 
-            if (loadError) {
-                setSchemaLoadError(loadError);
-            }
-
+            // Apply auch nach Effect-Restart: Generation-Guard in complete*/shouldApply.
             if (updates.size === 0) {
+                if (loadError) {
+                    setSchemaLoadError(loadError);
+                }
                 return;
             }
 
@@ -1737,9 +1775,8 @@ export default function CalculationWizard({
             );
         })();
 
-        return () => {
-            cancelled = true;
-        };
+        // Kein Effect-Cleanup, der Pending löscht: Restarts brauchen Generation-Guard.
+        return undefined;
         // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
         // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
@@ -2157,6 +2194,58 @@ export default function CalculationWizard({
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
     const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
+
+    // Recovery nur als begrenztes Sicherheitsnetz – Primärfix muss ohne Retries greifen.
+    // Retry-Budget gilt pro positionsNeedingSchemaKey (Position/Medium-Wechsel → Reset).
+    useEffect(() => {
+        const scoped = syncSchemaRecoveryScope(
+            {
+                scopeKey: schemaRecoveryScopeRef.current,
+                attempts: schemaRecoveryAttemptsRef.current,
+            },
+            positionsNeedingSchemaKey,
+        );
+        schemaRecoveryScopeRef.current = scoped.scopeKey;
+        schemaRecoveryAttemptsRef.current = scoped.attempts;
+
+        if (!schemaFingerprintMissing) {
+            schemaRecoveryAttemptsRef.current = 0;
+            schemaRecoveryScopeRef.current = '';
+            return;
+        }
+        if (schemaStillLoading) {
+            return;
+        }
+
+        const handle = window.setTimeout(() => {
+            if (!schemaWizardMountedRef.current) {
+                return;
+            }
+            const plan = planSchemaFetchRecovery({
+                needsSchema: true,
+                isLoading: false,
+                attempts: schemaRecoveryAttemptsRef.current,
+                maxAttempts: SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS,
+            });
+            if (plan.action === 'none') {
+                return;
+            }
+            if (plan.action === 'fail') {
+                setSchemaLoadError((current) => current ?? plan.message);
+                return;
+            }
+            schemaRecoveryAttemptsRef.current = plan.nextAttempts;
+            setSchemaRetryToken((token) => token + 1);
+        }, 150);
+
+        return () => {
+            window.clearTimeout(handle);
+        };
+    }, [
+        schemaFingerprintMissing,
+        schemaStillLoading,
+        positionsNeedingSchemaKey,
+    ]);
     const pageValidationErrors = mapValidationErrors(
         (usePage().props.errors ?? {}) as Record<string, string | string[]>,
     );

@@ -33,6 +33,24 @@ export function shouldApplyPositionSchemaResponse(
     );
 }
 
+/**
+ * Loading-Flag nur löschen, wenn dieser Fetch noch der aktive Versuch ist.
+ * Sonst kann ein verspätetes finally eines älteren Generationen-Laufs den
+ * Ladezustand eines neueren Versuchs vorzeitig beenden (CI: stuck Schema).
+ */
+export function shouldClearSchemaLoadingForGeneration(
+    pending: PositionSchemaFetchTarget | null | undefined,
+    completed: PositionSchemaFetchTarget,
+): boolean {
+    return shouldApplyPositionSchemaResponse(pending, completed);
+}
+
+/** Max. automatische Retries, wenn Fingerprint fehlt aber kein Fetch mehr läuft. */
+export const SCHEMA_FETCH_RECOVERY_MAX_ATTEMPTS = 3;
+
+export const SCHEMA_FETCH_FAILED_MESSAGE =
+    'Positions-Feldschema konnte nicht geladen werden. Speichern ist ohne Fingerprint nicht möglich.';
+
 export function positionNeedsFieldSchema(position: {
     advertising_medium_id: number | null;
     schema_fingerprint?: string | null;
