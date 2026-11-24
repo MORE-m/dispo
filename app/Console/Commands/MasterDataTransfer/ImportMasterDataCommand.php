@@ -3,7 +3,10 @@
 namespace App\Console\Commands\MasterDataTransfer;
 
 use App\Services\MasterDataTransfer\Import\MasterDataImporter;
+use App\Services\MasterDataTransfer\MasterDataTransferContract;
+use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Console\Command;
 
 /**
@@ -19,7 +22,7 @@ class ImportMasterDataCommand extends Command
 
     protected $description = 'EPIC-03-B: Stammdaten/Preislisten-Paket importieren (fail-closed, Draft-Preise)';
 
-    public function handle(MasterDataImporter $importer): int
+    public function handle(MasterDataImporter $importer, MasterDataPackage $packages): int
     {
         $dryRun = (bool) $this->option('dry-run');
         $apply = (bool) $this->option('apply');
@@ -40,6 +43,18 @@ class ImportMasterDataCommand extends Command
         $path = $pathArgument;
 
         try {
+            $schemaVersion = $packages->detectSchemaVersion($path);
+            if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
+                throw new MasterDataTransferException(
+                    'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase B/C und Schutzprüfungen fehlen).',
+                );
+            }
+            if ($schemaVersion !== MasterDataTransferContract::SCHEMA_VERSION) {
+                throw new MasterDataTransferException(
+                    'Unbekannte oder nicht freigegebene schema_version: '.$schemaVersion,
+                );
+            }
+
             $report = $importer->import($path, $dryRun, $confirm);
         } catch (MasterDataTransferException $e) {
             $this->error($e->getMessage());
