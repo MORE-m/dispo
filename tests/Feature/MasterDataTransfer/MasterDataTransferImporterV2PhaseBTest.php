@@ -414,6 +414,161 @@ class MasterDataTransferImporterV2PhaseBTest extends TestCase
         $this->assertSame(5, (int) FieldSetAssignment::query()->value('sort'));
     }
 
+    #[Test]
+    public function inconsistent_assignment_target_identity_conflicts_despite_correct_fk(): void
+    {
+        $files = $this->richPayload();
+        $files['data/field_set_assignments.json'] = [[
+            'field_set_key' => 'calc_header_v2',
+            'applies_to_process' => FieldAppliesTo::Calculation->value,
+            'target_layer' => FieldSetAssignmentTargetLayer::AdvertisingCategory->value,
+            'category_key' => 'spots_v2',
+            'is_active' => true,
+            'sort' => 7,
+        ]];
+        $package = $this->writeRichV2Package($files);
+        app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($package, dryRun: false);
+
+        $assignment = FieldSetAssignment::query()->firstOrFail();
+        $category = AdvertisingCategory::query()->where('key', 'spots_v2')->firstOrFail();
+        $this->assertSame((int) $category->id, (int) $assignment->advertising_category_id);
+
+        // DB-Guards kurz aussetzen, um inkonsistente Legacy-/Drift-Daten zu simulieren.
+        $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
+            DB::statement('DROP TRIGGER IF EXISTS field_set_assignment_target_xor_insert');
+            DB::statement('DROP TRIGGER IF EXISTS field_set_assignment_target_xor_update');
+        } elseif ($driver === 'mysql') {
+            DB::statement('ALTER TABLE field_set_assignments DROP CHECK field_set_assignment_target_xor');
+        }
+
+        // FK bleibt korrekt, target_identity wird absichtlich verfälscht.
+        DB::table('field_set_assignments')->where('id', $assignment->id)->update([
+            'target_identity' => 'c:999999',
+        ]);
+
+        try {
+            app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($package, dryRun: false);
+            $this->fail('Inkonsistente target_identity muss konfliktieren');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(
+                collect($e->errors)->contains(fn (string $m): bool => str_contains($m, 'target_identity')),
+            );
+        }
+
+        $fresh = FieldSetAssignment::query()->findOrFail($assignment->id);
+        $this->assertSame('c:999999', $fresh->target_identity);
+        $this->assertSame((int) $category->id, (int) $fresh->advertising_category_id);
+        $this->assertSame(7, (int) $fresh->sort);
+    }
+
+    #[Test]
+    public function null_pointer_matrix_for_current_revision_and_active_version(): void
+    {
+        $base = $this->richPayload();
+        $base['data/field_definitions.json'][0]['current_revision'] = null;
+        $base['data/field_sets.json'][0]['active_version'] = null;
+        $nullPackage = $this->writeRichV2Package($base);
+
+        $nullReport = app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($nullPackage, dryRun: false);
+        $this->assertSame([], $nullReport['conflicts']);
+        $definition = FieldDefinition::query()->where('key', 'campaign_title')->firstOrFail();
+        $set = FieldSet::query()->where('key', 'calc_header_v2')->firstOrFail();
+        $this->assertNull($definition->current_revision_id);
+        $this->assertNull($set->active_version_id);
+
+        $againNull = app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($nullPackage, dryRun: false);
+        $pointerRows = collect($againNull['rows'])->whereIn('entity', [
+            'field_definition_current_revision',
+            'field_set_active_version',
+        ]);
+        $this->assertTrue($pointerRows->every(fn (array $row): bool => $row['action'] === 'unchanged'));
+
+        $revision = FieldDefinitionRevision::query()
+            ->where('field_definition_id', $definition->id)
+            ->where('revision', 1)
+            ->firstOrFail();
+        $version = FieldSetVersion::query()
+            ->where('field_set_id', $set->id)
+            ->where('version', 1)
+            ->firstOrFail();
+        $definition->forceFill(['current_revision_id' => $revision->id])->save();
+        $set->forceFill(['active_version_id' => $version->id])->save();
+
+        try {
+            app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($nullPackage, dryRun: false);
+            $this->fail('Paket NULL bei gesetztem Zielzeiger muss konfliktieren');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $m): bool => str_contains($m, 'Paket NULL'),
+            ));
+        }
+        $this->assertSame((int) $revision->id, (int) $definition->fresh()->current_revision_id);
+        $this->assertSame((int) $version->id, (int) $set->fresh()->active_version_id);
+
+        $setPackage = $this->richPayload();
+        $setPath = $this->writeRichV2Package($setPackage);
+        $setReport = app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($setPath, dryRun: false);
+        $this->assertSame([], $setReport['conflicts']);
+        $this->assertSame((int) $revision->id, (int) $definition->fresh()->current_revision_id);
+        $this->assertSame((int) $version->id, (int) $set->fresh()->active_version_id);
+
+        $unchanged = app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($setPath, dryRun: false);
+        $setPointers = collect($unchanged['rows'])->whereIn('entity', [
+            'field_definition_current_revision',
+            'field_set_active_version',
+        ]);
+        $this->assertTrue($setPointers->every(fn (array $row): bool => $row['action'] === 'unchanged'));
+    }
+
+    #[Test]
+    public function post_apply_integrity_failure_rolls_back_phase_a_and_b(): void
+    {
+        $files = $this->richPayload();
+        $files['data/field_set_assignments.json'] = [[
+            'field_set_key' => 'calc_header_v2',
+            'applies_to_process' => FieldAppliesTo::Calculation->value,
+            'target_layer' => FieldSetAssignmentTargetLayer::Global->value,
+            'is_active' => true,
+            'sort' => 1,
+        ]];
+        $package = $this->writeRichV2Package($files);
+
+        FieldDefinition::saved(function (FieldDefinition $definition): void {
+            if ($definition->key !== 'campaign_title') {
+                return;
+            }
+            $currentId = (int) ($definition->getAttributes()['current_revision_id'] ?? 0);
+            if ($currentId < 1) {
+                return;
+            }
+            // Zeiger nach dem Speichern absichtlich leeren → Post-Apply-Konflikt.
+            DB::table('field_definitions')->where('id', $definition->id)->update([
+                'current_revision_id' => null,
+            ]);
+        });
+
+        try {
+            try {
+                app(MasterDataImporterV2::class)->executePhasesABForIsolatedTests($package, dryRun: false);
+                $this->fail('Post-Apply-Integrität muss bei verfälschtem current_revision_id abbrechen');
+            } catch (MasterDataTransferException $e) {
+                $this->assertTrue(
+                    collect($e->errors)->contains(
+                        fn (string $m): bool => str_contains($m, 'current_revision_id') || str_contains($m, 'Nach Apply'),
+                    ),
+                );
+            }
+        } finally {
+            FieldDefinition::flushEventListeners();
+        }
+
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+        $this->assertSame(0, FieldDefinition::query()->where('key', 'campaign_title')->count());
+        $this->assertSame(0, FieldSetAssignment::query()->count());
+        $this->assertSame(0, Organization::query()->where('name', 'Fixture Org V2')->count());
+    }
+
     /**
      * @param  array<string, array<string, mixed>|list<mixed>>  $overrides
      */
