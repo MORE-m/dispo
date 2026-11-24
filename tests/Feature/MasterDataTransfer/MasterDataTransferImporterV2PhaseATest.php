@@ -478,6 +478,299 @@ class MasterDataTransferImporterV2PhaseATest extends TestCase
         $this->assertSame(0, Organization::query()->count());
     }
 
+    #[Test]
+    public function isolated_execution_rejects_protected_databases_and_non_testing_env(): void
+    {
+        $package = $this->writeRichV2Package();
+        $importer = app(MasterDataImporterV2::class);
+        $connection = (string) config('database.default');
+        $originalDb = config('database.connections.'.$connection.'.database');
+
+        foreach (['dispo_mat_core', 'dispo', 'staging', 'production'] as $blocked) {
+            config(['database.connections.'.$connection.'.database' => $blocked]);
+            try {
+                $importer->executePhaseAForIsolatedTests($package, dryRun: true);
+                $this->fail('Geschützte DB muss auch im Dry-Run abgelehnt werden: '.$blocked);
+            } catch (MasterDataTransferException $e) {
+                $this->assertStringContainsString('gesperrt', $e->getMessage());
+            }
+
+            try {
+                $importer->executePhaseAForIsolatedTests($package, dryRun: false);
+                $this->fail('Geschützte DB muss im Apply abgelehnt werden: '.$blocked);
+            } catch (MasterDataTransferException $e) {
+                $this->assertStringContainsString('gesperrt', $e->getMessage());
+            }
+        }
+
+        config(['database.connections.'.$connection.'.database' => $originalDb]);
+
+        $originalEnv = app()->environment();
+        app()->detectEnvironment(fn (): string => 'production');
+        try {
+            try {
+                $importer->executePhaseAForIsolatedTests($package, dryRun: true);
+                $this->fail('Nicht-Testumgebung muss abgelehnt werden.');
+            } catch (MasterDataTransferException $e) {
+                $this->assertStringContainsString('APP_ENV=testing', $e->getMessage());
+            }
+        } finally {
+            app()->detectEnvironment(fn (): string => $originalEnv);
+            config(['database.connections.'.$connection.'.database' => $originalDb]);
+        }
+
+        $this->assertSame(0, Organization::query()->count());
+    }
+
+    #[Test]
+    public function duplicate_price_positions_and_version_collisions_are_rejected_without_partial_write(): void
+    {
+        $base = $this->richPayload();
+
+        try {
+            $bad = $base;
+            $bad['data/price_lists.json'][0]['items'][] = [
+                'hour' => 8,
+                'day_group' => 'mo_fr',
+                'second_price' => '1.0000',
+            ];
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('Doppelte Spotpreispositionen müssen abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Doppelte Spotpreisposition'),
+            ));
+        }
+
+        try {
+            $bad = $base;
+            $bad['data/oa_tkp_price_lists.json'][0]['items'][] = [
+                'inventory_code' => 'inv_v2_radio',
+                'medium_code' => 'spot_v2',
+                'list_tkp' => '1.0000',
+                'minimum_tkp' => '1.0000',
+            ];
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('Doppelte OA-TKP-Positionen müssen abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Doppelte OA-TKP-Position'),
+            ));
+        }
+
+        try {
+            $bad = $base;
+            $bad['data/price_lists.json'][] = [
+                'inventory_code' => 'inv_v2_radio',
+                'year' => 2026,
+                'revision_number' => 2,
+                'name' => 'Andere Revision gleiche Version',
+                'version' => '1',
+                'valid_from' => '2026-01-01',
+                'source_status' => 'draft',
+                'import_status' => 'draft',
+                'items' => [[
+                    'hour' => 9,
+                    'day_group' => 'mo_fr',
+                    'second_price' => '2.0000',
+                ]],
+            ];
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('Doppelte Spotpreislisten-Version muss abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Doppelte Spotpreislisten-Version'),
+            ));
+        }
+
+        app(MasterDataImporterV2::class)->executePhaseAForIsolatedTests($this->writeRichV2Package(), dryRun: false);
+        $inventory = Inventory::query()->where('code', 'inv_v2_radio')->firstOrFail();
+        $beforeCount = PriceList::query()->where('inventory_id', $inventory->id)->count();
+
+        $collisionPackage = $this->writeRichV2Package(overrides: [
+            'data/price_lists.json' => [[
+                'inventory_code' => 'inv_v2_radio',
+                'year' => 2026,
+                'revision_number' => 2,
+                'name' => 'Kollidierende Version',
+                'version' => '1',
+                'valid_from' => '2026-06-01',
+                'source_status' => 'draft',
+                'import_status' => 'draft',
+                'items' => [[
+                    'hour' => 10,
+                    'day_group' => 'sa',
+                    'second_price' => '3.0000',
+                ]],
+            ]],
+        ]);
+
+        try {
+            app(MasterDataImporterV2::class)->executePhaseAForIsolatedTests($collisionPackage, dryRun: false);
+            $this->fail('Version-Kollision gegen bestehende Liste muss Konflikt erzeugen.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Version-Kollision'),
+            ));
+        }
+
+        $this->assertSame($beforeCount, PriceList::query()->where('inventory_id', $inventory->id)->count());
+        $this->assertFalse(
+            PriceList::query()->where('inventory_id', $inventory->id)->where('revision_number', 2)->exists(),
+        );
+    }
+
+    #[Test]
+    public function nullable_keys_assignments_default_method_and_multi_org_are_validated(): void
+    {
+        $base = $this->richPayload();
+
+        try {
+            $bad = $base;
+            unset($bad['data/calculation_methods.json'][0]['help_text']);
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('Fehlender nullable Schlüssel muss abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'help_text fehlt'),
+            ));
+        }
+
+        try {
+            $bad = $base;
+            $bad['data/field_sets.json'] = [[
+                'key' => 'calc_header_v2',
+                'name' => 'Calc Header V2',
+                'is_system' => false,
+                'applies_to' => FieldAppliesTo::Calculation->value,
+                'is_assignable' => true,
+                'active_version' => 1,
+            ]];
+            $bad['data/field_set_assignments.json'] = [[
+                'field_set_key' => 'calc_header_v2',
+                'applies_to_process' => FieldAppliesTo::Calculation->value,
+                'target_layer' => 'global',
+                'is_active' => true,
+                'sort' => 1,
+                'category_key' => 'spots_v2',
+                'medium_code' => null,
+            ]];
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('global mit category_key muss abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'target_layer=global darf category_key nicht setzen'),
+            ));
+        }
+
+        try {
+            $bad = $base;
+            $bad['data/field_set_assignments.json'] = [
+                [
+                    'field_set_key' => 'calc_header_v2',
+                    'applies_to_process' => FieldAppliesTo::Calculation->value,
+                    'target_layer' => 'advertising_category',
+                    'is_active' => true,
+                    'sort' => 1,
+                    'category_key' => 'spots_v2',
+                    'medium_code' => null,
+                ],
+                [
+                    'field_set_key' => 'calc_header_v2',
+                    'applies_to_process' => FieldAppliesTo::Calculation->value,
+                    'target_layer' => 'advertising_category',
+                    'is_active' => false,
+                    'sort' => 2,
+                    'category_key' => 'spots_v2',
+                    'medium_code' => null,
+                ],
+            ];
+            MasterDataImportRecordValidatorV2::validate($bad);
+            $this->fail('Doppelte Feldset-Zuordnung muss abgewiesen werden.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Doppelte Feldset-Zuordnung'),
+            ));
+        }
+
+        Organization::query()->create(['name' => 'Org A']);
+        Organization::query()->create(['name' => 'Org B']);
+        try {
+            app(MasterDataImporterV2::class)->executePhaseAForIsolatedTests($this->writeRichV2Package(), dryRun: false);
+            $this->fail('Mehrere Organisationen müssen Konflikt erzeugen.');
+        } catch (MasterDataTransferException $e) {
+            $this->assertTrue(collect($e->errors)->contains(
+                fn (string $msg): bool => str_contains($msg, 'Mehr als eine Organisation'),
+            ));
+        }
+        $this->assertSame(2, Organization::query()->count());
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+
+        Organization::query()->delete();
+        Organization::query()->create(['name' => 'Fixture Org V2']);
+        $existingCategory = new AdvertisingCategory;
+        $existingCategory->forceFill([
+            'key' => 'spots_v2',
+            'name' => 'Spots V2',
+            'is_active' => true,
+            'sort' => 10,
+            'default_calculation_method_id' => null,
+            'lock_version' => 1,
+        ])->save();
+
+        $package = $this->writeRichV2Package(overrides: [
+            'data/calculation_methods.json' => [[
+                'key' => 'brand_new_method',
+                'name' => 'Brand New',
+                'help_text' => null,
+                'is_active' => true,
+                'sort' => 50,
+            ]],
+            'data/advertising_categories.json' => [[
+                'key' => 'spots_v2',
+                'name' => 'Spots V2',
+                'is_active' => true,
+                'sort' => 10,
+                'default_calculation_method_key' => 'brand_new_method',
+            ]],
+            'data/advertising_category_calculation_methods.json' => [[
+                'category_key' => 'spots_v2',
+                'method_key' => 'brand_new_method',
+                'engine_profile_key' => 'default',
+                'is_active' => true,
+                'sort' => 1,
+            ]],
+            'data/advertising_medium_calculation_methods.json' => [[
+                'medium_code' => 'spot_v2',
+                'method_key' => 'brand_new_method',
+                'engine_profile_key' => 'default',
+                'is_active' => true,
+                'sort' => 1,
+            ]],
+            'data/advertising_media.json' => [[
+                'code' => 'spot_v2',
+                'name' => 'Spot V2',
+                'category_key' => 'spots_v2',
+                'kind' => 'spot_classic',
+                'component_profile' => null,
+                'calculation_method_mode' => 'inherit',
+                'default_calculation_method_key' => null,
+                'default_length_seconds' => 30,
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'is_active' => true,
+                'sort' => 10,
+            ]],
+        ]);
+
+        $report = app(MasterDataImporterV2::class)->executePhaseAForIsolatedTests($package, dryRun: false);
+        $this->assertSame([], $report['conflicts']);
+        $methodId = (int) CalculationMethod::query()->where('key', 'brand_new_method')->value('id');
+        $this->assertGreaterThan(0, $methodId);
+        $existingCategory->refresh();
+        $this->assertSame($methodId, (int) $existingCategory->default_calculation_method_id);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

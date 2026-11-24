@@ -67,6 +67,17 @@ final class MasterDataImporterV2
         );
     }
 
+    /** @var list<string> */
+    private const FORBIDDEN_TEST_DATABASES = [
+        'dispo_mat_core',
+        'dispo',
+        'staging',
+        'dispo_staging',
+        'production',
+        'dispo_production',
+        'prod',
+    ];
+
     /**
      * Isolierte Test-/interne Ausführung von Phase A. Nicht für CLI/Staging.
      *
@@ -74,6 +85,8 @@ final class MasterDataImporterV2
      */
     public function executePhaseAForIsolatedTests(string $packagePath, bool $dryRun): array
     {
+        $this->assertIsolatedTestExecutionAllowed();
+
         $package = $this->packages->load($packagePath);
         if ($package['schema_version'] !== MasterDataTransferContractV2::SCHEMA_VERSION) {
             throw new MasterDataTransferException(sprintf(
@@ -119,6 +132,68 @@ final class MasterDataImporterV2
 
             return $report->toArray(false);
         });
+    }
+
+    /**
+     * Fail-closed: nur APP_ENV=testing und isolierte Testdatenbanken.
+     * Gilt für dry-run und apply gleichermaßen.
+     */
+    private function assertIsolatedTestExecutionAllowed(): void
+    {
+        if (! app()->environment('testing')) {
+            throw new MasterDataTransferException(
+                'Phase-A-Testausführung nur in APP_ENV=testing erlaubt (operativer Pfad bleibt gesperrt).',
+            );
+        }
+
+        $connection = (string) config('database.default');
+        $driver = (string) config('database.connections.'.$connection.'.driver');
+        $database = config('database.connections.'.$connection.'.database');
+        $normalized = is_string($database) || is_numeric($database)
+            ? trim((string) $database)
+            : '';
+
+        if ($normalized === '') {
+            throw new MasterDataTransferException(
+                'Phase-A-Testausführung abgebrochen: aktive Datenbank ist leer oder unbestimmt.',
+            );
+        }
+
+        if ($this->isForbiddenTestDatabase($normalized, $driver)) {
+            throw new MasterDataTransferException(
+                'Phase-A-Testausführung gegen geschützte/operative Datenbank gesperrt: '.$normalized,
+            );
+        }
+
+        if ($driver === 'mysql' && strcasecmp($normalized, 'dispo_test') !== 0) {
+            throw new MasterDataTransferException(
+                'Phase-A-Testausführung unter MySQL nur gegen dispo_test erlaubt (aktiv: '.$normalized.').',
+            );
+        }
+    }
+
+    private function isForbiddenTestDatabase(string $database, string $driver): bool
+    {
+        foreach (self::FORBIDDEN_TEST_DATABASES as $forbidden) {
+            if (strcasecmp($database, $forbidden) === 0) {
+                return true;
+            }
+        }
+
+        if ($database === ':memory:') {
+            return false;
+        }
+
+        if ($driver === 'sqlite' || str_contains($database, DIRECTORY_SEPARATOR) || str_contains($database, '/')) {
+            $filename = pathinfo($database, PATHINFO_FILENAME);
+            foreach (self::FORBIDDEN_TEST_DATABASES as $forbidden) {
+                if (strcasecmp($filename, $forbidden) === 0) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -210,6 +285,13 @@ final class MasterDataImporterV2
         $name = trim((string) ($row['name'] ?? ''));
         if ($name === '') {
             $report->conflict('organization.name fehlt.');
+
+            return [];
+        }
+
+        $orgCount = Organization::query()->count();
+        if ($orgCount > 1) {
+            $report->conflict('Mehr als eine Organisation im Ziel — Import nicht möglich.');
 
             return [];
         }
@@ -308,8 +390,11 @@ final class MasterDataImporterV2
             }
             $defaultMethodKey = $row['default_calculation_method_key'] ?? null;
             $defaultMethodId = null;
-            if (is_string($defaultMethodKey) && $defaultMethodKey !== '') {
-                $defaultMethodId = $this->resolveMethodId($defaultMethodKey, $context, $report);
+            $packageDefaultKey = is_string($defaultMethodKey) && $defaultMethodKey !== ''
+                ? $defaultMethodKey
+                : null;
+            if ($packageDefaultKey !== null) {
+                $defaultMethodId = $this->resolveMethodId($packageDefaultKey, $context, $report);
                 if ($defaultMethodId === false) {
                     continue;
                 }
@@ -326,11 +411,17 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('advertising_category', $key, 'create');
                 $context->markCategory($key);
-                $ops[] = function () use ($key, $payload, $defaultMethodKey): void {
-                    if (is_string($defaultMethodKey) && $defaultMethodKey !== '') {
-                        $payload['default_calculation_method_id'] = CalculationMethod::query()
-                            ->where('key', $defaultMethodKey)
-                            ->value('id');
+                $ops[] = function () use ($key, $payload, $packageDefaultKey): void {
+                    if ($packageDefaultKey !== null) {
+                        $resolvedId = CalculationMethod::query()->where('key', $packageDefaultKey)->value('id');
+                        if ($resolvedId === null) {
+                            throw new MasterDataTransferException(
+                                'Kategorie-Default-Methode fehlt beim Apply: '.$packageDefaultKey,
+                            );
+                        }
+                        $payload['default_calculation_method_id'] = (int) $resolvedId;
+                    } else {
+                        $payload['default_calculation_method_id'] = null;
                     }
                     $category = new AdvertisingCategory;
                     $category->forceFill(['key' => $key, ...$payload, 'lock_version' => 1])->save();
@@ -345,25 +436,47 @@ final class MasterDataImporterV2
                 continue;
             }
 
-            $metaOnly = [
-                'is_active' => $payload['is_active'],
-                'sort' => $payload['sort'],
-                'default_calculation_method_id' => $payload['default_calculation_method_id'],
-            ];
-            $actualMeta = [
-                'is_active' => (bool) $existing->is_active,
-                'sort' => (int) $existing->sort,
-                'default_calculation_method_id' => $existing->default_calculation_method_id,
-            ];
-            if ($actualMeta === $metaOnly) {
+            $existingDefaultKey = null;
+            if ($existing->default_calculation_method_id !== null) {
+                $existingDefaultKey = CalculationMethod::query()
+                    ->where('id', $existing->default_calculation_method_id)
+                    ->value('key');
+                $existingDefaultKey = is_string($existingDefaultKey) ? $existingDefaultKey : null;
+            }
+            $defaultMatches = $packageDefaultKey === null
+                ? $existing->default_calculation_method_id === null
+                : (
+                    $defaultMethodId !== null
+                        ? (int) $existing->default_calculation_method_id === (int) $defaultMethodId
+                        : $existingDefaultKey === $packageDefaultKey
+                );
+
+            $metaMatches = (bool) $existing->is_active === $payload['is_active']
+                && (int) $existing->sort === $payload['sort']
+                && $defaultMatches;
+            if ($metaMatches) {
                 $report->add('advertising_category', $key, 'unchanged');
 
                 continue;
             }
 
             $report->add('advertising_category', $key, 'update', 'erlaubtes Metadaten-Angleichen');
-            $ops[] = function () use ($existing, $metaOnly): void {
-                $existing->forceFill($metaOnly)->save();
+            $ops[] = function () use ($existing, $payload, $packageDefaultKey): void {
+                $defaultId = null;
+                if ($packageDefaultKey !== null) {
+                    $resolvedId = CalculationMethod::query()->where('key', $packageDefaultKey)->value('id');
+                    if ($resolvedId === null) {
+                        throw new MasterDataTransferException(
+                            'Kategorie-Default-Methode fehlt beim Apply: '.$packageDefaultKey,
+                        );
+                    }
+                    $defaultId = (int) $resolvedId;
+                }
+                $existing->forceFill([
+                    'is_active' => $payload['is_active'],
+                    'sort' => $payload['sort'],
+                    'default_calculation_method_id' => $defaultId,
+                ])->save();
             };
         }
 
@@ -946,6 +1059,23 @@ final class MasterDataImporterV2
 
                     continue;
                 }
+
+                $versionCollision = PriceList::query()
+                    ->where('inventory_id', $inventory->id)
+                    ->where('year', $year)
+                    ->where('version', $version)
+                    ->where('revision_number', '!=', $revision)
+                    ->exists();
+                if ($versionCollision) {
+                    $report->conflict(sprintf(
+                        'price_list Version-Kollision (inventory/year/version): %s|%d|%s',
+                        $inventoryCode,
+                        $year,
+                        $version,
+                    ));
+
+                    continue;
+                }
             }
 
             $report->add('price_list', $key, 'create', 'status=draft');
@@ -963,6 +1093,16 @@ final class MasterDataImporterV2
                     ->exists();
                 if ($exists) {
                     throw new MasterDataTransferException('price_list existiert bereits: '.$key);
+                }
+                $versionCollision = PriceList::query()
+                    ->where('inventory_id', $inventory->id)
+                    ->where('year', $year)
+                    ->where('version', $version)
+                    ->exists();
+                if ($versionCollision) {
+                    throw new MasterDataTransferException(
+                        'price_list Version-Kollision beim Apply: '.$inventoryCode.'|'.$year.'|'.$version,
+                    );
                 }
                 $list = new PriceList;
                 $list->forceFill([

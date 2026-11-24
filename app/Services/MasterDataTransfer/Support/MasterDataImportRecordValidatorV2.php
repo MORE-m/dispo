@@ -146,7 +146,7 @@ final class MasterDataImportRecordValidatorV2
             $this->requireString($row, 'name', 'calculation_methods['.$i.']');
             $this->requireBool($row, 'is_active', 'calculation_methods['.$i.']');
             $this->requireInt($row, 'sort', 'calculation_methods['.$i.']');
-            $this->requireNullableString($row, 'help_text', 'calculation_methods['.$i.']');
+            $this->requirePresentNullableString($row, 'help_text', 'calculation_methods['.$i.']');
         }
 
         return $keys;
@@ -186,13 +186,17 @@ final class MasterDataImportRecordValidatorV2
             $this->requireString($row, 'name', 'advertising_categories['.$i.']');
             $this->requireBool($row, 'is_active', 'advertising_categories['.$i.']');
             $this->requireInt($row, 'sort', 'advertising_categories['.$i.']');
-            $default = $row['default_calculation_method_key'] ?? null;
-            if ($default !== null && $default !== '') {
-                if (! is_string($default) || ! isset($methods[$default])) {
+            if (! array_key_exists('default_calculation_method_key', $row)) {
+                $this->errors[] = 'advertising_categories['.$i.'].default_calculation_method_key fehlt (Schlüssel muss vorhanden sein, Wert darf null sein).';
+            } else {
+                $default = $row['default_calculation_method_key'];
+                if ($default === null) {
+                    // erlaubt
+                } elseif (! is_string($default) || $default === '') {
+                    $this->errors[] = 'default_calculation_method_key ungültig bei '.$key;
+                } elseif (! isset($methods[$default])) {
                     $this->errors[] = 'default_calculation_method_key unbekannt: '.$key.' → '.$default;
                 }
-            } elseif ($default !== null) {
-                $this->errors[] = 'default_calculation_method_key ungültig bei '.$key;
             }
         }
 
@@ -376,7 +380,7 @@ final class MasterDataImportRecordValidatorV2
             $this->requireEnum($row, 'type', InventoryType::class, 'inventories['.$i.']');
             $this->requireBool($row, 'is_active', 'inventories['.$i.']');
             $this->requireInt($row, 'sort', 'inventories['.$i.']');
-            $this->requireNullableString($row, 'logo_path', 'inventories['.$i.']');
+            $this->requirePresentNullableString($row, 'logo_path', 'inventories['.$i.']');
         }
 
         return $codes;
@@ -515,8 +519,8 @@ final class MasterDataImportRecordValidatorV2
             }
             $keys[$biz] = true;
             $this->requireString($row, 'label', 'revisions['.$i.']');
-            $this->requireNullableString($row, 'help_text', 'revisions['.$i.']');
-            $this->requireNullableString($row, 'group_key', 'revisions['.$i.']');
+            $this->requirePresentNullableString($row, 'help_text', 'revisions['.$i.']');
+            $this->requirePresentNullableString($row, 'group_key', 'revisions['.$i.']');
             $this->requireInt($row, 'sort_default', 'revisions['.$i.']');
             $this->requireBool($row, 'reportable', 'revisions['.$i.']');
             if (! array_key_exists('validation_json', $row)) {
@@ -698,6 +702,13 @@ final class MasterDataImportRecordValidatorV2
             }
             $seen[$biz] = true;
             $this->requireInt($row, 'sort', 'fsvf['.$i.']');
+            foreach (['required_override', 'visible_override'] as $nullableBool) {
+                if (! array_key_exists($nullableBool, $row)) {
+                    $this->errors[] = 'fsvf['.$i.'].'.$nullableBool.' fehlt (Schlüssel muss vorhanden sein, Wert darf null sein).';
+                } elseif ($row[$nullableBool] !== null && ! is_bool($row[$nullableBool])) {
+                    $this->errors[] = 'fsvf['.$i.'].'.$nullableBool.' muss bool oder null sein.';
+                }
+            }
         }
     }
 
@@ -860,6 +871,7 @@ final class MasterDataImportRecordValidatorV2
             return;
         }
         $seen = [];
+        $seenVersion = [];
         foreach ($rows as $i => $row) {
             if (! is_array($row)) {
                 continue;
@@ -872,6 +884,8 @@ final class MasterDataImportRecordValidatorV2
             $inventoryCode = $this->requireNonEmptyString($row, 'inventory_code', 'price_lists['.$i.']');
             $this->requireInt($row, 'year', 'price_lists['.$i.']');
             $this->requireInt($row, 'revision_number', 'price_lists['.$i.']');
+            $this->requireString($row, 'version', 'price_lists['.$i.']');
+            $this->requirePresentNullableDateString($row, 'valid_from', 'price_lists['.$i.']');
             if ($inventoryCode === null) {
                 continue;
             }
@@ -880,11 +894,19 @@ final class MasterDataImportRecordValidatorV2
             }
             $year = (int) ($row['year'] ?? 0);
             $revision = (int) ($row['revision_number'] ?? 0);
+            $version = (string) ($row['version'] ?? '');
             $biz = $inventoryCode.'|'.$year.'|'.$revision;
             if (isset($seen[$biz])) {
                 $this->errors[] = 'Doppelte Spotpreisliste: '.$biz;
             }
             $seen[$biz] = true;
+            $versionBiz = $inventoryCode.'|'.$year.'|'.$version;
+            if ($version !== '' && isset($seenVersion[$versionBiz])) {
+                $this->errors[] = 'Doppelte Spotpreislisten-Version (inventory/year/version): '.$versionBiz;
+            }
+            if ($version !== '') {
+                $seenVersion[$versionBiz] = true;
+            }
             $this->validatePriceStatusFields($row, 'price_lists['.$i.']');
             $items = $row['items'] ?? null;
             if (! is_array($items)) {
@@ -892,6 +914,7 @@ final class MasterDataImportRecordValidatorV2
 
                 continue;
             }
+            $seenItems = [];
             foreach ($items as $j => $item) {
                 if (! is_array($item)) {
                     continue;
@@ -900,6 +923,11 @@ final class MasterDataImportRecordValidatorV2
                 $this->requireInt($item, 'hour', 'price_list_item');
                 $this->requireEnum($item, 'day_group', DayGroup::class, 'price_list_item');
                 $this->requireDecimal($item, 'second_price', MasterDataExportDecimal::PRICE_SCALE, 'price_list_item');
+                $itemBiz = (string) ($item['day_group'] ?? '').'|'.(string) ($item['hour'] ?? '');
+                if (isset($seenItems[$itemBiz])) {
+                    $this->errors[] = 'Doppelte Spotpreisposition (day_group, hour) in price_lists['.$i.']: '.$itemBiz;
+                }
+                $seenItems[$itemBiz] = true;
             }
         }
     }
@@ -981,12 +1009,14 @@ final class MasterDataImportRecordValidatorV2
             }
             $seen[$biz] = true;
             $this->validatePriceStatusFields($row, 'oa_tkp_price_lists['.$i.']');
+            $this->requirePresentNullableDateString($row, 'valid_from', 'oa_tkp_price_lists['.$i.']');
             $items = $row['items'] ?? null;
             if (! is_array($items)) {
                 $this->errors[] = 'oa_tkp_price_lists['.$i.'].items fehlt.';
 
                 continue;
             }
+            $seenItems = [];
             foreach ($items as $j => $item) {
                 if (! is_array($item)) {
                     continue;
@@ -1003,6 +1033,13 @@ final class MasterDataImportRecordValidatorV2
                 }
                 if ($med !== null && ! isset($media[$med])) {
                     $this->errors[] = 'medium_code unbekannt in OA-TKP-Item: '.$med;
+                }
+                if ($inv !== null && $med !== null) {
+                    $itemBiz = $inv.'|'.$med;
+                    if (isset($seenItems[$itemBiz])) {
+                        $this->errors[] = 'Doppelte OA-TKP-Position (inventory_code, medium_code) in oa_tkp_price_lists['.$i.']: '.$itemBiz;
+                    }
+                    $seenItems[$itemBiz] = true;
                 }
                 $this->requireDecimal($item, 'list_tkp', MasterDataExportDecimal::PRICE_SCALE, 'oa_tkp_item');
                 $this->requireDecimal($item, 'minimum_tkp', MasterDataExportDecimal::PRICE_SCALE, 'oa_tkp_item');
@@ -1064,6 +1101,7 @@ final class MasterDataImportRecordValidatorV2
 
             return;
         }
+        $seen = [];
         foreach ($rows as $i => $row) {
             if (! is_array($row)) {
                 continue;
@@ -1078,6 +1116,7 @@ final class MasterDataImportRecordValidatorV2
                 $this->errors[] = 'field_set_key unbekannt in Zuordnung: '.$setKey;
             }
             $this->requireEnum($row, 'applies_to_process', FieldAppliesTo::class, 'assignments['.$i.']');
+            $process = is_string($row['applies_to_process'] ?? null) ? (string) $row['applies_to_process'] : '';
             $layer = $row['target_layer'] ?? null;
             if (! is_string($layer) || FieldSetAssignmentTargetLayer::tryFrom($layer) === null) {
                 $this->errors[] = 'target_layer ungültig in assignments['.$i.']';
@@ -1085,18 +1124,40 @@ final class MasterDataImportRecordValidatorV2
                 continue;
             }
             $targetLayer = FieldSetAssignmentTargetLayer::from($layer);
-            if ($targetLayer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+
+            if ($targetLayer === FieldSetAssignmentTargetLayer::Global) {
+                if (array_key_exists('category_key', $row) && $row['category_key'] !== null) {
+                    $this->errors[] = 'assignments['.$i.']: target_layer=global darf category_key nicht setzen.';
+                }
+                if (array_key_exists('medium_code', $row) && $row['medium_code'] !== null) {
+                    $this->errors[] = 'assignments['.$i.']: target_layer=global darf medium_code nicht setzen.';
+                }
+                $semantic = ($setKey ?? '').'|'.$process.'|global';
+            } elseif ($targetLayer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
                 $cat = $this->requireNonEmptyString($row, 'category_key', 'assignments['.$i.']');
                 if ($cat !== null && ! isset($categories[$cat])) {
                     $this->errors[] = 'category_key unbekannt in Zuordnung: '.$cat;
                 }
-            }
-            if ($targetLayer === FieldSetAssignmentTargetLayer::AdvertisingMedium) {
+                if (array_key_exists('medium_code', $row) && $row['medium_code'] !== null) {
+                    $this->errors[] = 'assignments['.$i.']: target_layer=advertising_category darf medium_code nicht setzen.';
+                }
+                $semantic = ($setKey ?? '').'|'.$process.'|category|'.($cat ?? '');
+            } else {
                 $med = $this->requireNonEmptyString($row, 'medium_code', 'assignments['.$i.']');
                 if ($med !== null && ! isset($media[$med])) {
                     $this->errors[] = 'medium_code unbekannt in Zuordnung: '.$med;
                 }
+                if (array_key_exists('category_key', $row) && $row['category_key'] !== null) {
+                    $this->errors[] = 'assignments['.$i.']: target_layer=advertising_medium darf category_key nicht setzen.';
+                }
+                $semantic = ($setKey ?? '').'|'.$process.'|medium|'.($med ?? '');
             }
+
+            if (isset($seen[$semantic])) {
+                $this->errors[] = 'Doppelte Feldset-Zuordnung: '.$semantic;
+            }
+            $seen[$semantic] = true;
+
             $this->requireBool($row, 'is_active', 'assignments['.$i.']');
             $this->requireInt($row, 'sort', 'assignments['.$i.']');
         }
@@ -1149,6 +1210,37 @@ final class MasterDataImportRecordValidatorV2
         if ($value !== null && ! is_string($value)) {
             $this->errors[] = $context.'.'.$field.' muss String oder null sein.';
         }
+    }
+
+    /**
+     * Pflichtschlüssel mit erlaubtem null: fehlender Schlüssel ≠ null-Wert.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function requirePresentNullableString(array $row, string $field, string $context): void
+    {
+        if (! array_key_exists($field, $row)) {
+            $this->errors[] = $context.'.'.$field.' fehlt (Schlüssel muss vorhanden sein, Wert darf null sein).';
+
+            return;
+        }
+        $value = $row[$field];
+        if ($value !== null && ! is_string($value)) {
+            $this->errors[] = $context.'.'.$field.' muss String oder null sein.';
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function requirePresentNullableDateString(array $row, string $field, string $context): void
+    {
+        if (! array_key_exists($field, $row)) {
+            $this->errors[] = $context.'.'.$field.' fehlt (Schlüssel muss vorhanden sein, Wert darf null sein).';
+
+            return;
+        }
+        $this->requireNullableDateString($row, $field, $context);
     }
 
     /**
