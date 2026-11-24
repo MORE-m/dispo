@@ -7,6 +7,7 @@ use App\Enums\CalculationMethodMode;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
+use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Enums\FieldSetVersionStatus;
 use App\Enums\FieldType;
 use App\Enums\InventoryType;
@@ -24,6 +25,7 @@ use App\Models\FieldDefinitionRevision;
 use App\Models\FieldDefinitionRevisionOption;
 use App\Models\FieldRule;
 use App\Models\FieldSet;
+use App\Models\FieldSetAssignment;
 use App\Models\FieldSetVersion;
 use App\Models\FieldSetVersionField;
 use App\Models\Inventory;
@@ -45,11 +47,13 @@ use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PDO;
 
 /**
- * EPIC-03-F Slice 3 Phase A: Inhaltsimport 2.0.0 (operativer CLI-Import gesperrt).
+ * EPIC-03-F Slice 4 Phase A+B: Inhaltsimport 2.0.0 inkl. nachlaufender Zeiger
+ * (operativer CLI-Import weiterhin gesperrt; Phase C/Schutz fehlen).
  */
 final class MasterDataImporterV2
 {
@@ -63,7 +67,7 @@ final class MasterDataImporterV2
     public function import(string $packagePath, bool $dryRun, string $confirmDatabase): array
     {
         throw new MasterDataTransferException(
-            'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase B/C und Schutzprüfungen fehlen).',
+            'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase C und Schutzprüfungen fehlen).',
         );
     }
 
@@ -84,6 +88,25 @@ final class MasterDataImporterV2
      * @return array<string, mixed> MasterDataImportReport::toArray
      */
     public function executePhaseAForIsolatedTests(string $packagePath, bool $dryRun): array
+    {
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false);
+    }
+
+    /**
+     * Isolierte Test-/interne Ausführung von Phase A+B in einer Transaktion.
+     * Nicht für CLI/Staging.
+     *
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    public function executePhasesABForIsolatedTests(string $packagePath, bool $dryRun): array
+    {
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true);
+    }
+
+    /**
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    private function executeIsolatedPhases(string $packagePath, bool $dryRun, bool $includePhaseB): array
     {
         $this->assertIsolatedTestExecutionAllowed();
 
@@ -106,6 +129,10 @@ final class MasterDataImporterV2
         DB::enableQueryLog();
         try {
             $ops = $this->planPhaseA($package['data'], $report, $context);
+            if ($includePhaseB) {
+                $ops = array_merge($ops, $this->planPhaseB($package['data'], $report, $context));
+                $this->assertReferentialIntegrity($package['data'], $report, $context);
+            }
 
             if ($report->hasConflicts()) {
                 throw new MasterDataTransferException('Import fail-closed wegen Konflikten.', $report->conflictMessages());
@@ -142,7 +169,7 @@ final class MasterDataImporterV2
     {
         if (! app()->environment('testing')) {
             throw new MasterDataTransferException(
-                'Phase-A-Testausführung nur in APP_ENV=testing erlaubt (operativer Pfad bleibt gesperrt).',
+                'Isolierte Testausführung nur in APP_ENV=testing erlaubt (operativer Pfad bleibt gesperrt).',
             );
         }
 
@@ -155,19 +182,19 @@ final class MasterDataImporterV2
 
         if ($normalized === '') {
             throw new MasterDataTransferException(
-                'Phase-A-Testausführung abgebrochen: aktive Datenbank ist leer oder unbestimmt.',
+                'Isolierte Testausführung abgebrochen: aktive Datenbank ist leer oder unbestimmt.',
             );
         }
 
         if ($this->isForbiddenTestDatabase($normalized, $driver)) {
             throw new MasterDataTransferException(
-                'Phase-A-Testausführung gegen geschützte/operative Datenbank gesperrt: '.$normalized,
+                'Isolierte Testausführung gegen geschützte/operative Datenbank gesperrt: '.$normalized,
             );
         }
 
         if ($driver === 'mysql' && strcasecmp($normalized, 'dispo_test') !== 0) {
             throw new MasterDataTransferException(
-                'Phase-A-Testausführung unter MySQL nur gegen dispo_test erlaubt (aktiv: '.$normalized.').',
+                'Isolierte Testausführung unter MySQL nur gegen dispo_test erlaubt (aktiv: '.$normalized.').',
             );
         }
     }
@@ -2187,6 +2214,637 @@ final class MasterDataImporterV2
         }
 
         return $ops;
+    }
+
+    /**
+     * Phase B: nachlaufende Zeiger, Zuordnungen und Integrität (schreibfreie Planung).
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<callable(): void>
+     */
+    private function planPhaseB(
+        array $data,
+        MasterDataImportReport $report,
+        MasterDataImportPlanContext $context,
+    ): array {
+        $ops = [];
+        $ops = array_merge($ops, $this->planCurrentRevisionPointers($data['data/field_definitions.json'], $report, $context));
+        $ops = array_merge($ops, $this->planActiveVersionPointers($data['data/field_sets.json'], $report, $context));
+        $ops = array_merge($ops, $this->planFieldSetAssignments($data['data/field_set_assignments.json'], $report, $context));
+
+        return $ops;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
+     */
+    private function planCurrentRevisionPointers(
+        array $rows,
+        MasterDataImportReport $report,
+        MasterDataImportPlanContext $context,
+    ): array {
+        $ops = [];
+        foreach ($rows as $row) {
+            $key = (string) ($row['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            if (! array_key_exists('current_revision', $row) || $row['current_revision'] === null) {
+                continue;
+            }
+            $revision = (int) $row['current_revision'];
+            if ($revision < 1) {
+                $report->conflict('field_definition.current_revision ungültig: '.$key);
+
+                continue;
+            }
+            if (! $this->fieldDefinitionResolvable($key, $context, $report)) {
+                continue;
+            }
+            if (! $this->fieldDefinitionRevisionResolvable($key, $revision, $context, $report)) {
+                continue;
+            }
+
+            $definition = FieldDefinition::query()->where('key', $key)->first();
+            $revisionModel = $this->findFieldDefinitionRevision($key, $revision);
+
+            if ($definition === null) {
+                $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
+                $ops[] = function () use ($key, $revision): void {
+                    $this->applyCurrentRevisionPointer($key, $revision);
+                };
+
+                continue;
+            }
+
+            if ($revisionModel === null) {
+                if ($definition->current_revision_id !== null) {
+                    $existingRev = FieldDefinitionRevision::query()->find($definition->current_revision_id);
+                    if ($existingRev === null
+                        || (int) $existingRev->field_definition_id !== (int) $definition->id
+                        || (int) $existingRev->revision !== $revision) {
+                        $report->conflict('field_definition.current_revision abweichend: '.$key);
+
+                        continue;
+                    }
+                }
+                $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
+                $ops[] = function () use ($key, $revision): void {
+                    $this->applyCurrentRevisionPointer($key, $revision);
+                };
+
+                continue;
+            }
+
+            if ((int) $revisionModel->field_definition_id !== (int) $definition->id) {
+                $report->conflict('field_definition.current_revision zeigt auf fremde Revision: '.$key);
+
+                continue;
+            }
+
+            if ($definition->current_revision_id === null) {
+                $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
+                $ops[] = function () use ($definition, $revisionModel): void {
+                    $definition->forceFill(['current_revision_id' => $revisionModel->id])->save();
+                };
+
+                continue;
+            }
+
+            if ((int) $definition->current_revision_id === (int) $revisionModel->id) {
+                $report->add('field_definition_current_revision', $key, 'unchanged');
+
+                continue;
+            }
+
+            $report->conflict('field_definition.current_revision abweichend: '.$key);
+        }
+
+        return $ops;
+    }
+
+    private function applyCurrentRevisionPointer(string $definitionKey, int $revision): void
+    {
+        $definition = FieldDefinition::query()->where('key', $definitionKey)->firstOrFail();
+        $revisionModel = $this->findFieldDefinitionRevision($definitionKey, $revision);
+        if ($revisionModel === null || (int) $revisionModel->field_definition_id !== (int) $definition->id) {
+            throw new MasterDataTransferException(
+                'current_revision_id nicht auflösbar: '.$definitionKey.'|'.$revision,
+            );
+        }
+        $definition->forceFill(['current_revision_id' => $revisionModel->id])->save();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
+     */
+    private function planActiveVersionPointers(
+        array $rows,
+        MasterDataImportReport $report,
+        MasterDataImportPlanContext $context,
+    ): array {
+        $ops = [];
+        foreach ($rows as $row) {
+            $key = (string) ($row['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            if (! array_key_exists('active_version', $row) || $row['active_version'] === null) {
+                continue;
+            }
+            $version = (int) $row['active_version'];
+            if ($version < 1) {
+                $report->conflict('field_set.active_version ungültig: '.$key);
+
+                continue;
+            }
+            if (! $this->fieldSetResolvable($key, $context, $report)) {
+                continue;
+            }
+            if (! $this->fieldSetVersionResolvable($key, $version, $context, $report)) {
+                continue;
+            }
+
+            $set = FieldSet::query()->where('key', $key)->first();
+            $versionModel = $this->findFieldSetVersion($key, $version);
+
+            if ($set === null) {
+                $report->add('field_set_active_version', $key, 'update', 'version='.$version);
+                $ops[] = function () use ($key, $version): void {
+                    $this->applyActiveVersionPointer($key, $version);
+                };
+
+                continue;
+            }
+
+            if ($versionModel === null) {
+                if ($set->active_version_id !== null) {
+                    $existingVersion = FieldSetVersion::query()->find($set->active_version_id);
+                    if ($existingVersion === null
+                        || (int) $existingVersion->field_set_id !== (int) $set->id
+                        || (int) $existingVersion->version !== $version) {
+                        $report->conflict('field_set.active_version abweichend: '.$key);
+
+                        continue;
+                    }
+                }
+                $report->add('field_set_active_version', $key, 'update', 'version='.$version);
+                $ops[] = function () use ($key, $version): void {
+                    $this->applyActiveVersionPointer($key, $version);
+                };
+
+                continue;
+            }
+
+            if ((int) $versionModel->field_set_id !== (int) $set->id) {
+                $report->conflict('field_set.active_version zeigt auf fremde Version: '.$key);
+
+                continue;
+            }
+
+            if ($set->active_version_id === null) {
+                $report->add('field_set_active_version', $key, 'update', 'version='.$version);
+                $ops[] = function () use ($set, $versionModel): void {
+                    $set->forceFill(['active_version_id' => $versionModel->id])->save();
+                };
+
+                continue;
+            }
+
+            if ((int) $set->active_version_id === (int) $versionModel->id) {
+                $report->add('field_set_active_version', $key, 'unchanged');
+
+                continue;
+            }
+
+            $report->conflict('field_set.active_version abweichend: '.$key);
+        }
+
+        return $ops;
+    }
+
+    private function applyActiveVersionPointer(string $setKey, int $version): void
+    {
+        $set = FieldSet::query()->where('key', $setKey)->firstOrFail();
+        $versionModel = $this->findFieldSetVersion($setKey, $version);
+        if ($versionModel === null || (int) $versionModel->field_set_id !== (int) $set->id) {
+            throw new MasterDataTransferException(
+                'active_version_id nicht auflösbar: '.$setKey.'|'.$version,
+            );
+        }
+        $set->forceFill(['active_version_id' => $versionModel->id])->save();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<callable(): void>
+     */
+    private function planFieldSetAssignments(
+        array $rows,
+        MasterDataImportReport $report,
+        MasterDataImportPlanContext $context,
+    ): array {
+        $ops = [];
+        foreach ($rows as $row) {
+            $setKey = (string) ($row['field_set_key'] ?? '');
+            $processRaw = (string) ($row['applies_to_process'] ?? '');
+            $layerRaw = (string) ($row['target_layer'] ?? '');
+            $process = FieldAppliesTo::tryFrom($processRaw);
+            $layer = FieldSetAssignmentTargetLayer::tryFrom($layerRaw);
+            if ($setKey === '' || $process === null || $layer === null) {
+                $report->conflict('field_set_assignment Schlüssel unvollständig.');
+
+                continue;
+            }
+            if (! $this->fieldSetResolvable($setKey, $context, $report)) {
+                continue;
+            }
+
+            $categoryKey = isset($row['category_key']) && is_string($row['category_key']) ? $row['category_key'] : null;
+            $mediumCode = isset($row['medium_code']) && is_string($row['medium_code']) ? $row['medium_code'] : null;
+
+            if ($layer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+                if ($categoryKey === null || $categoryKey === '') {
+                    $report->conflict('field_set_assignment category_key fehlt.');
+
+                    continue;
+                }
+                if (! $this->categoryResolvable($categoryKey, $context, $report)) {
+                    continue;
+                }
+            } elseif ($layer === FieldSetAssignmentTargetLayer::AdvertisingMedium) {
+                if ($mediumCode === null || $mediumCode === '') {
+                    $report->conflict('field_set_assignment medium_code fehlt.');
+
+                    continue;
+                }
+                if (! $this->mediumResolvable($mediumCode, $context, $report)) {
+                    continue;
+                }
+            }
+
+            $semantic = $this->assignmentSemanticKey($setKey, $processRaw, $layer, $categoryKey, $mediumCode);
+            $payload = [
+                'target_layer' => $layer,
+                'is_active' => (bool) $row['is_active'],
+                'sort' => (int) $row['sort'],
+            ];
+
+            $matches = $this->findAssignmentsBySemantic($setKey, $process, $layer, $categoryKey, $mediumCode);
+            if ($matches->count() > 1) {
+                $report->conflict('field_set_assignment mehrdeutig: '.$semantic);
+
+                continue;
+            }
+            $existing = $matches->first();
+            if ($existing === null) {
+                $report->add('field_set_assignment', $semantic, 'create');
+                $ops[] = function () use ($setKey, $process, $layer, $categoryKey, $mediumCode, $payload): void {
+                    $this->applyFieldSetAssignmentCreate($setKey, $process, $layer, $categoryKey, $mediumCode, $payload);
+                };
+
+                continue;
+            }
+
+            $actual = [
+                'target_layer' => $existing->target_layer,
+                'is_active' => (bool) $existing->is_active,
+                'sort' => (int) $existing->sort,
+            ];
+            if ($actual['target_layer'] !== $payload['target_layer']
+                || $actual['is_active'] !== $payload['is_active']
+                || $actual['sort'] !== $payload['sort']) {
+                $report->conflict('field_set_assignment Konflikt: '.$semantic);
+
+                continue;
+            }
+            $report->add('field_set_assignment', $semantic, 'unchanged');
+        }
+
+        return $ops;
+    }
+
+    private function assignmentSemanticKey(
+        string $setKey,
+        string $process,
+        FieldSetAssignmentTargetLayer $layer,
+        ?string $categoryKey,
+        ?string $mediumCode,
+    ): string {
+        return match ($layer) {
+            FieldSetAssignmentTargetLayer::Global => $setKey.'|'.$process.'|global',
+            FieldSetAssignmentTargetLayer::AdvertisingCategory => $setKey.'|'.$process.'|category|'.($categoryKey ?? ''),
+            FieldSetAssignmentTargetLayer::AdvertisingMedium => $setKey.'|'.$process.'|medium|'.($mediumCode ?? ''),
+        };
+    }
+
+    /**
+     * @return Collection<int, FieldSetAssignment>
+     */
+    private function findAssignmentsBySemantic(
+        string $setKey,
+        FieldAppliesTo $process,
+        FieldSetAssignmentTargetLayer $layer,
+        ?string $categoryKey,
+        ?string $mediumCode,
+    ) {
+        $query = FieldSetAssignment::query()
+            ->where('applies_to_process', $process)
+            ->where('target_layer', $layer)
+            ->whereHas('fieldSet', fn ($q) => $q->where('key', $setKey));
+
+        if ($layer === FieldSetAssignmentTargetLayer::Global) {
+            $query->where('target_identity', 'g');
+        } elseif ($layer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+            $query->whereHas('advertisingCategory', fn ($q) => $q->where('key', $categoryKey));
+        } else {
+            $query->whereHas('advertisingMedium', fn ($q) => $q->where('code', $mediumCode));
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * @param  array{target_layer: FieldSetAssignmentTargetLayer, is_active: bool, sort: int}  $payload
+     */
+    private function applyFieldSetAssignmentCreate(
+        string $setKey,
+        FieldAppliesTo $process,
+        FieldSetAssignmentTargetLayer $layer,
+        ?string $categoryKey,
+        ?string $mediumCode,
+        array $payload,
+    ): void {
+        $set = FieldSet::query()->where('key', $setKey)->firstOrFail();
+        $categoryId = null;
+        $mediumId = null;
+        if ($layer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+            $categoryId = (int) AdvertisingCategory::query()->where('key', $categoryKey)->value('id');
+            if ($categoryId < 1) {
+                throw new MasterDataTransferException('Assignment-Kategorie fehlt: '.$categoryKey);
+            }
+        } elseif ($layer === FieldSetAssignmentTargetLayer::AdvertisingMedium) {
+            $mediumId = (int) AdvertisingMedium::query()->where('code', $mediumCode)->value('id');
+            if ($mediumId < 1) {
+                throw new MasterDataTransferException('Assignment-Medium fehlt: '.$mediumCode);
+            }
+        }
+
+        $identity = FieldSetAssignment::buildTargetIdentity($layer, $categoryId, $mediumId);
+        $assignment = new FieldSetAssignment;
+        $assignment->field_set_id = $set->id;
+        $assignment->target_layer = $payload['target_layer'];
+        $assignment->advertising_category_id = $categoryId;
+        $assignment->advertising_medium_id = $mediumId;
+        $assignment->target_identity = $identity;
+        $assignment->applies_to_process = $process;
+        $assignment->is_active = $payload['is_active'];
+        $assignment->sort = $payload['sort'];
+        $assignment->lock_version = 1;
+        $assignment->save();
+    }
+
+    /**
+     * Abschließende Referenz-/Integritätsprüfung über Paket + virtuelle Planung + Ziel-DB.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertReferentialIntegrity(
+        array $data,
+        MasterDataImportReport $report,
+        MasterDataImportPlanContext $context,
+    ): void {
+        $orgCount = Organization::query()->count();
+        if ($orgCount > 1) {
+            $report->conflict('Mehr als eine Organisation im Ziel — Konflikt.');
+        }
+        if ($orgCount === 0 && ! $this->packageWillCreateOrganization($data)) {
+            $report->conflict('Organisation fehlt für Inventar-Referenzen.');
+        }
+
+        foreach ($data['data/inventories.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $code = (string) ($row['code'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            $existing = Inventory::query()->where('code', $code)->first();
+            if ($existing !== null) {
+                $orgId = (int) ($existing->getAttributes()['organization_id'] ?? 0);
+                if ($orgId < 1 || ! Organization::query()->whereKey($orgId)->exists()) {
+                    $report->conflict('Inventar ohne Organisation: '.$code);
+                }
+            }
+        }
+
+        foreach ($data['data/advertising_media.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $code = (string) ($row['code'] ?? '');
+            $categoryKey = (string) ($row['category_key'] ?? '');
+            if ($code === '' || $categoryKey === '') {
+                continue;
+            }
+            $this->categoryResolvable($categoryKey, $context, $report);
+            $methodKey = $row['default_calculation_method_key'] ?? null;
+            if (is_string($methodKey) && $methodKey !== '') {
+                $this->resolveMethodId($methodKey, $context, $report);
+            }
+        }
+
+        foreach ($data['data/advertising_categories.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $methodKey = $row['default_calculation_method_key'] ?? null;
+            if (is_string($methodKey) && $methodKey !== '') {
+                $this->resolveMethodId($methodKey, $context, $report);
+            }
+        }
+
+        foreach ($data['data/inventory_medium_rules.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->inventoryResolvable((string) ($row['inventory_code'] ?? ''), $context, $report);
+            $this->mediumResolvable((string) ($row['medium_code'] ?? ''), $context, $report);
+        }
+
+        foreach ($data['data/oa_platform_medium_rules.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->platformResolvable((string) ($row['platform_code'] ?? ''), $context, $report);
+            $this->mediumResolvable((string) ($row['medium_code'] ?? ''), $context, $report);
+        }
+
+        foreach ($data['data/price_lists.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->inventoryResolvable((string) ($row['inventory_code'] ?? ''), $context, $report);
+        }
+
+        foreach ($data['data/production_price_lists.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->inventoryResolvable((string) ($row['inventory_code'] ?? ''), $context, $report);
+        }
+
+        foreach ($data['data/oa_tkp_price_lists.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $items = $row['items'] ?? [];
+            if (! is_array($items)) {
+                continue;
+            }
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $this->inventoryResolvable((string) ($item['inventory_code'] ?? ''), $context, $report);
+                $this->mediumResolvable((string) ($item['medium_code'] ?? ''), $context, $report);
+            }
+        }
+
+        foreach ($data['data/field_definition_revisions.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->fieldDefinitionResolvable((string) ($row['field_definition_key'] ?? ''), $context, $report);
+        }
+
+        foreach ($data['data/field_set_version_fields.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $setKey = (string) ($row['field_set_key'] ?? '');
+            $version = (int) ($row['version'] ?? 0);
+            $defKey = (string) ($row['field_definition_key'] ?? '');
+            $revision = (int) ($row['revision'] ?? 0);
+            $this->fieldSetVersionResolvable($setKey, $version, $context, $report);
+            $this->fieldDefinitionRevisionResolvable($defKey, $revision, $context, $report);
+
+            $link = null;
+            $setVersion = $this->findFieldSetVersion($setKey, $version);
+            $definition = FieldDefinition::query()->where('key', $defKey)->first();
+            $revisionModel = $this->findFieldDefinitionRevision($defKey, $revision);
+            if ($setVersion !== null && $definition !== null) {
+                $link = FieldSetVersionField::query()
+                    ->where('field_set_version_id', $setVersion->id)
+                    ->where('field_definition_id', $definition->id)
+                    ->first();
+            }
+            if ($link !== null) {
+                $linkedRevisionId = (int) ($link->getAttributes()['field_definition_revision_id'] ?? 0);
+                if ($linkedRevisionId < 1) {
+                    $report->conflict('field_set_version_fields.field_definition_revision_id ist NULL: '.$setKey.'|'.$version.'|'.$defKey);
+                } elseif ($revisionModel !== null
+                    && $linkedRevisionId !== (int) $revisionModel->id) {
+                    $report->conflict('field_set_version_fields Revisions-FK passt nicht zum Fachschlüssel: '.$setKey.'|'.$version.'|'.$defKey);
+                } elseif ($revisionModel !== null
+                    && (int) $revisionModel->field_definition_id !== (int) $definition->id) {
+                    $report->conflict('field_set_version_fields Revision gehört nicht zur Definition: '.$defKey);
+                }
+            }
+        }
+
+        foreach ($data['data/field_rules.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $this->fieldSetVersionResolvable(
+                (string) ($row['field_set_key'] ?? ''),
+                (int) ($row['version'] ?? 0),
+                $context,
+                $report,
+            );
+        }
+
+        foreach ($data['data/field_definitions.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $key = (string) ($row['key'] ?? '');
+            if ($key === '' || ! array_key_exists('current_revision', $row) || $row['current_revision'] === null) {
+                continue;
+            }
+            $revision = (int) $row['current_revision'];
+            $definition = FieldDefinition::query()->where('key', $key)->first();
+            $revisionModel = $this->findFieldDefinitionRevision($key, $revision);
+            if ($definition !== null && $definition->current_revision_id !== null) {
+                $current = FieldDefinitionRevision::query()->find($definition->current_revision_id);
+                if ($current === null || (int) $current->field_definition_id !== (int) $definition->id) {
+                    $report->conflict('current_revision_id ungültig nach Planung: '.$key);
+                }
+            }
+            if ($revisionModel !== null && $definition !== null
+                && (int) $revisionModel->field_definition_id !== (int) $definition->id) {
+                $report->conflict('current_revision zeigt auf fremde Revision: '.$key);
+            }
+            if ($revisionModel === null
+                && ! $context->willHaveFieldDefinitionRevision($key, $revision)
+                && ! $context->packageHasFieldDefinitionRevision($key, $revision)) {
+                $report->conflict('current_revision ohne Zielrevision: '.$key.'|'.$revision);
+            }
+        }
+
+        foreach ($data['data/field_sets.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $key = (string) ($row['key'] ?? '');
+            if ($key === '' || ! array_key_exists('active_version', $row) || $row['active_version'] === null) {
+                continue;
+            }
+            $version = (int) $row['active_version'];
+            $set = FieldSet::query()->where('key', $key)->first();
+            $versionModel = $this->findFieldSetVersion($key, $version);
+            if ($set !== null && $set->active_version_id !== null) {
+                $current = FieldSetVersion::query()->find($set->active_version_id);
+                if ($current === null || (int) $current->field_set_id !== (int) $set->id) {
+                    $report->conflict('active_version_id ungültig nach Planung: '.$key);
+                }
+            }
+            if ($versionModel !== null && $set !== null
+                && (int) $versionModel->field_set_id !== (int) $set->id) {
+                $report->conflict('active_version zeigt auf fremde Version: '.$key);
+            }
+            if ($versionModel === null && ! $context->willHaveFieldSetVersion($key, $version)) {
+                $report->conflict('active_version ohne Zielversion: '.$key.'|'.$version);
+            }
+        }
+
+        foreach ($data['data/field_set_assignments.json'] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $setKey = (string) ($row['field_set_key'] ?? '');
+            $this->fieldSetResolvable($setKey, $context, $report);
+            $layer = FieldSetAssignmentTargetLayer::tryFrom((string) ($row['target_layer'] ?? ''));
+            if ($layer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+                $this->categoryResolvable((string) ($row['category_key'] ?? ''), $context, $report);
+            } elseif ($layer === FieldSetAssignmentTargetLayer::AdvertisingMedium) {
+                $this->mediumResolvable((string) ($row['medium_code'] ?? ''), $context, $report);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function packageWillCreateOrganization(array $data): bool
+    {
+        $org = $data['data/organization.json'] ?? null;
+
+        return is_array($org) && isset($org['name']) && is_string($org['name']) && $org['name'] !== '';
     }
 
     /**
