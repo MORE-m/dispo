@@ -30,6 +30,8 @@ use App\Models\PriceList;
 use App\Models\ProductionPriceList;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
+use App\Services\MasterDataTransfer\Support\MasterDataExportReadSnapshot;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Support\Collection;
 
@@ -52,7 +54,7 @@ final class MasterDataExporterV2
      */
     public function export(string $packagePath, ?string $gitSha = null): array
     {
-        $payload = $this->buildPayload();
+        $payload = MasterDataExportReadSnapshot::run(fn (): array => $this->buildPayload());
         $manifest = [
             'format' => MasterDataTransferContractV2::FORMAT,
             'schema_version' => MasterDataTransferContractV2::SCHEMA_VERSION,
@@ -93,7 +95,8 @@ final class MasterDataExporterV2
      */
     private function buildPayload(): array
     {
-        $organizations = Organization::query()->orderBy('id')->get();
+        // Lesereihenfolge bewusst nicht kanonisch: finale Sortierung erfolgt über Fachschlüssel.
+        $organizations = Organization::query()->get();
         if ($organizations->count() !== 1) {
             throw new MasterDataTransferException(
                 'Export 2.0.0 erwartet genau eine Organisation.',
@@ -103,109 +106,46 @@ final class MasterDataExporterV2
         /** @var Organization $organization */
         $organization = $organizations->first();
 
-        $methods = CalculationMethod::query()->orderBy('key')->get();
+        $methods = CalculationMethod::query()->get();
         $methodById = $methods->keyBy('id');
 
-        $categories = AdvertisingCategory::query()->orderBy('key')->get();
+        $categories = AdvertisingCategory::query()->get();
         $categoryById = $categories->keyBy('id');
 
-        $media = AdvertisingMedium::query()->orderBy('code')->get();
+        $media = AdvertisingMedium::query()->get();
         $mediaById = $media->keyBy('id');
 
-        $inventories = Inventory::query()->orderBy('code')->get();
+        $inventories = Inventory::query()->get();
         $inventoryById = $inventories->keyBy('id');
 
-        $categoryMethods = AdvertisingCategoryCalculationMethod::query()
-            ->orderBy('advertising_category_id')
-            ->orderBy('calculation_method_id')
-            ->get();
+        $categoryMethods = AdvertisingCategoryCalculationMethod::query()->get();
+        $mediumMethods = AdvertisingMediumCalculationMethod::query()->get();
+        $rules = InventoryMediumRule::query()->get();
+        $priceLists = PriceList::query()->with('items')->get();
+        $productionLists = ProductionPriceList::query()->get();
 
-        $mediumMethods = AdvertisingMediumCalculationMethod::query()
-            ->orderBy('advertising_medium_id')
-            ->orderBy('calculation_method_id')
-            ->get();
-
-        $rules = InventoryMediumRule::query()
-            ->orderBy('inventory_id')
-            ->orderBy('advertising_medium_id')
-            ->get();
-
-        $priceLists = PriceList::query()
-            ->with(['items' => fn ($q) => $q->orderBy('day_group')->orderBy('hour')])
-            ->orderBy('inventory_id')
-            ->orderBy('year')
-            ->orderBy('revision_number')
-            ->get();
-
-        $productionLists = ProductionPriceList::query()
-            ->orderBy('inventory_id')
-            ->orderBy('production_type')
-            ->orderBy('year')
-            ->orderBy('revision_number')
-            ->get();
-
-        $oaPlatforms = OaPlatform::query()->orderBy('code')->get();
+        $oaPlatforms = OaPlatform::query()->get();
         $oaPlatformById = $oaPlatforms->keyBy('id');
+        $oaPlatformRules = OaPlatformMediumRule::query()->get();
+        $oaTargeting = OaTargetingDefinition::query()->get();
+        $oaTkpLists = OaTkpPriceList::query()->with('items')->get();
+        $oaAdserver = OaAdserverSurcharge::query()->get();
 
-        $oaPlatformRules = OaPlatformMediumRule::query()
-            ->orderBy('oa_platform_id')
-            ->orderBy('advertising_medium_id')
-            ->get();
-
-        $oaTargeting = OaTargetingDefinition::query()
-            ->orderBy('code')
-            ->orderBy('revision_number')
-            ->get();
-
-        $oaTkpLists = OaTkpPriceList::query()
-            ->with(['items' => fn ($q) => $q
-                ->orderBy('inventory_id')
-                ->orderBy('advertising_medium_id')])
-            ->orderBy('year')
-            ->orderBy('revision_number')
-            ->get();
-
-        $oaAdserver = OaAdserverSurcharge::query()
-            ->orderBy('code')
-            ->orderBy('revision_number')
-            ->get();
-
-        $fieldDefinitions = FieldDefinition::query()->orderBy('key')->get();
+        $fieldDefinitions = FieldDefinition::query()->get();
         $fieldDefinitionById = $fieldDefinitions->keyBy('id');
 
-        $fieldRevisions = FieldDefinitionRevision::query()
-            ->with(['options' => fn ($q) => $q->orderBy('sort')->orderBy('key')])
-            ->orderBy('field_definition_id')
-            ->orderBy('revision')
-            ->get();
+        $fieldRevisions = FieldDefinitionRevision::query()->with('options')->get();
         $fieldRevisionById = $fieldRevisions->keyBy('id');
 
-        $fieldSets = FieldSet::query()->orderBy('key')->get();
+        $fieldSets = FieldSet::query()->get();
         $fieldSetById = $fieldSets->keyBy('id');
 
-        $fieldSetVersions = FieldSetVersion::query()
-            ->orderBy('field_set_id')
-            ->orderBy('version')
-            ->get();
+        $fieldSetVersions = FieldSetVersion::query()->get();
         $fieldSetVersionById = $fieldSetVersions->keyBy('id');
 
-        $fieldSetVersionFields = FieldSetVersionField::query()
-            ->orderBy('field_set_version_id')
-            ->orderBy('sort')
-            ->orderBy('field_definition_id')
-            ->get();
-
-        $fieldRules = FieldRule::query()
-            ->orderBy('field_set_version_id')
-            ->orderBy('sort')
-            ->get();
-
-        $fieldAssignments = FieldSetAssignment::query()
-            ->orderBy('field_set_id')
-            ->orderBy('applies_to_process')
-            ->orderBy('target_layer')
-            ->orderBy('sort')
-            ->get();
+        $fieldSetVersionFields = FieldSetVersionField::query()->get();
+        $fieldRules = FieldRule::query()->get();
+        $fieldAssignments = FieldSetAssignment::query()->get();
 
         $files = [
             'data/organization.json' => [
@@ -330,9 +270,10 @@ final class MasterDataExporterV2
                         'default_length_seconds' => $rule->default_length_seconds === null
                             ? null
                             : (int) $rule->default_length_seconds,
-                        'surcharge_percent' => $rule->surcharge_percent === null
-                            ? null
-                            : $this->decimalString($rule->surcharge_percent),
+                        'surcharge_percent' => MasterDataExportDecimal::canonicalizeNullable(
+                            $this->rawDecimalAttribute($rule, 'surcharge_percent'),
+                            MasterDataExportDecimal::PRICE_SCALE,
+                        ),
                         'is_discountable' => (bool) $rule->is_discountable,
                         'is_ae_eligible' => (bool) $rule->is_ae_eligible,
                         'component_calculation_strategy' => $rule->component_calculation_strategy->value,
@@ -345,20 +286,22 @@ final class MasterDataExporterV2
                 if ($inventory === null) {
                     throw new MasterDataTransferException('Spotpreisliste ohne Inventar.');
                 }
-                $items = $list->items
-                    ->sortBy(fn ($item) => sprintf('%s|%03d', $item->day_group->value, (int) $item->hour))
-                    ->values()
-                    ->map(function ($item): array {
+                $items = $this->sortByBusinessKeys(
+                    $list->items->map(function ($item): array {
                         /** @var DayGroup $dayGroup */
                         $dayGroup = $item->day_group;
 
                         return [
                             'hour' => (int) $item->hour,
                             'day_group' => $dayGroup->value,
-                            'second_price' => $this->decimalString($item->second_price),
+                            'second_price' => MasterDataExportDecimal::canonicalize(
+                                $this->rawDecimalAttribute($item, 'second_price'),
+                                MasterDataExportDecimal::PRICE_SCALE,
+                            ),
                         ];
-                    })
-                    ->all();
+                    })->all(),
+                    ['day_group', 'hour'],
+                );
 
                 return [
                     'inventory_code' => $inventory->code,
@@ -388,7 +331,10 @@ final class MasterDataExporterV2
                         'version' => (string) $list->version,
                         'source_status' => $list->status->value,
                         'import_status' => 'draft',
-                        'unit_price' => $this->decimalString($list->unit_price),
+                        'unit_price' => MasterDataExportDecimal::canonicalize(
+                            $this->rawDecimalAttribute($list, 'unit_price'),
+                            MasterDataExportDecimal::MONEY_SCALE,
+                        ),
                         'is_discountable' => (bool) $list->is_discountable,
                         'is_ae_eligible' => (bool) $list->is_ae_eligible,
                     ];
@@ -421,8 +367,14 @@ final class MasterDataExporterV2
                 'revision_number' => (int) $row->revision_number,
                 'name' => $row->name,
                 'category' => $row->category->value,
-                'tkp_surcharge' => $this->decimalString($row->tkp_surcharge),
-                'minimum_tkp_surcharge' => $this->decimalString($row->minimum_tkp_surcharge),
+                'tkp_surcharge' => MasterDataExportDecimal::canonicalize(
+                    $this->rawDecimalAttribute($row, 'tkp_surcharge'),
+                    MasterDataExportDecimal::PRICE_SCALE,
+                ),
+                'minimum_tkp_surcharge' => MasterDataExportDecimal::canonicalize(
+                    $this->rawDecimalAttribute($row, 'minimum_tkp_surcharge'),
+                    MasterDataExportDecimal::PRICE_SCALE,
+                ),
                 'is_active' => (bool) $row->is_active,
                 'valid_from' => $row->valid_from?->toDateString(),
                 'valid_to' => $row->valid_to?->toDateString(),
@@ -439,13 +391,18 @@ final class MasterDataExporterV2
                         return [
                             'inventory_code' => $inventory->code,
                             'medium_code' => $medium->code,
-                            'list_tkp' => $this->decimalString($item->list_tkp),
-                            'minimum_tkp' => $this->decimalString($item->minimum_tkp),
+                            'list_tkp' => MasterDataExportDecimal::canonicalize(
+                                $this->rawDecimalAttribute($item, 'list_tkp'),
+                                MasterDataExportDecimal::PRICE_SCALE,
+                            ),
+                            'minimum_tkp' => MasterDataExportDecimal::canonicalize(
+                                $this->rawDecimalAttribute($item, 'minimum_tkp'),
+                                MasterDataExportDecimal::PRICE_SCALE,
+                            ),
                         ];
                     })
-                    ->sortBy(fn (array $item) => $item['inventory_code'].'|'.$item['medium_code'])
-                    ->values()
                     ->all();
+                $items = $this->sortByBusinessKeys($items, ['inventory_code', 'medium_code']);
 
                 return [
                     'year' => (int) $list->year,
@@ -462,7 +419,10 @@ final class MasterDataExporterV2
                 'code' => $row->code,
                 'revision_number' => (int) $row->revision_number,
                 'name' => $row->name,
-                'tkp_amount' => $this->decimalString($row->tkp_amount),
+                'tkp_amount' => MasterDataExportDecimal::canonicalize(
+                    $this->rawDecimalAttribute($row, 'tkp_amount'),
+                    MasterDataExportDecimal::PRICE_SCALE,
+                ),
                 'is_active' => (bool) $row->is_active,
                 'scope_json' => $row->scope_json,
                 'valid_from' => $row->valid_from?->toDateString(),
@@ -625,6 +585,8 @@ final class MasterDataExporterV2
             )->values()->all(),
         ];
 
+        $files = $this->sortExportFilesByBusinessKeys($files);
+
         $counts = [];
         foreach (MasterDataTransferContractV2::DATA_FILES as $relative) {
             $payload = $files[$relative];
@@ -642,6 +604,123 @@ final class MasterDataExporterV2
                 'oa_tkp' => $this->statusSummary($oaTkpLists),
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $files
+     * @return array<string, mixed>
+     */
+    private function sortExportFilesByBusinessKeys(array $files): array
+    {
+        $files['data/calculation_methods.json'] = $this->sortByBusinessKeys(
+            $files['data/calculation_methods.json'],
+            ['key'],
+        );
+        $files['data/advertising_categories.json'] = $this->sortByBusinessKeys(
+            $files['data/advertising_categories.json'],
+            ['key'],
+        );
+        $files['data/advertising_media.json'] = $this->sortByBusinessKeys(
+            $files['data/advertising_media.json'],
+            ['code'],
+        );
+        $files['data/advertising_category_calculation_methods.json'] = $this->sortByBusinessKeys(
+            $files['data/advertising_category_calculation_methods.json'],
+            ['category_key', 'method_key'],
+        );
+        $files['data/advertising_medium_calculation_methods.json'] = $this->sortByBusinessKeys(
+            $files['data/advertising_medium_calculation_methods.json'],
+            ['medium_code', 'method_key'],
+        );
+        $files['data/inventories.json'] = $this->sortByBusinessKeys(
+            $files['data/inventories.json'],
+            ['code'],
+        );
+        $files['data/inventory_medium_rules.json'] = $this->sortByBusinessKeys(
+            $files['data/inventory_medium_rules.json'],
+            ['inventory_code', 'medium_code'],
+        );
+        $files['data/price_lists.json'] = $this->sortByBusinessKeys(
+            $files['data/price_lists.json'],
+            ['inventory_code', 'year', 'revision_number'],
+        );
+        $files['data/production_price_lists.json'] = $this->sortByBusinessKeys(
+            $files['data/production_price_lists.json'],
+            ['inventory_code', 'production_type', 'year', 'revision_number'],
+        );
+        $files['data/oa_platforms.json'] = $this->sortByBusinessKeys(
+            $files['data/oa_platforms.json'],
+            ['code'],
+        );
+        $files['data/oa_platform_medium_rules.json'] = $this->sortByBusinessKeys(
+            $files['data/oa_platform_medium_rules.json'],
+            ['platform_code', 'medium_code'],
+        );
+        $files['data/oa_targeting_definitions.json'] = $this->sortByBusinessKeys(
+            $files['data/oa_targeting_definitions.json'],
+            ['code', 'revision_number'],
+        );
+        $files['data/oa_tkp_price_lists.json'] = $this->sortByBusinessKeys(
+            $files['data/oa_tkp_price_lists.json'],
+            ['year', 'revision_number'],
+        );
+        $files['data/oa_adserver_surcharges.json'] = $this->sortByBusinessKeys(
+            $files['data/oa_adserver_surcharges.json'],
+            ['code', 'revision_number'],
+        );
+        $files['data/field_definitions.json'] = $this->sortByBusinessKeys(
+            $files['data/field_definitions.json'],
+            ['key'],
+        );
+        $files['data/field_definition_revisions.json'] = $this->sortByBusinessKeys(
+            $files['data/field_definition_revisions.json'],
+            ['field_definition_key', 'revision'],
+        );
+        $files['data/field_definition_revision_options.json'] = $this->sortByBusinessKeys(
+            $files['data/field_definition_revision_options.json'],
+            ['field_definition_key', 'revision', 'sort', 'key'],
+        );
+        $files['data/field_sets.json'] = $this->sortByBusinessKeys(
+            $files['data/field_sets.json'],
+            ['key'],
+        );
+        $files['data/field_set_versions.json'] = $this->sortByBusinessKeys(
+            $files['data/field_set_versions.json'],
+            ['field_set_key', 'version'],
+        );
+        $files['data/field_set_version_fields.json'] = $this->sortByBusinessKeys(
+            $files['data/field_set_version_fields.json'],
+            ['field_set_key', 'version', 'sort', 'field_definition_key', 'revision'],
+        );
+        // field_rules: bereits in exportFieldRules nach Fachschlüsseln + kanonischem JSON sortiert.
+        $files['data/field_set_assignments.json'] = $this->sortByBusinessKeys(
+            $files['data/field_set_assignments.json'],
+            ['field_set_key', 'applies_to_process', 'target_layer', 'category_key', 'medium_code', 'sort'],
+        );
+
+        return $files;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  list<string>  $keys
+     * @return array<int, array<string, mixed>>
+     */
+    private function sortByBusinessKeys(array $rows, array $keys): array
+    {
+        $rows = array_values($rows);
+        usort($rows, function (array $left, array $right) use ($keys): int {
+            $a = [];
+            $b = [];
+            foreach ($keys as $key) {
+                $a[] = $left[$key] ?? null;
+                $b[] = $right[$key] ?? null;
+            }
+
+            return $a <=> $b;
+        });
+
+        return $rows;
     }
 
     /**
@@ -748,16 +827,19 @@ final class MasterDataExporterV2
         ];
     }
 
-    private function decimalString(mixed $value): string
+    /**
+     * Liest Dezimal-Rohwerte ohne Eloquent-decimal-Cast (vermeidet PHP-Float).
+     */
+    private function rawDecimalAttribute(object $model, string $attribute): mixed
     {
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
+        if (method_exists($model, 'getAttributes')) {
+            /** @var array<string, mixed> $attributes */
+            $attributes = $model->getAttributes();
+
+            return $attributes[$attribute] ?? null;
         }
 
-        return (string) $value;
+        return $model->{$attribute} ?? null;
     }
 
     /**

@@ -46,6 +46,7 @@ use App\Services\MasterDataTransfer\Export\MasterDataExporterV2;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -398,6 +399,136 @@ class MasterDataTransferExporterV2Test extends TestCase
         $targeting = $loaded['data']['data/oa_targeting_definitions.json'][0];
         $this->assertArrayHasKey('minimum_tkp_surcharge', $targeting);
         $this->assertArrayHasKey('revision_number', $targeting);
+    }
+
+    #[Test]
+    public function identical_business_content_with_different_insert_order_matches_checksums(): void
+    {
+        $pathA = $this->tmp.'/order-a';
+        $this->seedOrderSensitiveCatalog(reverseInsertOrder: true);
+        app(MasterDataExporterV2::class)->export($pathA, 'same-sha');
+        $idsA = Inventory::query()->orderBy('code')->pluck('id', 'code')->all();
+
+        $this->wipeOrderSensitiveCatalog();
+        $pathB = $this->tmp.'/order-b';
+        $this->seedOrderSensitiveCatalog(reverseInsertOrder: false);
+        app(MasterDataExporterV2::class)->export($pathB, 'same-sha');
+        $idsB = Inventory::query()->orderBy('code')->pluck('id', 'code')->all();
+
+        $this->assertNotSame($idsA['inv_order_a'], $idsB['inv_order_a']);
+        $this->assertNotSame($idsA['inv_order_z'], $idsB['inv_order_z']);
+        $this->assertTrue($idsA['inv_order_z'] < $idsA['inv_order_a']);
+        $this->assertTrue($idsB['inv_order_a'] < $idsB['inv_order_z']);
+
+        foreach ([
+            'data/inventories.json',
+            'data/inventory_medium_rules.json',
+            'data/price_lists.json',
+            'data/oa_platforms.json',
+            'data/oa_targeting_definitions.json',
+            'checksums.sha256',
+        ] as $relative) {
+            $this->assertSame(
+                File::get($pathA.'/'.$relative),
+                File::get($pathB.'/'.$relative),
+                $relative,
+            );
+        }
+
+        $inventories = json_decode(File::get($pathA.'/data/inventories.json'), true);
+        $this->assertSame(['inv_order_a', 'inv_order_z'], array_column($inventories, 'code'));
+    }
+
+    #[Test]
+    public function export_canonicalizes_decimal_scales(): void
+    {
+        $this->seedMinimalOrganizationCatalog();
+        $orgId = (int) Organization::query()->value('id');
+        $medium = AdvertisingMedium::query()->firstOrFail();
+        $inventory = Inventory::factory()->create([
+            'organization_id' => $orgId,
+            'code' => 'inv_decimal',
+            'name' => 'Decimal Inv',
+            'type' => InventoryType::Sender,
+            'is_active' => true,
+            'sort' => 1,
+        ]);
+        InventoryMediumRule::query()->create([
+            'inventory_id' => $inventory->id,
+            'advertising_medium_id' => $medium->id,
+            'is_active' => true,
+            'booking_code' => null,
+            'planning_responsibility_key' => null,
+            'hint_text' => null,
+            'sort' => 1,
+            'default_length_seconds' => null,
+            'surcharge_percent' => '12.5',
+            'is_discountable' => true,
+            'is_ae_eligible' => true,
+            'component_calculation_strategy' => ComponentCalculationStrategy::Individual,
+            'swf_allonge_confirmed_at' => null,
+        ]);
+        $list = PriceList::factory()->create([
+            'inventory_id' => $inventory->id,
+            'year' => 2026,
+            'revision_number' => 1,
+            'version' => '2026.1',
+            'status' => PriceListStatus::Active,
+            'valid_from' => '2026-01-01',
+        ]);
+        PriceListItem::factory()->create([
+            'price_list_id' => $list->id,
+            'hour' => 6,
+            'day_group' => DayGroup::MoFr,
+            'second_price' => '2.5',
+        ]);
+        ProductionPriceList::factory()->create([
+            'inventory_id' => $inventory->id,
+            'production_type' => ProductionType::SpotProduction,
+            'year' => 2026,
+            'revision_number' => 1,
+            'version' => '2026.1',
+            'status' => PriceListStatus::Active,
+            'unit_price' => '600',
+            'is_discountable' => false,
+            'is_ae_eligible' => false,
+        ]);
+        OaTargetingDefinition::query()->create([
+            'code' => 'dec_geo',
+            'name' => 'Dec Geo',
+            'category' => OaTargetingCategory::Technisch,
+            'tkp_surcharge' => '1.5',
+            'minimum_tkp_surcharge' => '0',
+            'revision_number' => 1,
+            'is_active' => true,
+            'valid_from' => null,
+            'valid_to' => null,
+        ]);
+
+        $loaded = app(MasterDataPackage::class)->load(
+            app(MasterDataExporterV2::class)->export($this->tmp.'/decimals', 'sha')['package_path'],
+        );
+
+        $this->assertSame(
+            MasterDataExportDecimal::canonicalize('12.5'),
+            collect($loaded['data']['data/inventory_medium_rules.json'])->first()['surcharge_percent'],
+        );
+        $this->assertSame(
+            '2.5000',
+            $loaded['data']['data/price_lists.json'][0]['items'][0]['second_price'],
+        );
+        $this->assertSame(
+            '600.00',
+            $loaded['data']['data/production_price_lists.json'][0]['unit_price'],
+        );
+        $this->assertSame(
+            '1.5000',
+            $loaded['data']['data/oa_targeting_definitions.json'][0]['tkp_surcharge'],
+        );
+        $this->assertSame(
+            '0.0000',
+            $loaded['data']['data/oa_targeting_definitions.json'][0]['minimum_tkp_surcharge'],
+        );
     }
 
     /**
@@ -783,5 +914,112 @@ class MasterDataTransferExporterV2Test extends TestCase
         }
 
         unset($method);
+    }
+
+    private function seedOrderSensitiveCatalog(bool $reverseInsertOrder): void
+    {
+        $this->seedMinimalOrganizationCatalog();
+        $orgId = (int) Organization::query()->value('id');
+        $medium = AdvertisingMedium::query()->where('code', 'spot_classic')->firstOrFail();
+
+        $specs = [
+            ['code' => 'inv_order_a', 'name' => 'Order A', 'sort' => 1],
+            ['code' => 'inv_order_z', 'name' => 'Order Z', 'sort' => 2],
+        ];
+        if ($reverseInsertOrder) {
+            $specs = array_reverse($specs);
+        }
+
+        foreach ($specs as $spec) {
+            $inventory = Inventory::factory()->create([
+                'organization_id' => $orgId,
+                'code' => $spec['code'],
+                'name' => $spec['name'],
+                'type' => InventoryType::Sender,
+                'is_active' => true,
+                'sort' => $spec['sort'],
+            ]);
+            InventoryMediumRule::query()->create([
+                'inventory_id' => $inventory->id,
+                'advertising_medium_id' => $medium->id,
+                'is_active' => true,
+                'booking_code' => $spec['code'],
+                'planning_responsibility_key' => null,
+                'hint_text' => null,
+                'sort' => $spec['sort'],
+                'default_length_seconds' => 30,
+                'surcharge_percent' => null,
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'component_calculation_strategy' => ComponentCalculationStrategy::Individual,
+                'swf_allonge_confirmed_at' => null,
+            ]);
+            $list = PriceList::factory()->create([
+                'inventory_id' => $inventory->id,
+                'year' => 2026,
+                'revision_number' => 1,
+                'version' => '2026.1',
+                'status' => PriceListStatus::Active,
+                'valid_from' => '2026-01-01',
+                'name' => $spec['name'].' PL',
+            ]);
+            PriceListItem::factory()->create([
+                'price_list_id' => $list->id,
+                'hour' => 8,
+                'day_group' => DayGroup::MoFr,
+                'second_price' => '1.2500',
+            ]);
+        }
+
+        $platformSpecs = [
+            ['code' => 'plat_a', 'name' => 'Plat A', 'sort' => 1],
+            ['code' => 'plat_z', 'name' => 'Plat Z', 'sort' => 2],
+        ];
+        if ($reverseInsertOrder) {
+            $platformSpecs = array_reverse($platformSpecs);
+        }
+        foreach ($platformSpecs as $platform) {
+            OaPlatform::query()->create([
+                'code' => $platform['code'],
+                'name' => $platform['name'],
+                'is_active' => true,
+                'sort' => $platform['sort'],
+                'is_adserver_relevant' => false,
+            ]);
+        }
+
+        $targetingSpecs = [
+            ['code' => 'tgt_a', 'revision_number' => 1, 'name' => 'Tgt A'],
+            ['code' => 'tgt_z', 'revision_number' => 1, 'name' => 'Tgt Z'],
+        ];
+        if ($reverseInsertOrder) {
+            $targetingSpecs = array_reverse($targetingSpecs);
+        }
+        foreach ($targetingSpecs as $targeting) {
+            OaTargetingDefinition::query()->create([
+                'code' => $targeting['code'],
+                'name' => $targeting['name'],
+                'category' => OaTargetingCategory::Technisch,
+                'tkp_surcharge' => '1.0000',
+                'minimum_tkp_surcharge' => '0.5000',
+                'revision_number' => $targeting['revision_number'],
+                'is_active' => true,
+                'valid_from' => null,
+                'valid_to' => null,
+            ]);
+        }
+    }
+
+    private function wipeOrderSensitiveCatalog(): void
+    {
+        PriceListItem::query()->delete();
+        PriceList::query()->delete();
+        InventoryMediumRule::query()->whereIn(
+            'inventory_id',
+            Inventory::query()->whereIn('code', ['inv_order_a', 'inv_order_z'])->pluck('id'),
+        )->delete();
+        Inventory::query()->whereIn('code', ['inv_order_a', 'inv_order_z'])->delete();
+        OaPlatform::query()->whereIn('code', ['plat_a', 'plat_z'])->delete();
+        OaTargetingDefinition::query()->whereIn('code', ['tgt_a', 'tgt_z'])->delete();
     }
 }
