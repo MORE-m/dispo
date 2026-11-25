@@ -259,18 +259,29 @@ Ohne GO → **STOP**. Mehrere parallele Dry-Runs gegen Staging sind nicht vorges
 ```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --dry-run \
-  --confirm-database=spn26jz7_dispo_staging
+  --confirm-database=spn26jz7_dispo_staging \
+  --require-package-sha256=<HEX>
 ```
 
-### OFFEN (Slice 6a) – kritisch
+### VORHANDEN (Slice 6a) – Dry-Run
 
-Im aktuellen `main` gilt:
+Im aktuellen Stand (nach Slice 6a) gilt:
 
-- `ImportMasterDataCommand` erkennt `schema_version=2.0.0` und **bricht ab** mit: Import operativ nicht freigegeben.
-- `MasterDataImporterV2::import()` wirft dieselbe Sperre.
-- Phasen A–C sind nur über isolierte Test-Hooks ausführbar, nicht über CLI.
+- `ImportMasterDataCommand` erkennt `schema_version=2.0.0` und routet `--dry-run` an `MasterDataImporterV2::dryRunOperational()`.
+- Pflicht: `--confirm-database=spn26jz7_dispo_staging` und `--require-package-sha256=<64-hex>`.
+- `--apply` und `--apply-price-status` bleiben für `2.0.0` gesperrt (Slice 6b / 7).
+- Isolierte Test-Hooks (`executePhasesABCForIsolatedTests`) bleiben getrennt und unverändert fail-closed.
 
-Erst nach **Slice-6a**-Freigabe ist der obige Dry-Run-Befehl für `2.0.0` zulässig. Slice 6b (Apply) und Slice 7 (Status) sind dafür **nicht** erforderlich. Bis 6a ist der Befehl hier nur als **Zielvertrag** dokumentiert.
+Beispiel (nach Export und PO-GO; `<HEX>` = `MasterDataPackage::computePackageSha256`):
+
+```bash
+php artisan dispo:import-master-data <PAKET_DIR> \
+  --dry-run \
+  --confirm-database=spn26jz7_dispo_staging \
+  --require-package-sha256=<HEX>
+```
+
+Auch den früheren Zielbefehl in Schritt 9 um `--require-package-sha256` ergänzen.
 
 ### Bericht auswerten
 
