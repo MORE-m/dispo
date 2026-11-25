@@ -75,21 +75,24 @@ final class SwfLengthMediumOverrideEnsurer
 
         $before = $this->snapshot($medium, $assignments);
 
-        $hasAverage = $assignments->contains(
+        $hasAverageExact = $assignments->contains(
             fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $average->id
                 && $row->engine_profile_key === $engineProfile
-                && (bool) $row->is_active,
+                && (bool) $row->is_active
+                && (int) $row->sort === 10,
         );
-        $hasCalendar = $assignments->contains(
+        $hasCalendarExact = $assignments->contains(
             fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $calendar->id
                 && $row->engine_profile_key === $engineProfile
-                && (bool) $row->is_active,
+                && (bool) $row->is_active
+                && (int) $row->sort === 20,
         );
 
+        // Strikter Sollzustand: genau Average@10 + Calendar@20, Default average, Override, keine Extra-Zeilen.
         $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
             && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $hasAverage
-            && $hasCalendar
+            && $hasAverageExact
+            && $hasCalendarExact
             && $assignments->count() === 2;
 
         if ($matches) {
@@ -106,10 +109,11 @@ final class SwfLengthMediumOverrideEnsurer
             && $medium->default_calculation_method_id === null
             && $assignments->isEmpty();
 
+        // Bekannter Migrations-Vorzustand: nur Average mit sort=10 am Soll-Profil.
         $canUpgradeAverageOnly = $medium->calculation_method_mode === CalculationMethodMode::Override
             && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $hasAverage
-            && ! $hasCalendar
+            && $hasAverageExact
+            && ! $hasCalendarExact
             && $assignments->count() === 1;
 
         if (! $canInstallFresh && ! $canUpgradeAverageOnly) {

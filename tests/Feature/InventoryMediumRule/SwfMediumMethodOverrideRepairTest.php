@@ -194,13 +194,17 @@ class SwfMediumMethodOverrideRepairTest extends TestCase
         $exit = Artisan::call('dispo:repair-swf-method-overrides', [
             '--dry-run' => true,
             '--confirm-database' => $db,
+            '--report-dir' => $this->tmp,
         ]);
 
         $this->assertSame(0, $exit);
         $this->assertSame($beforeAllonge, $this->mediumFingerprint('allonge'));
         $this->assertSame($beforePromo, $this->mediumFingerprint('promo_moderation'));
         $this->assertSame($mmBefore, AdvertisingMediumCalculationMethod::query()->count());
-        $this->assertStringContainsString('PASS', Artisan::output());
+        $output = Artisan::output();
+        $this->assertStringContainsString('PASS', $output);
+        $this->assertStringContainsString('Report persistiert:', $output);
+        $this->assertNotEmpty(glob($this->tmp.'/swf-method-override-repair-*.json'));
     }
 
     #[Test]
@@ -212,11 +216,143 @@ class SwfMediumMethodOverrideRepairTest extends TestCase
         $exit = Artisan::call('dispo:repair-swf-method-overrides', [
             '--dry-run' => true,
             '--confirm-database' => 'definitely-not-the-active-db',
+            '--report-dir' => $this->tmp,
         ]);
 
         $this->assertSame(1, $exit);
         $this->assertStringContainsString('STOP', Artisan::output());
         $this->assertSame($before, AdvertisingMediumCalculationMethod::query()->count());
+    }
+
+    #[Test]
+    public function production_env_is_forbidden(): void
+    {
+        $this->seedBrokenSwfOverrides();
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        $previous = $this->app['env'];
+        $this->app['env'] = 'production';
+
+        try {
+            $exit = Artisan::call('dispo:repair-swf-method-overrides', [
+                '--dry-run' => true,
+                '--confirm-database' => $db,
+                '--report-dir' => $this->tmp,
+            ]);
+        } finally {
+            $this->app['env'] = $previous;
+        }
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('Produktion', Artisan::output());
+    }
+
+    #[Test]
+    public function local_env_rejects_non_allowlisted_database(): void
+    {
+        $this->seedBrokenSwfOverrides();
+        $previous = $this->app['env'];
+        $this->app['env'] = 'local';
+
+        try {
+            $exit = Artisan::call('dispo:repair-swf-method-overrides', [
+                '--dry-run' => true,
+                '--confirm-database' => ':memory:',
+                '--report-dir' => $this->tmp,
+            ]);
+        } finally {
+            $this->app['env'] = $previous;
+        }
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('nicht erlaubt', Artisan::output());
+    }
+
+    #[Test]
+    public function testing_env_rejects_operative_database_name(): void
+    {
+        $this->seedBrokenSwfOverrides();
+        $previousDb = config('database.connections.sqlite.database');
+        config(['database.connections.sqlite.database' => 'dispo_mat_core']);
+
+        try {
+            $exit = Artisan::call('dispo:repair-swf-method-overrides', [
+                '--dry-run' => true,
+                '--confirm-database' => 'dispo_mat_core',
+                '--report-dir' => $this->tmp,
+            ]);
+        } finally {
+            config(['database.connections.sqlite.database' => $previousDb]);
+        }
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('isolierte Testdatenbanken', Artisan::output());
+    }
+
+    #[Test]
+    public function unwritable_report_directory_stops_before_apply(): void
+    {
+        $this->seedBrokenSwfOverrides();
+        $before = $this->mediumFingerprint('allonge');
+        $mmBefore = AdvertisingMediumCalculationMethod::query()->count();
+
+        $readonly = $this->tmp.'/readonly-reports';
+        File::ensureDirectoryExists($readonly);
+        chmod($readonly, 0555);
+
+        $db = (string) config('database.connections.'.config('database.default').'.database');
+        try {
+            $exit = Artisan::call('dispo:repair-swf-method-overrides', [
+                '--apply' => true,
+                '--confirm-database' => $db,
+                '--report-dir' => $readonly,
+            ]);
+        } finally {
+            chmod($readonly, 0755);
+        }
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('nicht beschreibbar', Artisan::output());
+        $this->assertSame($before, $this->mediumFingerprint('allonge'));
+        $this->assertSame($mmBefore, AdvertisingMediumCalculationMethod::query()->count());
+    }
+
+    #[Test]
+    public function wrong_sort_on_existing_override_is_not_unchanged_and_stops(): void
+    {
+        app(InitialCatalogBootstrapper::class)->bootstrap();
+
+        $allonge = AdvertisingMedium::query()->where('code', 'allonge')->firstOrFail();
+        AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $allonge->id)
+            ->where('sort', 10)
+            ->update(['sort' => 11]);
+
+        $before = $this->mediumFingerprint('allonge');
+        $report = app(SwfMediumMethodOverrideRepairer::class)->repair(dryRun: false);
+
+        $this->assertSame('STOP', $report['status']);
+        $this->assertNotEmpty($report['conflicts']);
+        $this->assertSame($before, $this->mediumFingerprint('allonge'));
+        $this->assertNotContains('allonge', $report['unchanged']);
+    }
+
+    #[Test]
+    public function inactive_assignment_is_not_treated_as_matching_sollzustand(): void
+    {
+        app(InitialCatalogBootstrapper::class)->bootstrap();
+
+        $promo = AdvertisingMedium::query()->where('code', 'promo_moderation')->firstOrFail();
+        AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $promo->id)
+            ->where('sort', 20)
+            ->update(['is_active' => false]);
+
+        $before = $this->mediumFingerprint('promo_moderation');
+        $report = app(SwfMediumMethodOverrideRepairer::class)->repair(dryRun: false);
+
+        $this->assertSame('STOP', $report['status']);
+        $this->assertSame($before, $this->mediumFingerprint('promo_moderation'));
+        $this->assertNotContains('promo_moderation', $report['unchanged']);
     }
 
     #[Test]
