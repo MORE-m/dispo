@@ -46,6 +46,7 @@ use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
 use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2;
+use App\Services\MasterDataTransfer\Support\MasterDataOperationalDryRunReadGuardV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use App\Services\MasterDataTransfer\Support\MasterDataPlannedWriteV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPriceListPinGuardV2;
@@ -55,6 +56,7 @@ use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PDO;
+use Throwable;
 
 /**
  * EPIC-03-F Slice 5+6a: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots, Pins, Whitelist.
@@ -68,6 +70,7 @@ final class MasterDataImporterV2
         private readonly MasterDataPriceListPinGuardV2 $priceListPins = new MasterDataPriceListPinGuardV2,
         private readonly MasterDataWriteWhitelistGuardV2 $writeGuard = new MasterDataWriteWhitelistGuardV2,
         private readonly MasterDataOperationalDatabaseGuardV2 $operationalDatabaseGuard = new MasterDataOperationalDatabaseGuardV2,
+        private readonly MasterDataOperationalDryRunReadGuardV2 $operationalReadGuard = new MasterDataOperationalDryRunReadGuardV2,
     ) {}
 
     /**
@@ -112,33 +115,40 @@ final class MasterDataImporterV2
             ));
         }
 
-        $report = $this->executePhases(
-            $packagePath,
-            dryRun: true,
-            includePhaseB: true,
-            includePhaseC: true,
-            requireIsolatedTestGuard: false,
-            packageSha256: $digestBefore,
-            operationalDatabase: $activeDatabase,
-        );
-
-        $digestAfter = strtolower($this->packages->computePackageSha256($packagePath));
-        if (! hash_equals($digestBefore, $digestAfter)) {
-            throw new MasterDataTransferException(
-                'Paket wurde während des Dry-Runs verändert (SHA256-Drift) — Abbruch.',
-                [
-                    'before='.$digestBefore,
-                    'after='.$digestAfter,
-                ],
+        $this->operationalReadGuard->enter();
+        try {
+            $report = $this->executePhases(
+                $packagePath,
+                dryRun: true,
+                includePhaseB: true,
+                includePhaseC: true,
+                requireIsolatedTestGuard: false,
+                packageSha256: $digestBefore,
+                operationalDatabase: $activeDatabase,
             );
-        }
-        if (! hash_equals($digestAfter, $normalizedRequired)) {
-            throw new MasterDataTransferException(
-                'Paket-SHA256 nach Dry-Run weicht von --require-package-sha256 ab — Abbruch.',
-            );
-        }
 
-        return $report;
+            $digestAfter = strtolower($this->packages->computePackageSha256($packagePath));
+            if (! hash_equals($digestBefore, $digestAfter)) {
+                throw new MasterDataTransferException(
+                    'Paket wurde während des Dry-Runs verändert (SHA256-Drift) — Abbruch.',
+                    [
+                        'before='.$digestBefore,
+                        'after='.$digestAfter,
+                    ],
+                );
+            }
+            if (! hash_equals($digestAfter, $normalizedRequired)) {
+                throw new MasterDataTransferException(
+                    'Paket-SHA256 nach Dry-Run weicht von --require-package-sha256 ab — Abbruch.',
+                );
+            }
+
+            return $report;
+        } catch (Throwable $e) {
+            throw $e;
+        } finally {
+            $this->operationalReadGuard->leave();
+        }
     }
 
     private function assertValidPackageSha256Option(string $requirePackageSha256): string
@@ -492,12 +502,33 @@ final class MasterDataImporterV2
     private function assertDryRunQueryLogIsReadOnly(): void
     {
         $writes = collect(DB::getQueryLog())->filter(function (array $entry): bool {
-            $sql = strtolower((string) $entry['query']);
+            $sql = strtolower(trim((string) $entry['query']));
 
-            return str_contains($sql, 'insert ')
-                || str_contains($sql, 'update ')
-                || str_contains($sql, 'delete ')
-                || str_contains($sql, 'alter ');
+            foreach ([
+                'insert ',
+                'update ',
+                'delete ',
+                'replace ',
+                'alter ',
+                'drop ',
+                'create ',
+                'truncate ',
+                'rename ',
+                'grant ',
+                'revoke ',
+                'lock tables',
+                'unlock tables',
+                'call ',
+                'load data',
+                'handler ',
+                'merge ',
+            ] as $needle) {
+                if (str_contains($sql, $needle)) {
+                    return true;
+                }
+            }
+
+            return (bool) preg_match('/^(insert|update|delete|replace|alter|drop|create|truncate|rename)\b/', $sql);
         });
 
         if ($writes->isNotEmpty()) {

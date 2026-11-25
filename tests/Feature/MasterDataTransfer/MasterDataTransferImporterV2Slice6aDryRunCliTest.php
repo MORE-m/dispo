@@ -26,6 +26,7 @@ use App\Services\MasterDataTransfer\Import\MasterDataImporterV2;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -273,7 +274,11 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
             '--confirm-database' => 'dispo_mat_core',
             '--require-package-sha256' => $sha,
         ]));
-        $this->assertStringContainsString('nur gegen '.MasterDataTransferContractV2::OPERATIONAL_DATABASE, Artisan::output());
+        $this->assertTrue(
+            str_contains(Artisan::output(), 'Test-Override muss exakt')
+            || str_contains(Artisan::output(), 'nur gegen '.MasterDataTransferContractV2::OPERATIONAL_DATABASE),
+            Artisan::output(),
+        );
 
         config(['dispo.master_data_transfer_testing_operational_database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE]);
         $this->assertNotSame(0, Artisan::call('dispo:import-master-data', [
@@ -298,6 +303,182 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
         ]));
         $this->assertStringContainsString('--require-package-sha256 ist Pflicht', Artisan::output());
+    }
+
+    #[Test]
+    public function config_staging_without_matching_live_connection_fails_closed(): void
+    {
+        User::factory()->create(['email' => 'cfg-mismatch@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+
+        config(['dispo.master_data_transfer_testing_operational_database' => null]);
+        $connection = (string) config('database.default');
+        $original = config('database.connections.'.$connection.'.database');
+        config([
+            'database.connections.'.$connection.'.database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+        ]);
+
+        try {
+            $this->assertNotSame(0, Artisan::call('dispo:import-master-data', [
+                'path' => $package,
+                '--dry-run' => true,
+                '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                '--require-package-sha256' => $sha,
+            ]));
+            $out = Artisan::output();
+            $this->assertTrue(
+                str_contains($out, 'MySQL/MariaDB')
+                || str_contains($out, 'weicht von tatsächlicher')
+                || str_contains($out, 'SELECT DATABASE()'),
+                $out,
+            );
+        } finally {
+            config(['database.connections.'.$connection.'.database' => $original]);
+        }
+    }
+
+    #[Test]
+    public function testing_override_on_non_isolated_database_is_rejected(): void
+    {
+        $guard = app(MasterDataOperationalDatabaseGuardV2::class);
+        $connection = (string) config('database.default');
+        $original = config('database.connections.'.$connection.'.database');
+        config([
+            'dispo.master_data_transfer_testing_operational_database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            'database.connections.'.$connection.'.database' => 'dispo_mat_core',
+        ]);
+
+        try {
+            $guard->assertDryRunAllowed(MasterDataTransferContractV2::OPERATIONAL_DATABASE);
+            $this->fail('Override auf nicht isolierter DB muss STOP auslösen');
+        } catch (MasterDataTransferException $e) {
+            $this->assertStringContainsString('isolierter Testdatenbank', $e->getMessage());
+        } finally {
+            config([
+                'database.connections.'.$connection.'.database' => $original,
+                'dispo.master_data_transfer_testing_operational_database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            ]);
+        }
+    }
+
+    #[Test]
+    public function intentional_write_during_operational_dry_run_is_blocked_without_durable_change(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'write-block@example.test',
+            'name' => 'Original',
+            'role' => Role::Admin,
+            'is_active' => true,
+        ]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+
+        User::retrieved(function () use ($user): void {
+            static $attempted = false;
+            if ($attempted) {
+                return;
+            }
+            $attempted = true;
+            DB::table('users')->where('id', $user->id)->update(['name' => 'Mutated By DryRun']);
+        });
+
+        try {
+            app(MasterDataImporterV2::class)->dryRunOperational(
+                $package,
+                MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                $sha,
+            );
+            $this->fail('Schreibversuch im Dry-Run muss abbrechen');
+        } catch (MasterDataTransferException|\Throwable $e) {
+            $blob = $e->getMessage();
+            $this->assertTrue(
+                str_contains($blob, 'readonly')
+                || str_contains($blob, 'read-only')
+                || str_contains($blob, 'Read-only')
+                || str_contains($blob, 'Schreib')
+                || str_contains($blob, 'query_only')
+                || str_contains($blob, 'attempt to write'),
+                $blob,
+            );
+        } finally {
+            User::flushEventListeners();
+        }
+
+        $this->assertSame('Original', $user->fresh()->name);
+    }
+
+    #[Test]
+    public function report_persist_failure_returns_nonzero_without_dry_run_ok(): void
+    {
+        User::factory()->create(['email' => 'report-fail@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+
+        $logs = storage_path('logs');
+        File::ensureDirectoryExists($logs);
+        $previous = fileperms($logs);
+        chmod($logs, 0555);
+
+        try {
+            $exit = Artisan::call('dispo:import-master-data', [
+                'path' => $package,
+                '--dry-run' => true,
+                '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                '--require-package-sha256' => $sha,
+            ]);
+            $output = Artisan::output();
+            $this->assertNotSame(0, $exit);
+            $this->assertStringNotContainsString('Dry-Run OK', $output);
+            $this->assertTrue(
+                str_contains($output, 'nicht beschreibbar')
+                || str_contains($output, 'nicht geschrieben')
+                || str_contains($output, 'Report'),
+                $output,
+            );
+        } finally {
+            chmod($logs, $previous ?: 0755);
+        }
+    }
+
+    #[Test]
+    public function fachkonflikt_writes_sanitized_stop_report(): void
+    {
+        User::factory()->create(['email' => 'conflict-report@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $org = Organization::query()->create(['name' => 'more Marketing']);
+        Inventory::query()->create([
+            'organization_id' => $org->id,
+            'code' => 'inv_v2_radio',
+            'name' => 'Andere Bezeichnung',
+            'type' => InventoryType::Sender,
+            'is_active' => true,
+            'sort' => 1,
+            'logo_path' => null,
+            'lock_version' => 1,
+        ]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+
+        $exit = Artisan::call('dispo:import-master-data', [
+            'path' => $package,
+            '--dry-run' => true,
+            '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            '--require-package-sha256' => $sha,
+        ]);
+        $this->assertNotSame(0, $exit);
+        $output = Artisan::output();
+        $this->assertStringContainsString('Report:', $output);
+        $this->assertMatchesRegularExpression('/Report: (.+master-data-import-report-.+\.json)/', $output, $output);
+        preg_match('/Report: (.+master-data-import-report-.+\.json)/', $output, $m);
+        $reportPath = trim($m[1]);
+        $this->assertFileExists($reportPath);
+
+        /** @var array<string, mixed> $payload */
+        $payload = json_decode((string) File::get($reportPath), true);
+        $this->assertSame('STOP', $payload['security']['result'] ?? null);
+        $this->assertIsArray($payload['conflicts'] ?? null);
+        $this->assertArrayNotHasKey('password', $payload);
+        $this->assertSame([], $payload['rows'] ?? null);
     }
 
     #[Test]

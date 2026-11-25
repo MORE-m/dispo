@@ -68,8 +68,24 @@ class ImportMasterDataCommand extends Command
         } catch (MasterDataTransferException $e) {
             $this->error($e->getMessage());
             foreach ($e->errors as $error) {
-                $this->line(' - '.$error);
+                $this->line(' - '.$this->sanitizeReportText($error));
             }
+
+            $stopReport = $this->buildSanitizedStopReport($e, $dryRun);
+            try {
+                $stopPath = $this->persistReport($stopReport);
+                $this->line('Report: '.$stopPath);
+            } catch (MasterDataTransferException $persistError) {
+                $this->error($persistError->getMessage());
+            }
+
+            return self::FAILURE;
+        }
+
+        try {
+            $pathOut = $this->persistReport($report);
+        } catch (MasterDataTransferException $e) {
+            $this->error($e->getMessage());
 
             return self::FAILURE;
         }
@@ -91,9 +107,6 @@ class ImportMasterDataCommand extends Command
                 $this->line('package_sha256='.$report['security']['package_sha256']);
             }
         }
-
-        $pathOut = storage_path('logs/master-data-import-report-'.now()->format('YmdHis').'.json');
-        file_put_contents($pathOut, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n");
         $this->line('Report: '.$pathOut);
 
         $securityResult = is_array($report['security'] ?? null)
@@ -161,5 +174,96 @@ class ImportMasterDataCommand extends Command
         }
 
         return $importer->dryRunOperational($path, $confirm, $requireSha);
+    }
+
+    /**
+     * @param  array<string, mixed>  $report
+     */
+    private function persistReport(array $report): string
+    {
+        $dir = storage_path('logs');
+        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            throw new MasterDataTransferException(
+                'Report-Verzeichnis fehlt und konnte nicht angelegt werden.',
+            );
+        }
+        if (! is_writable($dir)) {
+            throw new MasterDataTransferException(
+                'Report-Verzeichnis ist nicht beschreibbar.',
+            );
+        }
+
+        $pathOut = $dir.DIRECTORY_SEPARATOR
+            .'master-data-import-report-'
+            .now()->format('YmdHis')
+            .'-'
+            .bin2hex(random_bytes(4))
+            .'.json';
+        $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            throw new MasterDataTransferException('Report-JSON konnte nicht kodiert werden.');
+        }
+
+        $written = @file_put_contents($pathOut, $json."\n");
+        if ($written === false || ! is_file($pathOut)) {
+            throw new MasterDataTransferException(
+                'Report konnte nicht geschrieben werden.',
+            );
+        }
+
+        $verify = @file_get_contents($pathOut);
+        if ($verify === false || $verify === '') {
+            throw new MasterDataTransferException(
+                'Report-Persistierung fehlgeschlagen (Datei leer oder nicht lesbar).',
+            );
+        }
+
+        return $pathOut;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSanitizedStopReport(MasterDataTransferException $e, bool $dryRun): array
+    {
+        $conflicts = [];
+        foreach ($e->errors as $error) {
+            if ($error !== '') {
+                $conflicts[] = $this->sanitizeReportText($error);
+            }
+        }
+
+        return [
+            'dry_run' => $dryRun,
+            'created' => 0,
+            'unchanged' => 0,
+            'conflicts' => $conflicts,
+            'skipped' => [],
+            'rows' => [],
+            'counts_by_action' => [],
+            'security' => [
+                'package_integrity' => 'stop',
+                'package_sha256' => null,
+                'operational_database' => null,
+                'protection_snapshots' => 'stop',
+                'protected_table_count' => 0,
+                'protected_table_counts' => [],
+                'price_list_pins' => 'stop',
+                'price_list_binding_count' => 0,
+                'price_list_pin_count' => 0,
+                'whitelist' => 'stop',
+                'referential_integrity' => 'stop',
+                'result' => 'STOP',
+                'abort_reason' => $this->sanitizeReportText($e->getMessage()),
+            ],
+        ];
+    }
+
+    private function sanitizeReportText(string $text): string
+    {
+        $clean = preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i', '[redacted-email]', $text) ?? $text;
+        $clean = preg_replace('/\b(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+/i', '$1=[redacted]', $clean) ?? $clean;
+
+        return mb_substr($clean, 0, 500);
     }
 }
