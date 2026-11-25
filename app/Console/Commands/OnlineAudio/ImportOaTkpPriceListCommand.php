@@ -23,15 +23,13 @@ class ImportOaTkpPriceListCommand extends Command
 
     public function handle(OaTkpImportJsonReader $reader, OaTkpPriceListDraftImportGuard $guard): int
     {
-        $pathArgument = $this->argument('path');
+        $path = $this->argument('path');
 
-        if (! is_string($pathArgument) || $pathArgument === '') {
+        if ($path === '') {
             $this->error('Ungültiger Importpfad.');
 
             return self::FAILURE;
         }
-
-        $path = $pathArgument;
         $dryRun = (bool) $this->option('dry-run');
         $startedAt = now()->toIso8601String();
 
