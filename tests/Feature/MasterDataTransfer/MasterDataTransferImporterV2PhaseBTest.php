@@ -330,7 +330,7 @@ class MasterDataTransferImporterV2PhaseBTest extends TestCase
             $this->fail('V2 import() muss gesperrt bleiben');
         } catch (MasterDataTransferException $e) {
             $this->assertStringContainsString('nicht freigegeben', $e->getMessage());
-            $this->assertStringContainsString('Phase C', $e->getMessage());
+            $this->assertStringContainsString('operativ nicht freigegeben', $e->getMessage());
         }
 
         $this->assertNotSame(0, Artisan::call('dispo:import-master-data', [

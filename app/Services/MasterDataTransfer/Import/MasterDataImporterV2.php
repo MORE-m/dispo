@@ -46,19 +46,26 @@ use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
+use App\Services\MasterDataTransfer\Support\MasterDataPlannedWriteV2;
+use App\Services\MasterDataTransfer\Support\MasterDataPriceListPinGuardV2;
+use App\Services\MasterDataTransfer\Support\MasterDataProtectedStateSnapshotV2;
+use App\Services\MasterDataTransfer\Support\MasterDataWriteWhitelistGuardV2;
 use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PDO;
 
 /**
- * EPIC-03-F Slice 4 Phase A+B: Inhaltsimport 2.0.0 inkl. nachlaufender Zeiger
- * (operativer CLI-Import weiterhin gesperrt; Phase C/Schutz fehlen).
+ * EPIC-03-F Slice 5 Phase A+B+C: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots,
+ * Pins und Whitelist (operativer CLI-Import weiterhin gesperrt; Status-Phase fehlt).
  */
 final class MasterDataImporterV2
 {
     public function __construct(
         private readonly MasterDataPackage $packages,
+        private readonly MasterDataProtectedStateSnapshotV2 $protectedSnapshots = new MasterDataProtectedStateSnapshotV2,
+        private readonly MasterDataPriceListPinGuardV2 $priceListPins = new MasterDataPriceListPinGuardV2,
+        private readonly MasterDataWriteWhitelistGuardV2 $writeGuard = new MasterDataWriteWhitelistGuardV2,
     ) {}
 
     /**
@@ -67,7 +74,7 @@ final class MasterDataImporterV2
     public function import(string $packagePath, bool $dryRun, string $confirmDatabase): array
     {
         throw new MasterDataTransferException(
-            'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase C und Schutzprüfungen fehlen).',
+            'Import für schema_version=2.0.0 ist operativ nicht freigegeben (Status-Phase und Staging-GO fehlen).',
         );
     }
 
@@ -89,7 +96,7 @@ final class MasterDataImporterV2
      */
     public function executePhaseAForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false);
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false, includePhaseC: false);
     }
 
     /**
@@ -100,14 +107,29 @@ final class MasterDataImporterV2
      */
     public function executePhasesABForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true);
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: false);
+    }
+
+    /**
+     * Isolierte Test-/interne Ausführung von Phase A+B+C (Schutz) in einer Transaktion.
+     * Nicht für CLI/Staging.
+     *
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    public function executePhasesABCForIsolatedTests(string $packagePath, bool $dryRun): array
+    {
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: true);
     }
 
     /**
      * @return array<string, mixed> MasterDataImportReport::toArray
      */
-    private function executeIsolatedPhases(string $packagePath, bool $dryRun, bool $includePhaseB): array
-    {
+    private function executeIsolatedPhases(
+        string $packagePath,
+        bool $dryRun,
+        bool $includePhaseB,
+        bool $includePhaseC,
+    ): array {
         $this->assertIsolatedTestExecutionAllowed();
 
         $package = $this->packages->load($packagePath);
@@ -123,7 +145,17 @@ final class MasterDataImporterV2
 
         $usersBefore = $this->snapshotUsers();
         $report = new MasterDataImportReport;
+        $report->setPackageIntegrity('pass');
         $context = new MasterDataImportPlanContext($package['data']);
+
+        $protectionBefore = null;
+        $pinsBefore = null;
+        if ($includePhaseC) {
+            $protectionBefore = $this->protectedSnapshots->capture();
+            $pinsBefore = $this->priceListPins->capture();
+            $report->setProtectedTableStats($protectionBefore['tables']);
+            $report->setPriceListPinStats($pinsBefore['binding_count'], $pinsBefore['list_count']);
+        }
 
         DB::flushQueryLog();
         DB::enableQueryLog();
@@ -132,6 +164,37 @@ final class MasterDataImporterV2
             if ($includePhaseB) {
                 $ops = array_merge($ops, $this->planPhaseB($package['data'], $report, $context));
                 $this->assertReferentialIntegrity($package['data'], $report, $context);
+                if ($report->hasConflicts()) {
+                    $report->setReferentialIntegrity('stop');
+                } else {
+                    $report->setReferentialIntegrity('pass');
+                }
+            }
+
+            // Präventiv: tatsächlich geplante Writes gegen Whitelist, unabhängig von Phase C.
+            $this->writeGuard->assertPlannedWritesAllowed($ops);
+
+            if ($includePhaseC) {
+                $report->setWhitelist('pass');
+
+                foreach ($this->priceListPins->conflictsAgainstPackage($pinsBefore, $package['data']) as $msg) {
+                    $report->conflict($msg);
+                }
+                $protectionAfterPlan = $this->protectedSnapshots->capture();
+                $pinsAfterPlan = $this->priceListPins->capture();
+                foreach ($this->protectedSnapshots->diff($protectionBefore, $protectionAfterPlan) as $msg) {
+                    $report->conflict($msg);
+                }
+                foreach ($this->priceListPins->diff($pinsBefore, $pinsAfterPlan) as $msg) {
+                    $report->conflict($msg);
+                }
+                if ($report->hasConflicts()) {
+                    $report->setProtectionSnapshots('stop');
+                    $report->setPriceListPins('stop');
+                } else {
+                    $report->setProtectionSnapshots('pass');
+                    $report->setPriceListPins('pass');
+                }
             }
 
             if ($report->hasConflicts()) {
@@ -144,6 +207,12 @@ final class MasterDataImporterV2
 
             if ($dryRun) {
                 $this->assertDryRunQueryLogIsReadOnly();
+                if ($includePhaseC) {
+                    $protectionDry = $this->protectedSnapshots->capture();
+                    foreach ($this->protectedSnapshots->diff($protectionBefore, $protectionDry) as $msg) {
+                        throw new MasterDataTransferException($msg);
+                    }
+                }
 
                 return $report->toArray(true);
             }
@@ -151,16 +220,76 @@ final class MasterDataImporterV2
             DB::disableQueryLog();
         }
 
-        return DB::transaction(function () use ($ops, $report, $usersBefore, $package, $includePhaseB): array {
-            $this->apply($ops);
-
-            if ($includePhaseB) {
-                $this->assertPersistedIntegrityAfterApply($package['data'], $report);
-                if ($report->hasConflicts()) {
+        return DB::transaction(function () use (
+            $ops,
+            $report,
+            $usersBefore,
+            $package,
+            $includePhaseB,
+            $includePhaseC,
+            $protectionBefore,
+            $pinsBefore,
+        ): array {
+            if ($includePhaseC) {
+                // Plan darf nicht veraltet sein: Schutzbestand unmittelbar vor Apply erneut prüfen.
+                $protectionPreApply = $this->protectedSnapshots->capture();
+                $pinsPreApply = $this->priceListPins->capture();
+                $drift = array_merge(
+                    $this->protectedSnapshots->diff($protectionBefore, $protectionPreApply),
+                    $this->priceListPins->diff($pinsBefore, $pinsPreApply),
+                );
+                if ($drift !== []) {
                     throw new MasterDataTransferException(
-                        'Import fail-closed wegen Integritätskonflikten nach Apply.',
-                        $report->conflictMessages(),
+                        'Import fail-closed: Schutzbestand zwischen Planung und Apply verändert.',
+                        $drift,
                     );
+                }
+                $this->writeGuard->startMonitoring();
+            }
+
+            try {
+                $this->apply($ops);
+
+                if ($includePhaseB) {
+                    $this->assertPersistedIntegrityAfterApply($package['data'], $report);
+                    if ($report->hasConflicts()) {
+                        $report->setReferentialIntegrity('stop');
+                        throw new MasterDataTransferException(
+                            'Import fail-closed wegen Integritätskonflikten nach Apply.',
+                            $report->conflictMessages(),
+                        );
+                    }
+                }
+
+                if ($includePhaseC) {
+                    $this->writeGuard->assertObservedWritesAllowed();
+                    $report->setWhitelist('pass');
+
+                    $protectionAfter = $this->protectedSnapshots->capture();
+                    $pinsAfter = $this->priceListPins->capture();
+                    $postConflicts = array_merge(
+                        $this->protectedSnapshots->diff($protectionBefore, $protectionAfter),
+                        $this->priceListPins->diff($pinsBefore, $pinsAfter),
+                    );
+                    foreach ($postConflicts as $msg) {
+                        $report->conflict($msg);
+                    }
+                    if ($postConflicts !== []) {
+                        $report->setProtectionSnapshots('stop');
+                        $report->setPriceListPins('stop');
+                        throw new MasterDataTransferException(
+                            'Import fail-closed wegen Schutz-/Pin-Drift nach Apply.',
+                            $report->conflictMessages(),
+                        );
+                    }
+                    $report->setProtectionSnapshots('pass');
+                    $report->setPriceListPins('pass');
+                    $report->setProtectedTableStats($protectionAfter['tables']);
+                    $report->setPriceListPinStats($pinsAfter['binding_count'], $pinsAfter['list_count']);
+                }
+            } finally {
+                if ($includePhaseC) {
+                    $this->writeGuard->stopMonitoring();
                 }
             }
 
@@ -270,7 +399,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  array<string, mixed>  $data
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planPhaseA(
         array $data,
@@ -305,18 +434,31 @@ final class MasterDataImporterV2
     }
 
     /**
-     * @param  list<callable(): void>  $ops
+     * @param  list<mixed>  $ops
      */
     private function apply(array $ops): void
     {
         foreach ($ops as $op) {
-            $op();
+            if (! $op instanceof MasterDataPlannedWriteV2) {
+                throw new MasterDataTransferException(
+                    'Whitelist-STOP: ungeprüfte Operation im Apply (kein PlannedWrite).',
+                );
+            }
+            $op->run();
         }
     }
 
     /**
+     * @param  list<string>|string  $tables
+     */
+    private function plannedWrite(array|string $tables, string $operation, \Closure $execute): MasterDataPlannedWriteV2
+    {
+        return new MasterDataPlannedWriteV2($operation, $tables, $execute);
+    }
+
+    /**
      * @param  array<string, mixed>  $row
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOrganization(array $row, MasterDataImportReport $report): array
     {
@@ -338,9 +480,9 @@ final class MasterDataImporterV2
         if ($existing === null) {
             $report->add('organization', $name, 'create');
 
-            return [function () use ($name): void {
+            return [$this->plannedWrite('organizations', 'create', function () use ($name): void {
                 Organization::query()->create(['name' => $name]);
-            }];
+            })];
         }
 
         if ($existing->name !== $name) {
@@ -360,7 +502,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planCalculationMethods(
         array $rows,
@@ -385,10 +527,10 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('calculation_method', $key, 'create');
                 $context->markMethod($key);
-                $ops[] = function () use ($key, $payload): void {
+                $ops[] = $this->plannedWrite('calculation_methods', 'create', function () use ($key, $payload): void {
                     $model = new CalculationMethod;
                     $model->forceFill(['key' => $key, ...$payload, 'lock_version' => 1])->save();
-                };
+                });
 
                 continue;
             }
@@ -411,7 +553,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planCategories(
         array $rows,
@@ -449,7 +591,7 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('advertising_category', $key, 'create');
                 $context->markCategory($key);
-                $ops[] = function () use ($key, $payload, $packageDefaultKey): void {
+                $ops[] = $this->plannedWrite('advertising_categories', 'create', function () use ($key, $payload, $packageDefaultKey): void {
                     if ($packageDefaultKey !== null) {
                         $resolvedId = CalculationMethod::query()->where('key', $packageDefaultKey)->value('id');
                         if ($resolvedId === null) {
@@ -463,7 +605,7 @@ final class MasterDataImporterV2
                     }
                     $category = new AdvertisingCategory;
                     $category->forceFill(['key' => $key, ...$payload, 'lock_version' => 1])->save();
-                };
+                });
 
                 continue;
             }
@@ -499,7 +641,7 @@ final class MasterDataImporterV2
             }
 
             $report->add('advertising_category', $key, 'update', 'erlaubtes Metadaten-Angleichen');
-            $ops[] = function () use ($existing, $payload, $packageDefaultKey): void {
+            $ops[] = $this->plannedWrite('advertising_categories', 'update', function () use ($existing, $payload, $packageDefaultKey): void {
                 $defaultId = null;
                 if ($packageDefaultKey !== null) {
                     $resolvedId = CalculationMethod::query()->where('key', $packageDefaultKey)->value('id');
@@ -515,7 +657,7 @@ final class MasterDataImporterV2
                     'sort' => $payload['sort'],
                     'default_calculation_method_id' => $defaultId,
                 ])->save();
-            };
+            });
         }
 
         return $ops;
@@ -523,7 +665,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planInventories(
         array $rows,
@@ -556,7 +698,7 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('inventory', $code, 'create');
                 $context->markInventory($code);
-                $ops[] = function () use ($code, $payload): void {
+                $ops[] = $this->plannedWrite('inventories', 'create', function () use ($code, $payload): void {
                     $organization = Organization::query()->orderBy('id')->first();
                     if ($organization === null) {
                         throw new MasterDataTransferException('Organisation fehlt vor Inventar-Import.');
@@ -568,7 +710,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -592,7 +734,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planMedia(
         array $rows,
@@ -648,7 +790,7 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('advertising_medium', $code, 'create');
                 $context->markMedium($code);
-                $ops[] = function () use ($code, $categoryKey, $kind, $profile, $mode, $defaultMethodKey, $row): void {
+                $ops[] = $this->plannedWrite('advertising_media', 'create', function () use ($code, $categoryKey, $kind, $profile, $mode, $defaultMethodKey, $row): void {
                     $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
                     if ($category === null) {
                         throw new MasterDataTransferException('Kategorie für Medium fehlt: '.$categoryKey);
@@ -673,7 +815,7 @@ final class MasterDataImporterV2
                         'sort' => (int) $row['sort'],
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -723,7 +865,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planCategoryMethods(
         array $rows,
@@ -759,7 +901,7 @@ final class MasterDataImporterV2
 
             if ($category === null || $methodId === null) {
                 $report->add('category_method', $key, 'create');
-                $ops[] = function () use ($categoryKey, $methodKey, $payload): void {
+                $ops[] = $this->plannedWrite('advertising_category_calculation_methods', 'create', function () use ($categoryKey, $methodKey, $payload): void {
                     $category = AdvertisingCategory::query()->where('key', $categoryKey)->first();
                     $method = CalculationMethod::query()->where('key', $methodKey)->first();
                     if ($category === null || $method === null) {
@@ -772,7 +914,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -784,7 +926,7 @@ final class MasterDataImporterV2
 
             if ($existing === null) {
                 $report->add('category_method', $key, 'create');
-                $ops[] = function () use ($category, $methodKey, $payload): void {
+                $ops[] = $this->plannedWrite('advertising_category_calculation_methods', 'create', function () use ($category, $methodKey, $payload): void {
                     $method = CalculationMethod::query()->where('key', $methodKey)->first();
                     if ($method === null) {
                         throw new MasterDataTransferException('method_key fehlt: '.$methodKey);
@@ -796,7 +938,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -819,7 +961,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planMediumMethods(
         array $rows,
@@ -855,7 +997,7 @@ final class MasterDataImporterV2
 
             if ($medium === null || $methodId === null) {
                 $report->add('medium_method', $key, 'create');
-                $ops[] = function () use ($mediumCode, $methodKey, $payload): void {
+                $ops[] = $this->plannedWrite('advertising_medium_calculation_methods', 'create', function () use ($mediumCode, $methodKey, $payload): void {
                     $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
                     $method = CalculationMethod::query()->where('key', $methodKey)->first();
                     if ($medium === null || $method === null) {
@@ -868,7 +1010,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -880,7 +1022,7 @@ final class MasterDataImporterV2
 
             if ($existing === null) {
                 $report->add('medium_method', $key, 'create');
-                $ops[] = function () use ($medium, $methodKey, $payload): void {
+                $ops[] = $this->plannedWrite('advertising_medium_calculation_methods', 'create', function () use ($medium, $methodKey, $payload): void {
                     $method = CalculationMethod::query()->where('key', $methodKey)->first();
                     if ($method === null) {
                         throw new MasterDataTransferException('method_key fehlt: '.$methodKey);
@@ -892,7 +1034,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -915,7 +1057,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planRules(
         array $rows,
@@ -966,7 +1108,7 @@ final class MasterDataImporterV2
 
             if ($inventory === null || $medium === null) {
                 $report->add('inventory_medium_rule', $key, 'create');
-                $ops[] = function () use ($inventoryCode, $mediumCode, $payload): void {
+                $ops[] = $this->plannedWrite('inventory_medium_rules', 'create', function () use ($inventoryCode, $mediumCode, $payload): void {
                     $inventory = Inventory::query()->where('code', $inventoryCode)->first();
                     $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
                     if ($inventory === null || $medium === null) {
@@ -979,7 +1121,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -990,7 +1132,7 @@ final class MasterDataImporterV2
                 ->first();
             if ($existing === null) {
                 $report->add('inventory_medium_rule', $key, 'create');
-                $ops[] = function () use ($inventory, $medium, $payload): void {
+                $ops[] = $this->plannedWrite('inventory_medium_rules', 'create', function () use ($inventory, $medium, $payload): void {
                     $rule = new InventoryMediumRule;
                     $rule->forceFill([
                         'inventory_id' => $inventory->id,
@@ -998,7 +1140,7 @@ final class MasterDataImporterV2
                         ...$payload,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -1033,7 +1175,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planPriceLists(
         array $rows,
@@ -1119,7 +1261,7 @@ final class MasterDataImporterV2
             $report->add('price_list', $key, 'create', 'status=draft');
             $name = (string) $row['name'];
             $validFrom = $row['valid_from'] ?? null;
-            $ops[] = function () use ($inventoryCode, $year, $revision, $version, $name, $validFrom, $incoming, $key): void {
+            $ops[] = $this->plannedWrite(['price_lists', 'price_list_items'], 'create', function () use ($inventoryCode, $year, $revision, $version, $name, $validFrom, $incoming, $key): void {
                 $inventory = Inventory::query()->where('code', $inventoryCode)->first();
                 if ($inventory === null) {
                     throw new MasterDataTransferException('price_list Inventar fehlt: '.$inventoryCode);
@@ -1163,7 +1305,7 @@ final class MasterDataImporterV2
                         'second_price' => $item['second_price'],
                     ]);
                 }
-            };
+            });
         }
 
         return $ops;
@@ -1171,7 +1313,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planProductionPriceLists(
         array $rows,
@@ -1239,7 +1381,7 @@ final class MasterDataImporterV2
 
             $report->add('production_price_list', $key, 'create', 'status=draft');
             $name = (string) $row['name'];
-            $ops[] = function () use ($inventoryCode, $type, $year, $revision, $version, $name, $unitPrice, $isDiscountable, $isAeEligible, $key): void {
+            $ops[] = $this->plannedWrite('production_price_lists', 'create', function () use ($inventoryCode, $type, $year, $revision, $version, $name, $unitPrice, $isDiscountable, $isAeEligible, $key): void {
                 $inventory = Inventory::query()->where('code', $inventoryCode)->first();
                 if ($inventory === null) {
                     throw new MasterDataTransferException('production_price_list Inventar fehlt: '.$inventoryCode);
@@ -1268,7 +1410,7 @@ final class MasterDataImporterV2
                     'published_at' => null,
                     'archived_at' => null,
                 ])->save();
-            };
+            });
         }
 
         return $ops;
@@ -1276,7 +1418,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldDefinitions(
         array $rows,
@@ -1311,7 +1453,7 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('field_definition', $key, 'create');
                 $context->markFieldDefinition($key);
-                $ops[] = function () use ($key, $payload): void {
+                $ops[] = $this->plannedWrite('field_definitions', 'create', function () use ($key, $payload): void {
                     $model = new FieldDefinition;
                     $model->forceFill([
                         'key' => $key,
@@ -1319,7 +1461,7 @@ final class MasterDataImporterV2
                         'current_revision_id' => null,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -1344,7 +1486,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldDefinitionRevisions(
         array $rows,
@@ -1376,7 +1518,7 @@ final class MasterDataImporterV2
             if ($definition === null) {
                 $report->add('field_definition_revision', $key, 'create');
                 $context->markFieldDefinitionRevision($defKey, $revision);
-                $ops[] = function () use ($defKey, $revision, $payload): void {
+                $ops[] = $this->plannedWrite('field_definition_revisions', 'create', function () use ($defKey, $revision, $payload): void {
                     $definition = FieldDefinition::query()->where('key', $defKey)->firstOrFail();
                     $model = new FieldDefinitionRevision;
                     $model->forceFill([
@@ -1384,7 +1526,7 @@ final class MasterDataImporterV2
                         'revision' => $revision,
                         ...$payload,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -1395,14 +1537,14 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('field_definition_revision', $key, 'create');
                 $context->markFieldDefinitionRevision($defKey, $revision);
-                $ops[] = function () use ($definition, $revision, $payload): void {
+                $ops[] = $this->plannedWrite('field_definition_revisions', 'create', function () use ($definition, $revision, $payload): void {
                     $model = new FieldDefinitionRevision;
                     $model->forceFill([
                         'field_definition_id' => $definition->id,
                         'revision' => $revision,
                         ...$payload,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -1432,7 +1574,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldDefinitionRevisionOptions(
         array $rows,
@@ -1461,7 +1603,7 @@ final class MasterDataImporterV2
             $revisionModel = $this->findFieldDefinitionRevision($defKey, $revision);
             if ($revisionModel === null) {
                 $report->add('field_definition_revision_option', $biz, 'create');
-                $ops[] = function () use ($defKey, $revision, $optKey, $payload): void {
+                $ops[] = $this->plannedWrite('field_definition_revision_options', 'create', function () use ($defKey, $revision, $optKey, $payload): void {
                     $revisionModel = $this->findFieldDefinitionRevision($defKey, $revision);
                     if ($revisionModel === null) {
                         throw new MasterDataTransferException('Revision fehlt: '.$defKey.'|'.$revision);
@@ -1471,7 +1613,7 @@ final class MasterDataImporterV2
                         'key' => $optKey,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1481,13 +1623,13 @@ final class MasterDataImporterV2
                 ->first();
             if ($existing === null) {
                 $report->add('field_definition_revision_option', $biz, 'create');
-                $ops[] = function () use ($revisionModel, $optKey, $payload): void {
+                $ops[] = $this->plannedWrite('field_definition_revision_options', 'create', function () use ($revisionModel, $optKey, $payload): void {
                     FieldDefinitionRevisionOption::query()->create([
                         'field_definition_revision_id' => $revisionModel->id,
                         'key' => $optKey,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1518,7 +1660,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldSets(
         array $rows,
@@ -1549,7 +1691,7 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('field_set', $key, 'create');
                 $context->markFieldSet($key);
-                $ops[] = function () use ($key, $payload): void {
+                $ops[] = $this->plannedWrite('field_sets', 'create', function () use ($key, $payload): void {
                     $model = new FieldSet;
                     $model->forceFill([
                         'key' => $key,
@@ -1557,7 +1699,7 @@ final class MasterDataImporterV2
                         'active_version_id' => null,
                         'lock_version' => 1,
                     ])->save();
-                };
+                });
 
                 continue;
             }
@@ -1580,7 +1722,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldSetVersions(
         array $rows,
@@ -1611,14 +1753,14 @@ final class MasterDataImporterV2
             if ($set === null) {
                 $report->add('field_set_version', $key, 'create');
                 $context->markFieldSetVersion($setKey, $version);
-                $ops[] = function () use ($setKey, $version, $payload): void {
+                $ops[] = $this->plannedWrite('field_set_versions', 'create', function () use ($setKey, $version, $payload): void {
                     $set = FieldSet::query()->where('key', $setKey)->firstOrFail();
                     FieldSetVersion::query()->create([
                         'field_set_id' => $set->id,
                         'version' => $version,
                         'status' => $payload['status'],
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1629,13 +1771,13 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('field_set_version', $key, 'create');
                 $context->markFieldSetVersion($setKey, $version);
-                $ops[] = function () use ($set, $version, $payload): void {
+                $ops[] = $this->plannedWrite('field_set_versions', 'create', function () use ($set, $version, $payload): void {
                     FieldSetVersion::query()->create([
                         'field_set_id' => $set->id,
                         'version' => $version,
                         'status' => $payload['status'],
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1652,7 +1794,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldSetVersionFields(
         array $rows,
@@ -1687,7 +1829,7 @@ final class MasterDataImporterV2
             $definition = FieldDefinition::query()->where('key', $defKey)->first();
             if ($setVersion === null || $definition === null) {
                 $report->add('field_set_version_field', $key, 'create');
-                $ops[] = function () use ($setKey, $version, $defKey, $payload): void {
+                $ops[] = $this->plannedWrite('field_set_version_fields', 'create', function () use ($setKey, $version, $defKey, $payload): void {
                     $setVersion = $this->findFieldSetVersion($setKey, $version);
                     $revisionModel = $this->findFieldDefinitionRevision($defKey, $payload['revision']);
                     $definition = FieldDefinition::query()->where('key', $defKey)->first();
@@ -1702,7 +1844,7 @@ final class MasterDataImporterV2
                         'required_override' => $payload['required_override'],
                         'visible_override' => $payload['visible_override'],
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1718,7 +1860,7 @@ final class MasterDataImporterV2
                     continue;
                 }
                 $report->add('field_set_version_field', $key, 'create');
-                $ops[] = function () use ($setVersion, $definition, $revisionModel, $payload): void {
+                $ops[] = $this->plannedWrite('field_set_version_fields', 'create', function () use ($setVersion, $definition, $revisionModel, $payload): void {
                     FieldSetVersionField::query()->create([
                         'field_set_version_id' => $setVersion->id,
                         'field_definition_id' => $definition->id,
@@ -1727,7 +1869,7 @@ final class MasterDataImporterV2
                         'required_override' => $payload['required_override'],
                         'visible_override' => $payload['visible_override'],
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1768,7 +1910,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldRules(
         array $rows,
@@ -1802,7 +1944,7 @@ final class MasterDataImporterV2
                     continue;
                 }
                 $report->add('field_rules', $groupKey, 'create', 'volle Regelmenge');
-                $ops[] = function () use ($setKey, $version, $packageRows): void {
+                $ops[] = $this->plannedWrite('field_rules', 'create', function () use ($setKey, $version, $packageRows): void {
                     $versionModel = $this->findFieldSetVersion($setKey, $version);
                     if ($versionModel === null) {
                         throw new MasterDataTransferException('field_rules Version fehlt: '.$setKey.'|'.$version);
@@ -1815,7 +1957,7 @@ final class MasterDataImporterV2
                             'action_json' => $ruleRow['action_json'],
                         ]);
                     }
-                };
+                });
 
                 continue;
             }
@@ -1829,7 +1971,7 @@ final class MasterDataImporterV2
 
             if ($dbSet === [] && $packageSet !== []) {
                 $report->add('field_rules', $groupKey, 'create', 'volle Regelmenge');
-                $ops[] = function () use ($versionModel, $packageRows): void {
+                $ops[] = $this->plannedWrite('field_rules', 'create', function () use ($versionModel, $packageRows): void {
                     foreach ($packageRows as $ruleRow) {
                         FieldRule::query()->create([
                             'field_set_version_id' => $versionModel->id,
@@ -1838,7 +1980,7 @@ final class MasterDataImporterV2
                             'action_json' => $ruleRow['action_json'],
                         ]);
                     }
-                };
+                });
 
                 continue;
             }
@@ -1880,7 +2022,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOaPlatforms(
         array $rows,
@@ -1905,9 +2047,9 @@ final class MasterDataImporterV2
             if ($existing === null) {
                 $report->add('oa_platform', $code, 'create');
                 $context->markPlatform($code);
-                $ops[] = function () use ($code, $payload): void {
+                $ops[] = $this->plannedWrite('oa_platforms', 'create', function () use ($code, $payload): void {
                     OaPlatform::query()->create(['code' => $code, ...$payload]);
-                };
+                });
 
                 continue;
             }
@@ -1930,7 +2072,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOaPlatformMediumRules(
         array $rows,
@@ -1958,7 +2100,7 @@ final class MasterDataImporterV2
             $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
             if ($platform === null || $medium === null) {
                 $report->add('oa_platform_medium_rule', $key, 'create');
-                $ops[] = function () use ($platformCode, $mediumCode, $payload): void {
+                $ops[] = $this->plannedWrite('oa_platform_medium_rules', 'create', function () use ($platformCode, $mediumCode, $payload): void {
                     $platform = OaPlatform::query()->where('code', $platformCode)->first();
                     $medium = AdvertisingMedium::query()->where('code', $mediumCode)->first();
                     if ($platform === null || $medium === null) {
@@ -1969,7 +2111,7 @@ final class MasterDataImporterV2
                         'advertising_medium_id' => $medium->id,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -1979,13 +2121,13 @@ final class MasterDataImporterV2
                 ->first();
             if ($existing === null) {
                 $report->add('oa_platform_medium_rule', $key, 'create');
-                $ops[] = function () use ($platform, $medium, $payload): void {
+                $ops[] = $this->plannedWrite('oa_platform_medium_rules', 'create', function () use ($platform, $medium, $payload): void {
                     OaPlatformMediumRule::query()->create([
                         'oa_platform_id' => $platform->id,
                         'advertising_medium_id' => $medium->id,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -2002,7 +2144,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOaTargetingDefinitions(
         array $rows,
@@ -2037,13 +2179,13 @@ final class MasterDataImporterV2
             $existing = OaTargetingDefinition::query()->where('code', $code)->where('revision_number', $revision)->first();
             if ($existing === null) {
                 $report->add('oa_targeting_definition', $key, 'create');
-                $ops[] = function () use ($code, $revision, $payload): void {
+                $ops[] = $this->plannedWrite('oa_targeting_definitions', 'create', function () use ($code, $revision, $payload): void {
                     OaTargetingDefinition::query()->create([
                         'code' => $code,
                         'revision_number' => $revision,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -2069,7 +2211,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOaTkpPriceLists(
         array $rows,
@@ -2128,7 +2270,7 @@ final class MasterDataImporterV2
             $report->add('oa_tkp_price_list', $key, 'create', 'status=draft');
             $name = (string) $row['name'];
             $validFrom = $row['valid_from'] ?? null;
-            $ops[] = function () use ($year, $revision, $version, $name, $validFrom, $items, $key): void {
+            $ops[] = $this->plannedWrite(['oa_tkp_price_lists', 'oa_tkp_price_list_items'], 'create', function () use ($year, $revision, $version, $name, $validFrom, $items, $key): void {
                 if (OaTkpPriceList::query()->where('year', $year)->where('revision_number', $revision)->exists()) {
                     throw new MasterDataTransferException('oa_tkp_price_list existiert bereits: '.$key);
                 }
@@ -2157,7 +2299,7 @@ final class MasterDataImporterV2
                         'minimum_tkp' => $item['minimum_tkp'],
                     ]);
                 }
-            };
+            });
         }
 
         return $ops;
@@ -2165,7 +2307,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planOaAdserverSurcharges(
         array $rows,
@@ -2193,13 +2335,13 @@ final class MasterDataImporterV2
             $existing = OaAdserverSurcharge::query()->where('code', $code)->where('revision_number', $revision)->first();
             if ($existing === null) {
                 $report->add('oa_adserver_surcharge', $key, 'create');
-                $ops[] = function () use ($code, $revision, $payload): void {
+                $ops[] = $this->plannedWrite('oa_adserver_surcharges', 'create', function () use ($code, $revision, $payload): void {
                     OaAdserverSurcharge::query()->create([
                         'code' => $code,
                         'revision_number' => $revision,
                         ...$payload,
                     ]);
-                };
+                });
 
                 continue;
             }
@@ -2231,7 +2373,7 @@ final class MasterDataImporterV2
      * Phase B: nachlaufende Zeiger, Zuordnungen und Integrität (schreibfreie Planung).
      *
      * @param  array<string, mixed>  $data
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planPhaseB(
         array $data,
@@ -2248,7 +2390,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planCurrentRevisionPointers(
         array $rows,
@@ -2298,9 +2440,9 @@ final class MasterDataImporterV2
 
             if ($definition === null) {
                 $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
-                $ops[] = function () use ($key, $revision): void {
+                $ops[] = $this->plannedWrite('field_definitions', 'update', function () use ($key, $revision): void {
                     $this->applyCurrentRevisionPointer($key, $revision);
-                };
+                });
 
                 continue;
             }
@@ -2317,9 +2459,9 @@ final class MasterDataImporterV2
                     }
                 }
                 $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
-                $ops[] = function () use ($key, $revision): void {
+                $ops[] = $this->plannedWrite('field_definitions', 'update', function () use ($key, $revision): void {
                     $this->applyCurrentRevisionPointer($key, $revision);
-                };
+                });
 
                 continue;
             }
@@ -2332,9 +2474,9 @@ final class MasterDataImporterV2
 
             if ($currentId < 1) {
                 $report->add('field_definition_current_revision', $key, 'update', 'revision='.$revision);
-                $ops[] = function () use ($definition, $revisionModel): void {
+                $ops[] = $this->plannedWrite('field_definitions', 'update', function () use ($definition, $revisionModel): void {
                     $definition->forceFill(['current_revision_id' => $revisionModel->id])->save();
-                };
+                });
 
                 continue;
             }
@@ -2365,7 +2507,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planActiveVersionPointers(
         array $rows,
@@ -2415,9 +2557,9 @@ final class MasterDataImporterV2
 
             if ($set === null) {
                 $report->add('field_set_active_version', $key, 'update', 'version='.$version);
-                $ops[] = function () use ($key, $version): void {
+                $ops[] = $this->plannedWrite('field_sets', 'update', function () use ($key, $version): void {
                     $this->applyActiveVersionPointer($key, $version);
-                };
+                });
 
                 continue;
             }
@@ -2434,9 +2576,9 @@ final class MasterDataImporterV2
                     }
                 }
                 $report->add('field_set_active_version', $key, 'update', 'version='.$version);
-                $ops[] = function () use ($key, $version): void {
+                $ops[] = $this->plannedWrite('field_sets', 'update', function () use ($key, $version): void {
                     $this->applyActiveVersionPointer($key, $version);
-                };
+                });
 
                 continue;
             }
@@ -2449,9 +2591,9 @@ final class MasterDataImporterV2
 
             if ($currentId < 1) {
                 $report->add('field_set_active_version', $key, 'update', 'version='.$version);
-                $ops[] = function () use ($set, $versionModel): void {
+                $ops[] = $this->plannedWrite('field_sets', 'update', function () use ($set, $versionModel): void {
                     $set->forceFill(['active_version_id' => $versionModel->id])->save();
-                };
+                });
 
                 continue;
             }
@@ -2482,7 +2624,7 @@ final class MasterDataImporterV2
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @return list<callable(): void>
+     * @return list<MasterDataPlannedWriteV2>
      */
     private function planFieldSetAssignments(
         array $rows,
@@ -2544,9 +2686,9 @@ final class MasterDataImporterV2
             $existing = $matches->first();
             if ($existing === null) {
                 $report->add('field_set_assignment', $semantic, 'create');
-                $ops[] = function () use ($setKey, $process, $layer, $categoryKey, $mediumCode, $payload): void {
+                $ops[] = $this->plannedWrite('field_set_assignments', 'create', function () use ($setKey, $process, $layer, $categoryKey, $mediumCode, $payload): void {
                     $this->applyFieldSetAssignmentCreate($setKey, $process, $layer, $categoryKey, $mediumCode, $payload);
-                };
+                });
 
                 continue;
             }
