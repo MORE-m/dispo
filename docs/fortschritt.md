@@ -1,6 +1,60 @@
 # Fortschritt V1
 
-Stand: 15. November 2026 – **PO-V1-CLOSURE-1.**
+Stand: 20. November 2026 – **PO-CALC-DISPO-UX-1 ABGESCHLOSSEN (GO mit Restpunkten).**
+
+Fünf PRs PO-CALC-DISPO-UX-1 PR1–PR5 auf `main` gemergt (#253 `366c535`,
+#254 `bc59dcd`, #256 `86cafd6`, #257 `eaa21ad`, #258 `32852af`). Letzter
+Merge-Commit `32852af12b162d17ee7416dc3ec7042cf1a0ad4f`; Post-Merge-CI
+[`44758026058`](https://github.com/MORE-m/dispo/actions/runs/44758026058)
+SUCCESS (`ci` / `mysql` / `e2e-spt008`; Composer audit und npm audit
+production SUCCESS).
+
+**Vertrag umgesetzt:** Wizard ohne Inventar-Default und Budget-Inventar leer
+(PR1); Dispo-Layout sticky Kommunikation + Freigabe am Seitenende (PR2);
+operative Kopfdaten Draft-only, RE vor Submit, Kunde read-only, Revision erbt
+Kopfdaten (PR3); Calc ohne Agentur/RE/Briefing/Zeitraum-Wizard, RE-Default
+`null`, Preserve-on-absent (PR4); operativer Kampagnenzeitraum native Spalten
+`operational_campaign_*`, kein Calc-Prefill, kein Backfill, kein globales
+Zeitraum-Submit-Gate (PO-PR5-01…07, PR5). Calc-Origin `campaign_period`,
+`derived_campaign_period_*`, DSP-DCP-001 und AT-13 unverändert.
+
+**Gesamtabnahme:** PO **GO** mit nicht blockierenden Restpunkten – Browser-E2E
+Nachweise für (1) Standardangebot → Kalkulation → Dispoauftrag,
+(2) OA-TKP-Positions-Flight vs. operativer Dispo-Kopfzeitraum,
+(3) Agenturwechsel/-entfernung mit Rechnungsempfänger-Atomik. Specs unter
+`tests/e2e/po-calc-dispo-ux-1-pr{2,3,4,5}-*.spec.ts`; isolierter CI-Step bisher
+nur für PR1 (`playwright.wizard-inventory-collapse.config.ts`).
+
+Dok: `docs/entscheidungen/PO-CALC-DISPO-UX-1.md`,
+`docs/blocker-und-entscheidungslog.md`. Keine Mutation `dispo_mat_core`,
+kein Deploy.
+
+Stand davor: 18. November 2026 – **SEC-NPM-AUDIT-PICOMATCH / PR #255.**
+
+Befristete Ausnahme GHSA-fc5q-39xc-vjpf (picomatch) bis **2026-12-18** via
+`scripts/npm-audit-production.mjs`; PO-/Security-Freigabe 18.11.2026.
+Merge #255 `ec26e42ff9596344de6b0e7be579464d2846a8b1`; Post-Merge-CI
+[`44368007218`](https://github.com/MORE-m/dispo/actions/runs/44368007218)
+SUCCESS. Entblockt PR #254. Restrisiko ungepatcht im Tree; Audit fail-closed
+für alle anderen Advisories; keine stillschweigende Verlängerung.
+Dok: `docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md`.
+
+Stand davor: 17. November 2026 – **PR #249 UI-Cleanup.**
+
+Passwort-Reset-Übersetzung; Spot-Preisjahr nur im Spot-Kontext. Merge
+`e16cfb46723471e2dee5d0d0516a0c1211e98589`; Post-Merge-CI
+[`44071845780`](https://github.com/MORE-m/dispo/actions/runs/44071845780)
+SUCCESS.
+
+Stand davor: 16. November 2026 – **Preisanlieferung XLSX v1 / PR #248.**
+
+Template-Download + Wide-Import (`PriceListDeliveryWorkbookContract`). Merge
+`8a7c72de34ef1cad9e2db59dff2406a1281033c8`; Post-Merge-CI
+[`43942081286`](https://github.com/MORE-m/dispo/actions/runs/43942081286)
+SUCCESS. MORE-Produktiv-Workbook-Mapping bleibt offen.
+Dok: `docs/readiness/import-templates/preisanlieferung-xlsx-v1.md`.
+
+Stand davor: 15. November 2026 – **PO-V1-CLOSURE-1.**
 
 V1-Backlogstatus gegen released Capabilities konsolidiert (Docs-only).
 Historische Status-Schulden bereinigt; keine neue Fachscope-Entscheidung außer
@@ -18,6 +72,10 @@ Keine Runtime-Änderung, keine Migration, kein DB-Write, kein Deploy.
 Dok: `docs/entscheidungen/PO-V1-CLOSURE-1-backlog-status.md`,
 `docs/backlog-v1.md`, `docs/blocker-und-entscheidungslog.md`,
 `docs/test-und-abnahmekatalog.md`.
+**Hinweis (20.11.2026):** Closure-ADR bleibt historischer Snapshot @ `f193c4b`;
+seitdem u. a. Preisanlieferung v1 (#248) und PO-CALC-DISPO-UX-1 (#253–#258)
+auf `main` – siehe aktuelle Kopfstände oben. Tag-1-Blocker BL-P11-01 /
+Katalog-Abnahme / Deploy unverändert offen.
 
 Stand davor: 15. November 2026 – **PO-OA-BUDGET-V2.**
 
@@ -886,8 +944,9 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Praxisrisiko Runtime | **niedrig** (Build-Tooling) |
 | Befristete Ausnahme bis 2026-12-18 | freigegeben (`scripts/npm-audit-production.mjs`) |
 | PO-/Security-Freigabe | **18.11.2026** – `docs/entscheidungen/SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md` |
-| PR #255 | Security-Chore mit fail-closed Audit-Helper |
-| PR #254 | bleibt Draft bis Chore auf `main` |
+| Merge PR #255 auf `main` | **erledigt** (`ec26e42`, CI `44368007218`) |
+| Merge PR #254 (PO-CALC-DISPO-UX PR2) | **erledigt** (`bc59dcd`, CI `44493207936`) |
+| Ablauf Ausnahme | **2026-12-18** (keine stillschweigende Verlängerung) |
 | Verlängerung | **keine** stillschweigende; Restrisiko ungepatcht |
 
 ## npm-audit source-map-js / GHSA-68fv-2mgg-jv7q (Oktober 2026)
@@ -1419,6 +1478,8 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | MORE-Adapter + kanonische Flachdatei unverändert kompatibel | **umgesetzt** |
 | Keine Auto-Aktivierung; Jahr nur im Dialog; Sparse ≠ 0 | **umgesetzt** |
 | Docs: `docs/readiness/import-templates/preisanlieferung-xlsx-v1.md` | **umgesetzt** |
+| Merge PR #248 auf `main` | **erledigt** (`8a7c72d`, CI `43942081286`) |
+| MORE-Produktiv-Workbook-Mapping | **offen** (Adapter bleibt) |
 
 ## BL-P4-01b – Preislisten-Excel-Import (September 2026)
 

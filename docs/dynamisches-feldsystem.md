@@ -54,6 +54,11 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
   Non-Calendar inkl. **OA-TKP** (`spot_method=tkp`) nutzt `period_open` /
   `position_flight_period` (Flight-Pfad). D3d-2a sichert diesen Vertrag
   regressionsseitig ab, ohne neue Flight-Pflichten.
+- **PO-CALC-DISPO-UX-1 PR5 (additiv, getrennt):** Der **operative Dispo-Kopfzeitraum**
+  liegt in nativen Spalten `operational_campaign_*` (nicht als Dyn-Feld).
+  Allgemeine `campaign_period`-Eingabe im Calc-Wizard entfernt; Key wird nicht
+  gesendet (Preserve-on-absent). Calc-Origin-Capture und Derived bleiben.
+  OA-Positions-Flight (`operational_flight_*`) bleibt eigenständig.
 
 ## Umsetzungsstand DF-3.1 (Admin Systemfelder / Kern-Feldsets)
 
