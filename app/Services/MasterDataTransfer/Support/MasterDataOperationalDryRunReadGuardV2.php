@@ -18,8 +18,6 @@ final class MasterDataOperationalDryRunReadGuardV2
 {
     private static bool $blockMutations = false;
 
-    private static bool $listenerRegistered = false;
-
     private bool $active = false;
 
     private string $driver = '';
@@ -154,21 +152,19 @@ final class MasterDataOperationalDryRunReadGuardV2
 
     private function enableWriteBlockListener(): void
     {
-        if (! self::$listenerRegistered) {
-            // beforeExecuting greift vor der Ausführung – zuverlässiger als QueryExecuted.
-            DB::connection()->beforeExecuting(static function (string $query, array $bindings, $connection): void {
-                if (! self::$blockMutations) {
-                    return;
-                }
-                $sql = strtolower(trim($query));
-                if (self::sqlLooksMutating($sql)) {
-                    throw new MasterDataTransferException(
-                        'Dry-Run Schreibversuch blockiert (Read-only-Guard): '.self::summarizeSql($sql),
-                    );
-                }
-            });
-            self::$listenerRegistered = true;
-        }
+        // Immer am aktuellen Connection-Objekt registrieren: static Flags überleben
+        // Application-Refresh zwischen PHPUnit-Tests, Connection-Instanzen nicht.
+        DB::connection()->beforeExecuting(static function (string $query, array $bindings, $connection): void {
+            if (! self::$blockMutations) {
+                return;
+            }
+            $sql = strtolower(trim($query));
+            if (self::sqlLooksMutating($sql)) {
+                throw new MasterDataTransferException(
+                    'Dry-Run Schreibversuch blockiert (Read-only-Guard): '.self::summarizeSql($sql),
+                );
+            }
+        });
 
         self::$blockMutations = true;
         $this->usedWriteBlockListener = true;
