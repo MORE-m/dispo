@@ -9,18 +9,19 @@ use Throwable;
 /**
  * Slice 6a: datenbankseitige Schreibfreiheit für den operativen V2-Dry-Run.
  *
- * MySQL/MariaDB: START TRANSACTION READ ONLY + REPEATABLE READ.
+ * MySQL/MariaDB: START TRANSACTION READ ONLY + REPEATABLE READ (transaktionslokal).
  * SQLite (nur APP_ENV=testing): PRAGMA query_only=ON.
  * Nesting unter RefreshDatabase (testing): zusätzlicher Write-Block-Listener.
  * Kein Write+Rollback als Ersatz. Session-/Transaktionszustand wird immer zurückgesetzt.
+ *
+ * Die Read-only-Transaktion wird per DB::unprepared() gestartet und zählt daher nicht
+ * in Laravel's transactionLevel(); leave() beendet sie deshalb immer per SQL ROLLBACK.
  */
 final class MasterDataOperationalDryRunReadGuardV2
 {
     private static bool $blockMutations = false;
 
     private bool $active = false;
-
-    private string $driver = '';
 
     private bool $startedReadOnlyTransaction = false;
 
@@ -38,7 +39,6 @@ final class MasterDataOperationalDryRunReadGuardV2
 
         $connection = DB::connection();
         $driver = $connection->getDriverName();
-        $this->driver = $driver;
 
         try {
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
@@ -78,21 +78,15 @@ final class MasterDataOperationalDryRunReadGuardV2
 
         try {
             if ($this->startedReadOnlyTransaction) {
-                if (DB::transactionLevel() > 0) {
-                    DB::rollBack();
-                }
+                // Unprepared START TRANSACTION erhöht Laravel's Zähler nicht.
+                // Immer per SQL ROLLBACK beenden — nie DB::rollBack() (könnte Fremd-TX treffen
+                // oder bei Level 0 die MySQL-TX unbemerkt offen lassen).
+                DB::unprepared('ROLLBACK');
                 $this->startedReadOnlyTransaction = false;
             }
         } catch (Throwable $e) {
             $errors[] = $e->getMessage();
-        }
-
-        try {
-            if (in_array($this->driver, ['mysql', 'mariadb'], true)) {
-                DB::statement('SET SESSION TRANSACTION READ WRITE');
-            }
-        } catch (Throwable $e) {
-            $errors[] = $e->getMessage();
+            $this->startedReadOnlyTransaction = false;
         }
 
         try {
@@ -102,10 +96,10 @@ final class MasterDataOperationalDryRunReadGuardV2
             }
         } catch (Throwable $e) {
             $errors[] = $e->getMessage();
+            $this->sqliteQueryOnly = false;
         }
 
         $this->active = false;
-        $this->driver = '';
 
         if ($errors !== []) {
             throw new MasterDataTransferException(
@@ -118,6 +112,14 @@ final class MasterDataOperationalDryRunReadGuardV2
     public function isActive(): bool
     {
         return $this->active;
+    }
+
+    /**
+     * Ob der Guard eine eigene (Laravel-untracked) Read-only-Transaktion hält.
+     */
+    public function hasStartedReadOnlyTransaction(): bool
+    {
+        return $this->startedReadOnlyTransaction;
     }
 
     private function enterMysqlReadOnly(int $transactionLevel): void
@@ -133,7 +135,8 @@ final class MasterDataOperationalDryRunReadGuardV2
             return;
         }
 
-        DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+        // Transaktionslokal (kein SET SESSION): Isolation + Read-only gelten nur für diese TX.
+        DB::unprepared('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         DB::unprepared('START TRANSACTION READ ONLY');
         $this->startedReadOnlyTransaction = true;
     }
@@ -180,7 +183,6 @@ final class MasterDataOperationalDryRunReadGuardV2
             $this->startedReadOnlyTransaction = false;
             $this->sqliteQueryOnly = false;
             $this->usedWriteBlockListener = false;
-            $this->driver = '';
         }
     }
 

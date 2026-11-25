@@ -187,7 +187,18 @@ final class MasterDataOperationalDatabaseGuardV2
         }
 
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
-            return strcasecmp($database, 'dispo_test') === 0;
+            if (strcasecmp($database, 'dispo_test') !== 0) {
+                return false;
+            }
+
+            // Auch die aktive Verbindung muss nachweislich dispo_test sein (nicht nur Config).
+            try {
+                $actual = $this->actualDatabaseNameFromConnection();
+            } catch (MasterDataTransferException) {
+                return false;
+            }
+
+            return $actual !== '' && strcasecmp($actual, 'dispo_test') === 0;
         }
 
         return false;
