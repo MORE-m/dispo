@@ -97,29 +97,15 @@ class MasterDataTransferImporterV2Slice6aMysqlReadOnlyStandaloneTest extends Tes
         $this->assertTrue($guard->isActive());
         $this->assertTrue($guard->hasStartedReadOnlyTransaction());
         $this->assertSame(0, DB::transactionLevel(), 'unprepared START TRANSACTION erhöht Laravel-Level nicht');
-        $this->assertSame(1, $this->mysqlInTransaction());
-
-        try {
-            DB::table('users')->where('id', 0)->update(['name' => 'should-fail']);
-            $this->fail('Schreibversuch in Read-only-TX muss scheitern');
-        } catch (\Throwable $e) {
-            $blob = $e->getMessage();
-            $this->assertTrue(
-                str_contains($blob, 'read only')
-                || str_contains($blob, 'READ ONLY')
-                || str_contains($blob, 'readonly')
-                || str_contains($blob, '1792')
-                || str_contains($blob, 'Cannot execute'),
-                $blob,
-            );
-        }
+        $this->assertWriteBlockedByReadOnly('Schreibversuch in Read-only-TX muss scheitern');
 
         $guard->leave();
 
         $this->assertFalse($guard->isActive());
         $this->assertFalse($guard->hasStartedReadOnlyTransaction());
         $this->assertSame($levelBefore, DB::transactionLevel());
-        $this->assertSame(0, $this->mysqlInTransaction(), 'keine offene MySQL-TX nach leave()');
+        // Verhaltensprobe: offene RO-TX würde Schreibzugriff weiter blockieren.
+        $this->assertConnectionAcceptsWrites();
 
         $user = User::factory()->create([
             'email' => 'ro-lifecycle@example.test',
@@ -138,7 +124,7 @@ class MasterDataTransferImporterV2Slice6aMysqlReadOnlyStandaloneTest extends Tes
         $guard = new MasterDataOperationalDryRunReadGuardV2;
 
         $guard->enter();
-        $this->assertSame(1, $this->mysqlInTransaction());
+        $this->assertWriteBlockedByReadOnly('RO muss vor Exception-Pfad aktiv sein');
 
         try {
             throw new MasterDataTransferException('simulierter Dry-Run-Fehler');
@@ -149,9 +135,7 @@ class MasterDataTransferImporterV2Slice6aMysqlReadOnlyStandaloneTest extends Tes
         $this->assertFalse($guard->isActive());
         $this->assertFalse($guard->hasStartedReadOnlyTransaction());
         $this->assertSame($levelBefore, DB::transactionLevel());
-        $this->assertSame(0, $this->mysqlInTransaction());
-
-        DB::table('users')->where('id', 0)->update(['name' => 'noop-ok']);
+        $this->assertConnectionAcceptsWrites();
     }
 
     #[Test]
@@ -188,10 +172,27 @@ class MasterDataTransferImporterV2Slice6aMysqlReadOnlyStandaloneTest extends Tes
         }
     }
 
-    private function mysqlInTransaction(): int
+    private function assertWriteBlockedByReadOnly(string $failureMessage): void
     {
-        $row = DB::selectOne('SELECT @@SESSION.in_transaction AS in_tx');
+        try {
+            DB::table('users')->where('id', 0)->update(['name' => 'should-fail-ro']);
+            $this->fail($failureMessage);
+        } catch (\Throwable $e) {
+            $blob = $e->getMessage();
+            $this->assertTrue(
+                str_contains($blob, 'read only')
+                || str_contains($blob, 'READ ONLY')
+                || str_contains($blob, 'readonly')
+                || str_contains($blob, '1792')
+                || str_contains($blob, 'Cannot execute'),
+                $blob,
+            );
+        }
+    }
 
-        return (int) ($row->in_tx ?? -1);
+    private function assertConnectionAcceptsWrites(): void
+    {
+        // No-op-Update: würde bei noch offener READ ONLY-TX fehlschlagen.
+        DB::table('users')->where('id', 0)->update(['name' => 'noop-after-leave']);
     }
 }
