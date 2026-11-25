@@ -16,6 +16,25 @@ final class MasterDataImportReport
     /** @var list<string> */
     private array $skipped = [];
 
+    private string $packageIntegrity = 'pass';
+
+    private string $protectionSnapshots = 'pass';
+
+    private string $priceListPins = 'pass';
+
+    private string $whitelist = 'pass';
+
+    private string $referentialIntegrity = 'pass';
+
+    /** @var array<string, int> */
+    private array $protectedTableCounts = [];
+
+    private int $protectedTableCount = 0;
+
+    private int $priceListBindingCount = 0;
+
+    private int $priceListPinCount = 0;
+
     public function add(string $entity, string $key, string $action, ?string $detail = null): void
     {
         $row = ['entity' => $entity, 'key' => $key, 'action' => $action];
@@ -48,6 +67,51 @@ final class MasterDataImportReport
         return $this->conflicts;
     }
 
+    public function setPackageIntegrity(string $status): void
+    {
+        $this->packageIntegrity = $status;
+    }
+
+    public function setProtectionSnapshots(string $status): void
+    {
+        $this->protectionSnapshots = $status;
+    }
+
+    public function setPriceListPins(string $status): void
+    {
+        $this->priceListPins = $status;
+    }
+
+    public function setWhitelist(string $status): void
+    {
+        $this->whitelist = $status;
+    }
+
+    public function setReferentialIntegrity(string $status): void
+    {
+        $this->referentialIntegrity = $status;
+    }
+
+    /**
+     * @param  array<string, array{count: int, digest: string}>  $tables
+     */
+    public function setProtectedTableStats(array $tables): void
+    {
+        $counts = [];
+        foreach ($tables as $name => $meta) {
+            $counts[$name] = (int) $meta['count'];
+        }
+        ksort($counts);
+        $this->protectedTableCounts = $counts;
+        $this->protectedTableCount = count($counts);
+    }
+
+    public function setPriceListPinStats(int $bindingCount, int $listCount): void
+    {
+        $this->priceListBindingCount = $bindingCount;
+        $this->priceListPinCount = $listCount;
+    }
+
     /**
      * @return array{
      *     dry_run: bool,
@@ -56,7 +120,19 @@ final class MasterDataImportReport
      *     conflicts: list<string>,
      *     skipped: list<string>,
      *     rows: list<RowReport>,
-     *     counts_by_action: array<string, int>
+     *     counts_by_action: array<string, int>,
+     *     security: array{
+     *         package_integrity: string,
+     *         protection_snapshots: string,
+     *         protected_table_count: int,
+     *         protected_table_counts: array<string, int>,
+     *         price_list_pins: string,
+     *         price_list_binding_count: int,
+     *         price_list_pin_count: int,
+     *         whitelist: string,
+     *         referential_integrity: string,
+     *         result: string
+     *     }
      * }
      */
     public function toArray(bool $dryRun): array
@@ -67,6 +143,13 @@ final class MasterDataImportReport
             $counts[$action] = ($counts[$action] ?? 0) + 1;
         }
 
+        $stopped = $this->hasConflicts()
+            || $this->packageIntegrity === 'stop'
+            || $this->protectionSnapshots === 'stop'
+            || $this->priceListPins === 'stop'
+            || $this->whitelist === 'stop'
+            || $this->referentialIntegrity === 'stop';
+
         return [
             'dry_run' => $dryRun,
             'created' => $counts['create'] ?? 0,
@@ -75,6 +158,18 @@ final class MasterDataImportReport
             'skipped' => $this->skipped,
             'rows' => $this->rows,
             'counts_by_action' => $counts,
+            'security' => [
+                'package_integrity' => $this->packageIntegrity,
+                'protection_snapshots' => $this->protectionSnapshots,
+                'protected_table_count' => $this->protectedTableCount,
+                'protected_table_counts' => $this->protectedTableCounts,
+                'price_list_pins' => $this->priceListPins,
+                'price_list_binding_count' => $this->priceListBindingCount,
+                'price_list_pin_count' => $this->priceListPinCount,
+                'whitelist' => $this->whitelist,
+                'referential_integrity' => $this->referentialIntegrity,
+                'result' => $stopped ? 'STOP' : 'PASS',
+            ],
         ];
     }
 }

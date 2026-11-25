@@ -46,19 +46,54 @@ use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
+use App\Services\MasterDataTransfer\Support\MasterDataPriceListPinGuardV2;
+use App\Services\MasterDataTransfer\Support\MasterDataProtectedStateSnapshotV2;
+use App\Services\MasterDataTransfer\Support\MasterDataWriteWhitelistGuardV2;
 use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use PDO;
 
 /**
- * EPIC-03-F Slice 4 Phase A+B: Inhaltsimport 2.0.0 inkl. nachlaufender Zeiger
- * (operativer CLI-Import weiterhin gesperrt; Phase C/Schutz fehlen).
+ * EPIC-03-F Slice 5 Phase A+B+C: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots,
+ * Pins und Whitelist (operativer CLI-Import weiterhin gesperrt; Status-Phase fehlt).
  */
 final class MasterDataImporterV2
 {
+    /** @var list<string> */
+    private const PHASE_AB_WRITE_TABLES = [
+        'organizations',
+        'calculation_methods',
+        'advertising_categories',
+        'advertising_media',
+        'advertising_category_calculation_methods',
+        'advertising_medium_calculation_methods',
+        'inventories',
+        'inventory_medium_rules',
+        'price_lists',
+        'price_list_items',
+        'production_price_lists',
+        'oa_platforms',
+        'oa_platform_medium_rules',
+        'oa_targeting_definitions',
+        'oa_tkp_price_lists',
+        'oa_tkp_price_list_items',
+        'oa_adserver_surcharges',
+        'field_definitions',
+        'field_definition_revisions',
+        'field_definition_revision_options',
+        'field_sets',
+        'field_set_versions',
+        'field_set_version_fields',
+        'field_rules',
+        'field_set_assignments',
+    ];
+
     public function __construct(
         private readonly MasterDataPackage $packages,
+        private readonly MasterDataProtectedStateSnapshotV2 $protectedSnapshots = new MasterDataProtectedStateSnapshotV2,
+        private readonly MasterDataPriceListPinGuardV2 $priceListPins = new MasterDataPriceListPinGuardV2,
+        private readonly MasterDataWriteWhitelistGuardV2 $writeGuard = new MasterDataWriteWhitelistGuardV2,
     ) {}
 
     /**
@@ -67,7 +102,7 @@ final class MasterDataImporterV2
     public function import(string $packagePath, bool $dryRun, string $confirmDatabase): array
     {
         throw new MasterDataTransferException(
-            'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase C und Schutzprüfungen fehlen).',
+            'Import für schema_version=2.0.0 ist operativ nicht freigegeben (Status-Phase und Staging-GO fehlen).',
         );
     }
 
@@ -89,7 +124,7 @@ final class MasterDataImporterV2
      */
     public function executePhaseAForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false);
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false, includePhaseC: false);
     }
 
     /**
@@ -100,14 +135,29 @@ final class MasterDataImporterV2
      */
     public function executePhasesABForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true);
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: false);
+    }
+
+    /**
+     * Isolierte Test-/interne Ausführung von Phase A+B+C (Schutz) in einer Transaktion.
+     * Nicht für CLI/Staging.
+     *
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    public function executePhasesABCForIsolatedTests(string $packagePath, bool $dryRun): array
+    {
+        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: true);
     }
 
     /**
      * @return array<string, mixed> MasterDataImportReport::toArray
      */
-    private function executeIsolatedPhases(string $packagePath, bool $dryRun, bool $includePhaseB): array
-    {
+    private function executeIsolatedPhases(
+        string $packagePath,
+        bool $dryRun,
+        bool $includePhaseB,
+        bool $includePhaseC,
+    ): array {
         $this->assertIsolatedTestExecutionAllowed();
 
         $package = $this->packages->load($packagePath);
@@ -123,7 +173,17 @@ final class MasterDataImporterV2
 
         $usersBefore = $this->snapshotUsers();
         $report = new MasterDataImportReport;
+        $report->setPackageIntegrity('pass');
         $context = new MasterDataImportPlanContext($package['data']);
+
+        $protectionBefore = null;
+        $pinsBefore = null;
+        if ($includePhaseC) {
+            $protectionBefore = $this->protectedSnapshots->capture();
+            $pinsBefore = $this->priceListPins->capture();
+            $report->setProtectedTableStats($protectionBefore['tables']);
+            $report->setPriceListPinStats($pinsBefore['binding_count'], $pinsBefore['list_count']);
+        }
 
         DB::flushQueryLog();
         DB::enableQueryLog();
@@ -132,6 +192,35 @@ final class MasterDataImporterV2
             if ($includePhaseB) {
                 $ops = array_merge($ops, $this->planPhaseB($package['data'], $report, $context));
                 $this->assertReferentialIntegrity($package['data'], $report, $context);
+                if ($report->hasConflicts()) {
+                    $report->setReferentialIntegrity('stop');
+                } else {
+                    $report->setReferentialIntegrity('pass');
+                }
+            }
+
+            if ($includePhaseC) {
+                $this->writeGuard->assertPlannedTablesAllowed(self::PHASE_AB_WRITE_TABLES);
+                $report->setWhitelist('pass');
+
+                foreach ($this->priceListPins->conflictsAgainstPackage($pinsBefore, $package['data']) as $msg) {
+                    $report->conflict($msg);
+                }
+                $protectionAfterPlan = $this->protectedSnapshots->capture();
+                $pinsAfterPlan = $this->priceListPins->capture();
+                foreach ($this->protectedSnapshots->diff($protectionBefore, $protectionAfterPlan) as $msg) {
+                    $report->conflict($msg);
+                }
+                foreach ($this->priceListPins->diff($pinsBefore, $pinsAfterPlan) as $msg) {
+                    $report->conflict($msg);
+                }
+                if ($report->hasConflicts()) {
+                    $report->setProtectionSnapshots('stop');
+                    $report->setPriceListPins('stop');
+                } else {
+                    $report->setProtectionSnapshots('pass');
+                    $report->setPriceListPins('pass');
+                }
             }
 
             if ($report->hasConflicts()) {
@@ -144,6 +233,12 @@ final class MasterDataImporterV2
 
             if ($dryRun) {
                 $this->assertDryRunQueryLogIsReadOnly();
+                if ($includePhaseC) {
+                    $protectionDry = $this->protectedSnapshots->capture();
+                    foreach ($this->protectedSnapshots->diff($protectionBefore, $protectionDry) as $msg) {
+                        throw new MasterDataTransferException($msg);
+                    }
+                }
 
                 return $report->toArray(true);
             }
@@ -151,16 +246,76 @@ final class MasterDataImporterV2
             DB::disableQueryLog();
         }
 
-        return DB::transaction(function () use ($ops, $report, $usersBefore, $package, $includePhaseB): array {
-            $this->apply($ops);
-
-            if ($includePhaseB) {
-                $this->assertPersistedIntegrityAfterApply($package['data'], $report);
-                if ($report->hasConflicts()) {
+        return DB::transaction(function () use (
+            $ops,
+            $report,
+            $usersBefore,
+            $package,
+            $includePhaseB,
+            $includePhaseC,
+            $protectionBefore,
+            $pinsBefore,
+        ): array {
+            if ($includePhaseC) {
+                // Plan darf nicht veraltet sein: Schutzbestand unmittelbar vor Apply erneut prüfen.
+                $protectionPreApply = $this->protectedSnapshots->capture();
+                $pinsPreApply = $this->priceListPins->capture();
+                $drift = array_merge(
+                    $this->protectedSnapshots->diff($protectionBefore, $protectionPreApply),
+                    $this->priceListPins->diff($pinsBefore, $pinsPreApply),
+                );
+                if ($drift !== []) {
                     throw new MasterDataTransferException(
-                        'Import fail-closed wegen Integritätskonflikten nach Apply.',
-                        $report->conflictMessages(),
+                        'Import fail-closed: Schutzbestand zwischen Planung und Apply verändert.',
+                        $drift,
                     );
+                }
+                $this->writeGuard->startMonitoring();
+            }
+
+            try {
+                $this->apply($ops);
+
+                if ($includePhaseB) {
+                    $this->assertPersistedIntegrityAfterApply($package['data'], $report);
+                    if ($report->hasConflicts()) {
+                        $report->setReferentialIntegrity('stop');
+                        throw new MasterDataTransferException(
+                            'Import fail-closed wegen Integritätskonflikten nach Apply.',
+                            $report->conflictMessages(),
+                        );
+                    }
+                }
+
+                if ($includePhaseC) {
+                    $this->writeGuard->assertObservedWritesAllowed();
+                    $report->setWhitelist('pass');
+
+                    $protectionAfter = $this->protectedSnapshots->capture();
+                    $pinsAfter = $this->priceListPins->capture();
+                    $postConflicts = array_merge(
+                        $this->protectedSnapshots->diff($protectionBefore, $protectionAfter),
+                        $this->priceListPins->diff($pinsBefore, $pinsAfter),
+                    );
+                    foreach ($postConflicts as $msg) {
+                        $report->conflict($msg);
+                    }
+                    if ($postConflicts !== []) {
+                        $report->setProtectionSnapshots('stop');
+                        $report->setPriceListPins('stop');
+                        throw new MasterDataTransferException(
+                            'Import fail-closed wegen Schutz-/Pin-Drift nach Apply.',
+                            $report->conflictMessages(),
+                        );
+                    }
+                    $report->setProtectionSnapshots('pass');
+                    $report->setPriceListPins('pass');
+                    $report->setProtectedTableStats($protectionAfter['tables']);
+                    $report->setPriceListPinStats($pinsAfter['binding_count'], $pinsAfter['list_count']);
+                }
+            } finally {
+                if ($includePhaseC) {
+                    $this->writeGuard->stopMonitoring();
                 }
             }
 

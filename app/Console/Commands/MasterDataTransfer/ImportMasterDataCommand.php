@@ -46,7 +46,7 @@ class ImportMasterDataCommand extends Command
             $schemaVersion = $packages->detectSchemaVersion($path);
             if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
                 throw new MasterDataTransferException(
-                    'Import für schema_version=2.0.0 ist in diesem Slice nicht freigegeben (Phase C und Schutzprüfungen fehlen).',
+                    'Import für schema_version=2.0.0 ist operativ nicht freigegeben (Status-Phase und Staging-GO fehlen).',
                 );
             }
             if ($schemaVersion !== MasterDataTransferContract::SCHEMA_VERSION) {
