@@ -250,13 +250,17 @@ class SwfMediumMethodOverrideRepairTest extends TestCase
     public function local_env_rejects_non_allowlisted_database(): void
     {
         $this->seedBrokenSwfOverrides();
+        $connection = (string) config('database.default');
+        $db = (string) config('database.connections.'.$connection.'.database');
+        $this->assertNotSame('dispo_mat_core', $db);
+
         $previous = $this->app['env'];
         $this->app['env'] = 'local';
 
         try {
             $exit = Artisan::call('dispo:repair-swf-method-overrides', [
                 '--dry-run' => true,
-                '--confirm-database' => ':memory:',
+                '--confirm-database' => $db,
                 '--report-dir' => $this->tmp,
             ]);
         } finally {
@@ -271,6 +275,13 @@ class SwfMediumMethodOverrideRepairTest extends TestCase
     public function testing_env_rejects_operative_database_name(): void
     {
         $this->seedBrokenSwfOverrides();
+        $connection = (string) config('database.default');
+        $driver = (string) config('database.connections.'.$connection.'.driver');
+        if ($driver !== 'sqlite') {
+            // Live-DB unter MySQL nicht auf operative Namen umbiegen; SQLite mappt Config=Live.
+            $this->markTestSkipped('Operative-Namensprüfung für APP_ENV=testing unter SQLite.');
+        }
+
         $previousDb = config('database.connections.sqlite.database');
         config(['database.connections.sqlite.database' => 'dispo_mat_core']);
 
@@ -520,11 +531,17 @@ class SwfMediumMethodOverrideRepairTest extends TestCase
     private function mediumFingerprint(string $code): array
     {
         $medium = AdvertisingMedium::query()->where('code', $code)->firstOrFail();
-        $methods = AdvertisingMediumCalculationMethod::query()
+        $methods = array_values(AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $medium->id)
             ->orderBy('sort')
             ->get(['calculation_method_id', 'engine_profile_key', 'is_active', 'sort'])
-            ->toArray();
+            ->map(fn (AdvertisingMediumCalculationMethod $row): array => [
+                'calculation_method_id' => (int) $row->calculation_method_id,
+                'engine_profile_key' => (string) $row->engine_profile_key,
+                'is_active' => (bool) $row->is_active,
+                'sort' => (int) $row->sort,
+            ])
+            ->all());
 
         return [
             'id' => (int) $medium->id,
