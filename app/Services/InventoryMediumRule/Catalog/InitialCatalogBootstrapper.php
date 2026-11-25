@@ -31,6 +31,7 @@ final class InitialCatalogBootstrapper
 {
     public function __construct(
         private readonly SingletonOrganizationResolver $organizations,
+        private readonly SwfLengthMediumOverrideEnsurer $swfLengthMediumOverrideEnsurer,
     ) {}
 
     /**
@@ -423,7 +424,7 @@ final class InitialCatalogBootstrapper
      */
     private function ensureAllongeMediumOverride(): void
     {
-        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+        $this->swfLengthMediumOverrideEnsurer->ensure(
             mediumCode: 'allonge',
             expectedKind: CalculationKind::SwfAllonge,
             engineProfile: EngineProfileRegistry::PROFILE_SWF_ALLONGE,
@@ -436,7 +437,7 @@ final class InitialCatalogBootstrapper
      */
     private function ensurePromoMediumOverride(): void
     {
-        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+        $this->swfLengthMediumOverrideEnsurer->ensure(
             mediumCode: 'promo_moderation',
             expectedKind: CalculationKind::SwfPromo,
             engineProfile: EngineProfileRegistry::PROFILE_SWF_PROMO,
@@ -449,105 +450,12 @@ final class InitialCatalogBootstrapper
      */
     private function ensureContestMediumOverride(): void
     {
-        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+        $this->swfLengthMediumOverrideEnsurer->ensure(
             mediumCode: 'contest_payoff',
             expectedKind: CalculationKind::SwfContest,
             engineProfile: EngineProfileRegistry::PROFILE_SWF_CONTEST,
             label: 'Contest',
         );
-    }
-
-    /**
-     * Installiert oder ergänzt Override mit Average (Default) + Calendar am angegebenen SWF-Profil.
-     * Idempotent. Bekannter Vorzustand (nur Average) wird um Calendar ergänzt; sonst fail-closed.
-     */
-    private function ensureSwfLengthMediumAverageAndCalendarOverride(
-        string $mediumCode,
-        CalculationKind $expectedKind,
-        string $engineProfile,
-        string $label,
-    ): void {
-        $medium = AdvertisingMedium::query()->where('code', $mediumCode)->lockForUpdate()->first();
-        if ($medium === null) {
-            return;
-        }
-
-        if ($medium->kind !== $expectedKind) {
-            throw new RuntimeException(
-                "{$label}-Medium hat nicht die Berechnungsart {$expectedKind->value}. Bootstrap überschreibt das nicht.",
-            );
-        }
-
-        $average = CalculationMethod::query()->where('key', 'average')->first();
-        $calendar = CalculationMethod::query()->where('key', 'calendar')->first();
-        if ($average === null || $calendar === null) {
-            throw new RuntimeException("Berechnungsmethoden „average“/„calendar“ fehlen für den {$label}-Override.");
-        }
-
-        $assignments = AdvertisingMediumCalculationMethod::query()
-            ->where('advertising_medium_id', $medium->id)
-            ->get();
-
-        $hasAverage = $assignments->contains(
-            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $average->id
-                && $row->engine_profile_key === $engineProfile
-                && (bool) $row->is_active,
-        );
-        $hasCalendar = $assignments->contains(
-            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $calendar->id
-                && $row->engine_profile_key === $engineProfile
-                && (bool) $row->is_active,
-        );
-
-        $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
-            && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $hasAverage
-            && $hasCalendar
-            && $assignments->count() === 2;
-
-        if ($matches) {
-            return;
-        }
-
-        $canInstallFresh = $medium->calculation_method_mode === CalculationMethodMode::Inherit
-            && $medium->default_calculation_method_id === null
-            && $assignments->isEmpty();
-
-        $canUpgradeAverageOnly = $medium->calculation_method_mode === CalculationMethodMode::Override
-            && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $hasAverage
-            && ! $hasCalendar
-            && $assignments->count() === 1;
-
-        if (! $canInstallFresh && ! $canUpgradeAverageOnly) {
-            throw new RuntimeException(
-                "{$label}-Methodenvertrag weicht ab und wird nicht überschrieben.",
-            );
-        }
-
-        if ($canInstallFresh) {
-            $medium->calculation_method_mode = CalculationMethodMode::Override;
-            $medium->default_calculation_method_id = $average->id;
-            $medium->save();
-
-            $averageAssignment = new AdvertisingMediumCalculationMethod;
-            $averageAssignment->advertising_medium_id = $medium->id;
-            $averageAssignment->calculation_method_id = $average->id;
-            $averageAssignment->engine_profile_key = $engineProfile;
-            $averageAssignment->is_active = true;
-            $averageAssignment->sort = 10;
-            $averageAssignment->lock_version = 1;
-            $averageAssignment->save();
-        }
-
-        $calendarAssignment = new AdvertisingMediumCalculationMethod;
-        $calendarAssignment->advertising_medium_id = $medium->id;
-        $calendarAssignment->calculation_method_id = $calendar->id;
-        $calendarAssignment->engine_profile_key = $engineProfile;
-        $calendarAssignment->is_active = true;
-        $calendarAssignment->sort = 20;
-        $calendarAssignment->lock_version = 1;
-        $calendarAssignment->save();
     }
 
     /**
