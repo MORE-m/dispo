@@ -14,14 +14,24 @@ use Illuminate\Support\Facades\Schema;
  */
 final class MasterDataProtectedStateSnapshotV2
 {
-    /** @var list<string> Technische Spalten ohne fachliche Relevanz für den Drift-Vergleich. */
+    /**
+     * Nur reine technische Spalten ohne Sicherheits-/Bestandsrelevanz.
+     *
+     * Bewusst NICHT ausgeschlossen (müssen Drift auslösen):
+     * - deleted_at (Soft-Delete / Bestandsschutz)
+     * - email_verified_at (Account-Sicherheitszustand)
+     * - two_factor_confirmed_at (2FA-Sicherheitszustand)
+     *
+     * Ausgeschlossen mit Begründung:
+     * - created_at / updated_at: reine Schreibzeitstempel ohne fachlichen Status
+     * - remember_token: sessiongebundenes Auth-Artefakt, kein Bestandsschlüssel
+     *
+     * @var list<string>
+     */
     private const IGNORED_COLUMNS = [
         'created_at',
         'updated_at',
-        'deleted_at',
-        'email_verified_at',
         'remember_token',
-        'two_factor_confirmed_at',
     ];
 
     /**
