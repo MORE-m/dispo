@@ -1,9 +1,9 @@
 # EPIC-03-F – Operative CLI-Anforderungen (Slice 6a / 6b / 7)
 
-**Status:** Nur Anforderungen. **Keine Implementierung in diesem Dokument/PR.**
+**Status:** Slice **6a** implementiert (schreibfreier V2-Dry-Run). Slice 6b/7 weiterhin Anforderung.
 **Datum:** 2026-11-25
 **Vertrag:** [`EPIC-03-F-master-data-transfer-2-0-0.md`](EPIC-03-F-master-data-transfer-2-0-0.md)
-**Ist-Code (Main nach PR #275):** Export V2 CLI vorhanden; Import V2 inhaltlich A–C in Tests; **operativer CLI-Import 2.0.0 gesperrt**
+**Ist-Code:** Export V2 CLI vorhanden; Import V2 A–C in Tests; **Slice 6a:** operativer Dry-Run CLI mit Allowlist + `--require-package-sha256`. Apply/Status weiterhin gesperrt.
 
 ## 1. Ist-Zustand (verbindlich ablesen)
 

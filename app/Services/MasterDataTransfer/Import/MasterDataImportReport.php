@@ -26,6 +26,10 @@ final class MasterDataImportReport
 
     private string $referentialIntegrity = 'pass';
 
+    private ?string $packageSha256 = null;
+
+    private ?string $operationalDatabase = null;
+
     /** @var array<string, int> */
     private array $protectedTableCounts = [];
 
@@ -92,6 +96,16 @@ final class MasterDataImportReport
         $this->referentialIntegrity = $status;
     }
 
+    public function setPackageSha256(string $sha256): void
+    {
+        $this->packageSha256 = strtolower($sha256);
+    }
+
+    public function setOperationalDatabase(string $database): void
+    {
+        $this->operationalDatabase = $database;
+    }
+
     /**
      * @param  array<string, array{count: int, digest: string}>  $tables
      */
@@ -123,6 +137,8 @@ final class MasterDataImportReport
      *     counts_by_action: array<string, int>,
      *     security: array{
      *         package_integrity: string,
+     *         package_sha256: ?string,
+     *         operational_database: ?string,
      *         protection_snapshots: string,
      *         protected_table_count: int,
      *         protected_table_counts: array<string, int>,
@@ -160,6 +176,8 @@ final class MasterDataImportReport
             'counts_by_action' => $counts,
             'security' => [
                 'package_integrity' => $this->packageIntegrity,
+                'package_sha256' => $this->packageSha256,
+                'operational_database' => $this->operationalDatabase,
                 'protection_snapshots' => $this->protectionSnapshots,
                 'protected_table_count' => $this->protectedTableCount,
                 'protected_table_counts' => $this->protectedTableCounts,

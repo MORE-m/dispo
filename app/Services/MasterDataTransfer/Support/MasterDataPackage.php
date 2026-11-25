@@ -85,6 +85,39 @@ final class MasterDataPackage
     }
 
     /**
+     * Verbindlicher Paket-Digest (SHA-256 hex, lowercase).
+     *
+     * Kanonisch: sortierte Zeilen `sha256  relativer_pfad` über Manifest,
+     * checksums.sha256 und alle Schema-Datendateien, danach äußeres SHA-256.
+     * Vor der Berechnung wird das Paket vollständig validiert (load).
+     */
+    public function computePackageSha256(string $packagePath): string
+    {
+        $package = $this->load($packagePath);
+        $canonicalRoot = $package['root'];
+        $dataFiles = $this->dataFilesForSchema($package['schema_version']);
+
+        $entries = [
+            MasterDataTransferContract::MANIFEST_FILE,
+            MasterDataTransferContract::CHECKSUMS_FILE,
+            ...$dataFiles,
+        ];
+        sort($entries);
+
+        $lines = [];
+        foreach ($entries as $relative) {
+            $absolute = $this->assertSafePackageFile($canonicalRoot, $relative);
+            $hash = hash_file('sha256', $absolute);
+            if ($hash === false) {
+                throw new MasterDataTransferException('Paket-Digest: SHA256 nicht lesbar: '.$relative);
+            }
+            $lines[] = $hash.'  '.$relative;
+        }
+
+        return hash('sha256', implode("\n", $lines)."\n");
+    }
+
+    /**
      * @param  array<string, mixed>  $manifest
      * @param  array<string, array<string, mixed>|list<mixed>>  $filePayloads  relative path => decoded JSON-serializable
      */

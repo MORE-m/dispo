@@ -52,4 +52,17 @@ return [
         explode(',', (string) env('DISPO_MAIL_RECIPIENT_ALLOWLIST', '')),
     ), static fn (string $email): bool => $email !== '')),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Master-Data-Transfer – Test-Only DB-Identität (EPIC-03-F Slice 6a)
+    |--------------------------------------------------------------------------
+    |
+    | Nur für synthetische Tests: simuliert die operative Ziel-DB-Identität,
+    | ohne die echte Verbindungs-DB umzubiegen und ohne CLI-Override.
+    | Wird ausschließlich bei APP_ENV=testing ausgewertet; sonst ignoriert.
+    |
+    */
+
+    'master_data_transfer_testing_operational_database' => null,
+
 ];

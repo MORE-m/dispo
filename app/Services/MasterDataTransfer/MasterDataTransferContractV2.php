@@ -22,6 +22,12 @@ final class MasterDataTransferContractV2
     public const PRICE_STATUS_ON_APPLY = 'draft';
 
     /**
+     * Einzige erlaubte operative Zieldatenbank (Slice 6a Dry-Run / spätere 6b/7).
+     * Nicht per CLI überschreibbar.
+     */
+    public const OPERATIONAL_DATABASE = 'spn26jz7_dispo_staging';
+
+    /**
      * Pflicht-Datendateien laut Vertrag 2.0.0 (Reihenfolge ist kanonisch).
      *
      * @var list<string>

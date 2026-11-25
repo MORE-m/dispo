@@ -363,9 +363,9 @@ class MasterDataTransferImporterV2PhaseATest extends TestCase
 
         try {
             app(MasterDataImporterV2::class)->import($package, dryRun: true, confirmDatabase: 'ignored');
-            $this->fail('Operativer ImporterV2::import muss gesperrt bleiben.');
+            $this->fail('ImporterV2::import() darf nicht als operativer Dry-Run dienen.');
         } catch (MasterDataTransferException $e) {
-            $this->assertStringContainsString('nicht freigegeben', $e->getMessage());
+            $this->assertStringContainsString('dryRunOperational()', $e->getMessage());
         }
 
         $db = (string) config('database.connections.'.config('database.default').'.database');
@@ -374,14 +374,14 @@ class MasterDataTransferImporterV2PhaseATest extends TestCase
             '--dry-run' => true,
             '--confirm-database' => $db,
         ]));
-        $this->assertStringContainsString('nicht freigegeben', Artisan::output());
+        $this->assertStringContainsString('--require-package-sha256 ist Pflicht', Artisan::output());
 
         $this->assertSame(1, Artisan::call('dispo:import-master-data', [
             'path' => $package,
             '--apply' => true,
             '--confirm-database' => $db,
         ]));
-        $this->assertStringContainsString('nicht freigegeben', Artisan::output());
+        $this->assertStringContainsString('Slice 6b fehlt', Artisan::output());
         $this->assertSame(0, Organization::query()->count());
     }
 

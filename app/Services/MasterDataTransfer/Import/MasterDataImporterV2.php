@@ -45,6 +45,7 @@ use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
+use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use App\Services\MasterDataTransfer\Support\MasterDataPlannedWriteV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPriceListPinGuardV2;
@@ -56,8 +57,8 @@ use Illuminate\Support\Facades\DB;
 use PDO;
 
 /**
- * EPIC-03-F Slice 5 Phase A+B+C: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots,
- * Pins und Whitelist (operativer CLI-Import weiterhin gesperrt; Status-Phase fehlt).
+ * EPIC-03-F Slice 5+6a: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots, Pins, Whitelist.
+ * Slice 6a: operativer schreibfreier Dry-Run. Apply und Status bleiben gesperrt.
  */
 final class MasterDataImporterV2
 {
@@ -66,16 +67,90 @@ final class MasterDataImporterV2
         private readonly MasterDataProtectedStateSnapshotV2 $protectedSnapshots = new MasterDataProtectedStateSnapshotV2,
         private readonly MasterDataPriceListPinGuardV2 $priceListPins = new MasterDataPriceListPinGuardV2,
         private readonly MasterDataWriteWhitelistGuardV2 $writeGuard = new MasterDataWriteWhitelistGuardV2,
+        private readonly MasterDataOperationalDatabaseGuardV2 $operationalDatabaseGuard = new MasterDataOperationalDatabaseGuardV2,
     ) {}
 
     /**
+     * Generischer Import-Einstieg bleibt für Apply/Status gesperrt.
+     * Operativer Dry-Run: {@see dryRunOperational()}.
+     *
      * @return array<string, mixed>
      */
     public function import(string $packagePath, bool $dryRun, string $confirmDatabase): array
     {
+        if ($dryRun) {
+            throw new MasterDataTransferException(
+                'Operativer V2-Dry-Run nur über dryRunOperational() mit --require-package-sha256 (Slice 6a).',
+            );
+        }
+
         throw new MasterDataTransferException(
-            'Import für schema_version=2.0.0 ist operativ nicht freigegeben (Status-Phase und Staging-GO fehlen).',
+            'Apply für schema_version=2.0.0 ist operativ nicht freigegeben (Slice 6b fehlt).',
         );
+    }
+
+    /**
+     * Slice 6a: operativer, schreibfreier Dry-Run gegen die Staging-Allowlist.
+     * Schwächt den Test-Isolations-Guard nicht ab (eigener Einstieg).
+     *
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    public function dryRunOperational(
+        string $packagePath,
+        string $confirmDatabase,
+        string $requirePackageSha256,
+    ): array {
+        $normalizedRequired = $this->assertValidPackageSha256Option($requirePackageSha256);
+        $activeDatabase = $this->operationalDatabaseGuard->assertDryRunAllowed($confirmDatabase);
+
+        $digestBefore = strtolower($this->packages->computePackageSha256($packagePath));
+        if (! hash_equals($digestBefore, $normalizedRequired)) {
+            throw new MasterDataTransferException(sprintf(
+                'Paket-SHA256 stimmt nicht (--require-package-sha256). erwartet=%s berechnet=%s',
+                $normalizedRequired,
+                $digestBefore,
+            ));
+        }
+
+        $report = $this->executePhases(
+            $packagePath,
+            dryRun: true,
+            includePhaseB: true,
+            includePhaseC: true,
+            requireIsolatedTestGuard: false,
+            packageSha256: $digestBefore,
+            operationalDatabase: $activeDatabase,
+        );
+
+        $digestAfter = strtolower($this->packages->computePackageSha256($packagePath));
+        if (! hash_equals($digestBefore, $digestAfter)) {
+            throw new MasterDataTransferException(
+                'Paket wurde während des Dry-Runs verändert (SHA256-Drift) — Abbruch.',
+                [
+                    'before='.$digestBefore,
+                    'after='.$digestAfter,
+                ],
+            );
+        }
+        if (! hash_equals($digestAfter, $normalizedRequired)) {
+            throw new MasterDataTransferException(
+                'Paket-SHA256 nach Dry-Run weicht von --require-package-sha256 ab — Abbruch.',
+            );
+        }
+
+        return $report;
+    }
+
+    private function assertValidPackageSha256Option(string $requirePackageSha256): string
+    {
+        $normalized = strtolower(trim($requirePackageSha256));
+        if ($normalized === '' || preg_match('/^[a-f0-9]{64}$/', $normalized) !== 1) {
+            throw new MasterDataTransferException(
+                '--require-package-sha256 ist Pflicht und muss ein 64-stelliger Hex-SHA256 sein.',
+            );
+        }
+
+        return $normalized;
     }
 
     /** @var list<string> */
@@ -96,7 +171,13 @@ final class MasterDataImporterV2
      */
     public function executePhaseAForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: false, includePhaseC: false);
+        return $this->executePhases(
+            $packagePath,
+            $dryRun,
+            includePhaseB: false,
+            includePhaseC: false,
+            requireIsolatedTestGuard: true,
+        );
     }
 
     /**
@@ -107,7 +188,13 @@ final class MasterDataImporterV2
      */
     public function executePhasesABForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: false);
+        return $this->executePhases(
+            $packagePath,
+            $dryRun,
+            includePhaseB: true,
+            includePhaseC: false,
+            requireIsolatedTestGuard: true,
+        );
     }
 
     /**
@@ -118,19 +205,34 @@ final class MasterDataImporterV2
      */
     public function executePhasesABCForIsolatedTests(string $packagePath, bool $dryRun): array
     {
-        return $this->executeIsolatedPhases($packagePath, $dryRun, includePhaseB: true, includePhaseC: true);
+        return $this->executePhases(
+            $packagePath,
+            $dryRun,
+            includePhaseB: true,
+            includePhaseC: true,
+            requireIsolatedTestGuard: true,
+        );
     }
 
     /**
      * @return array<string, mixed> MasterDataImportReport::toArray
      */
-    private function executeIsolatedPhases(
+    private function executePhases(
         string $packagePath,
         bool $dryRun,
         bool $includePhaseB,
         bool $includePhaseC,
+        bool $requireIsolatedTestGuard,
+        ?string $packageSha256 = null,
+        ?string $operationalDatabase = null,
     ): array {
-        $this->assertIsolatedTestExecutionAllowed();
+        if ($requireIsolatedTestGuard) {
+            $this->assertIsolatedTestExecutionAllowed();
+        } elseif (! $dryRun) {
+            throw new MasterDataTransferException(
+                'Operativer V2-Pfad ohne Isolations-Guard darf nur schreibfreien Dry-Run ausführen.',
+            );
+        }
 
         $package = $this->packages->load($packagePath);
         if ($package['schema_version'] !== MasterDataTransferContractV2::SCHEMA_VERSION) {
@@ -146,6 +248,12 @@ final class MasterDataImporterV2
         $usersBefore = $this->snapshotUsers();
         $report = new MasterDataImportReport;
         $report->setPackageIntegrity('pass');
+        if ($packageSha256 !== null) {
+            $report->setPackageSha256($packageSha256);
+        }
+        if ($operationalDatabase !== null) {
+            $report->setOperationalDatabase($operationalDatabase);
+        }
         $context = new MasterDataImportPlanContext($package['data']);
 
         $protectionBefore = null;
