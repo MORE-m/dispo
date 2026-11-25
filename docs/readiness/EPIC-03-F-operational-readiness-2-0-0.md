@@ -21,7 +21,7 @@ Dieses Paket bereitet den späteren operativen Gesamttransfer vor. Es enthält k
 | B – Datenabgleich | [`EPIC-03-F-data-reconciliation-matrix-2-0-0.md`](EPIC-03-F-data-reconciliation-matrix-2-0-0.md) |
 | C – Schutz/Abnahme | [`EPIC-03-F-protection-acceptance-matrix-2-0-0.md`](EPIC-03-F-protection-acceptance-matrix-2-0-0.md) |
 | D – Risiken/Recovery | [`EPIC-03-F-risks-recovery-2-0-0.md`](EPIC-03-F-risks-recovery-2-0-0.md) |
-| E – Slice-6-CLI | [`../entscheidungen/EPIC-03-F-slice6-operational-cli-requirements.md`](../entscheidungen/EPIC-03-F-slice6-operational-cli-requirements.md) |
+| E – CLI 6a/6b/7 | [`../entscheidungen/EPIC-03-F-slice6-operational-cli-requirements.md`](../entscheidungen/EPIC-03-F-slice6-operational-cli-requirements.md) |
 
 ## Dokumentationsbasis
 
@@ -43,7 +43,7 @@ Nach jedem weiteren Merge, der den Transfer-Code ändert, diese Doku erneut gege
 
 ## Operative Checkliste (Kurzform)
 
-Siehe Runbook Abschnitt „Operative Checkliste“. Die zwölf Schritte sind:
+Siehe Runbook Abschnitt „Operative Checkliste“. Die 13 Schritte sind:
 
 1. Technischen Stand und CI-Gates prüfen
 2. Quell- und Staging-DB eindeutig identifizieren
@@ -61,10 +61,10 @@ Siehe Runbook Abschnitt „Operative Checkliste“. Die zwölf Schritte sind:
 
 ## Was für den ersten kontrollierten Staging-Dry-Run noch fehlt
 
-Kurzfassung; Details in Teil E und im Abschlussbericht des PRs:
+Kurzfassung; Details in Teil E (Phasen Slice 6a / 6b / 7):
 
-- Operative CLI-Freigabe für Schema `2.0.0` (aktuell CLI blockiert `2.0.0`-Import)
-- Slice-6-Funktionen: DB-Allowlist, Backup-Nachweis, Paket-SHA256-Bindung, Sicherheitsbericht, Status-Phase-Trennung
-- Frische, verifizierte Staging-Sicherung zum Ausführungszeitpunkt
-- Aktuelle Ausgangszählung (Readiness-Zahlen vom 23.11. sind historische Referenz)
+- **Slice 6a:** schreibfreier V2-Dry-Run über CLI (aktuell Import `2.0.0` gesperrt) – Voraussetzung für den ersten Dry-Run
 - Separates PO-GO für Export und danach für genau einen Dry-Run
+- Aktuelle Ausgangszählung (Readiness-Zahlen vom 23.11. sind historische Referenz)
+- **Nicht** Voraussetzung für den ersten Dry-Run: Slice 6b (Apply inkl. Backup-Nachweis), Slice 7 (Preisstatus)
+- Frische, verifizierte Staging-Sicherung wird für Apply (6b) und Status (7) verlangt, nicht als Blocker für den schreibfreien Dry-Run

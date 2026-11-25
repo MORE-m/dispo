@@ -111,8 +111,8 @@ Status-Phase nur gegen dasselbe SHA256-Paket; nur `draft→active/archived` gem�
 
 | Risiko | Mitigation |
 |---|---|
-| Apply gegen Quelle/Produktion | Allowlist + `--confirm-database`; ohne Slice 6 nicht freigeben |
-| CLI noch gesperrt für 2.0.0 | Slice 6 abschließen; bis dahin kein operativer Dry-Run |
+| Apply gegen Quelle/Produktion | Allowlist + `--confirm-database`; ohne Slice 6b nicht freigeben |
+| CLI noch gesperrt für 2.0.0 | Slice 6a abschließen; bis dahin kein operativer Dry-Run |
 | Verwechslung Schema 1.0.0 / 2.0.0 | Export immer `--schema=2.0.0`; Import Schema-Bindung |
 | Historische Counts als Ist verwendet | Neuablesung vor Lauf verpflichtend |
 | Parallelarbeit an Slice-5-Nachbesserungen | Dieser Docs-Branch ändert keinen Importcode; nach Code-Merges Doku re-checken |

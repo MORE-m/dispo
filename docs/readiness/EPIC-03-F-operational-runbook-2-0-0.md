@@ -10,7 +10,7 @@
 | Kennzeichnung | Bedeutung |
 |---|---|
 | **VORHANDEN** | Befehl/Parameter existiert im aktuellen `main`-Code |
-| **OFFEN (Slice 6)** | Noch nicht operativ freigegeben oder Parameter fehlt; hier nur als Anforderung notiert |
+| **OFFEN (Slice 6a/6b/7)** | Noch nicht operativ freigegeben oder Parameter fehlt; hier nur als Anforderung notiert |
 | **MANUELL** | Operativer Host-/DB-Schritt außerhalb der Artisan-CLI |
 
 In diesem Dokument werden **keine** Befehle ausgeführt. Platzhalter wie `<PAKET>` und `<BACKUP>` sind vor Ort zu ersetzen.
@@ -32,7 +32,7 @@ In diesem Dokument werden **keine** Befehle ausgeführt. Platzhalter wie `<PAKET
 | 9 | Dry-Run-Bericht + Konflikte | nach #8 | conflicts > 0 oder security ≠ PASS |
 | 10 | PO-GO Apply | **ja, separat** | kein GO |
 | 11 | Apply + Nachkontrolle | nach #10 | Fehler, Schutz-Drift, Pin-Drift |
-| 12 | Idempotenzprüfung | nach #11 | zusätzliche Creates/Updates |
+| 12 | Idempotenzprüfung (kein zweiter Staging-Lauf ohne GO) | nach #11; operativ nur mit GO | zusätzliche Creates/Updates; ungeplanter Zweitlauf |
 | 13 | Preisstatus-Phase | **ja, eigenes GO** | ohne GO oder anderes Paket |
 
 ---
@@ -49,13 +49,13 @@ Sicherstellen, dass der ausführende Stand dem freigegebenen `main` entspricht u
 2. Prüfen, dass der Stand Merge von Slice 1–5 enthält (Paket, Exporter V2, Importer Phasen A–C).
 3. GitHub Actions / CI für den Deploy-SHA: alle Gates grün.
 4. Schema beider DBs: gleiche Migrationsanzahl (historische Lesung 23.11.2026: je 79 Migrationen – **nur Referenz**, vor Lauf erneut zählen).
-5. Bestätigen: operativer Import `2.0.0` ist freigeschaltet (siehe Teil E). **Aktuell OFFEN:** CLI lehnt `schema_version=2.0.0` ab.
+5. Bestätigen: für den geplanten Schritt die passende CLI-Phase freigeschaltet ist (siehe Teil E: **6a** Dry-Run, **6b** Apply, **7** Status). **Aktuell OFFEN:** CLI lehnt `schema_version=2.0.0` ab.
 
 ### PASS / STOP
 
 | PASS | STOP |
 |---|---|
-| Deploy-SHA dokumentiert, CI grün, Slice-6-CLI freigegeben | CI rot, SHA unklar, CLI noch gesperrt |
+| Deploy-SHA dokumentiert, CI grün, benötigte Phase (6a/6b/7) freigegeben | CI rot, SHA unklar, benötigte Phase noch gesperrt |
 
 ---
 
@@ -71,9 +71,9 @@ Sicherstellen, dass der ausführende Stand dem freigegebenen `main` entspricht u
 
 Apply gegen `dispo_mat_core` / `dispo` ist im V1-Importer blockiert. V2 hat zusätzlich `FORBIDDEN_TEST_DATABASES` für isolierte Tests.
 
-### OFFEN (Slice 6)
+### OFFEN (Slice 6a/6b)
 
-- Explizite Allowlist nur `spn26jz7_dispo_staging` für operativen Apply
+- Explizite Allowlist nur `spn26jz7_dispo_staging` für operative Läufe (6b Apply zwingend; 6a Dry-Run empfohlen/soll)
 - Pflicht `--confirm-database` muss exakt dem aktiven Staging-Namen entsprechen
 - Fail-closed, wenn `DB_DATABASE` ≠ confirm
 
@@ -227,9 +227,9 @@ Zusätzlich:
 - Keine Users/CRM/Calcs/Dispo im Paket
 - Paket-SHA256 (Gesamtpaket oder kanonischer Digest) für spätere Bindung notieren
 
-### OFFEN (Slice 6)
+### OFFEN (Slice 6a/6b/7)
 
-- CLI-Parameter, der den Paket-SHA256 beim Import erzwingt (`--require-package-sha256=` o. ä.)
+- CLI-Parameter, der den Paket-SHA256 beim Import erzwingt (`--require-package-sha256=` o. ä.; für Apply/Status Pflicht laut 6b/7)
 
 ### PASS / STOP
 
@@ -262,7 +262,7 @@ php artisan dispo:import-master-data <PAKET_DIR> \
   --confirm-database=spn26jz7_dispo_staging
 ```
 
-### OFFEN (Slice 6) – kritisch
+### OFFEN (Slice 6a) – kritisch
 
 Im aktuellen `main` gilt:
 
@@ -270,7 +270,7 @@ Im aktuellen `main` gilt:
 - `MasterDataImporterV2::import()` wirft dieselbe Sperre.
 - Phasen A–C sind nur über isolierte Test-Hooks ausführbar, nicht über CLI.
 
-Erst nach Slice-6-Freigabe ist der obige Befehl für `2.0.0` zulässig. Bis dahin ist der Befehl hier nur als **Zielvertrag** dokumentiert.
+Erst nach **Slice-6a**-Freigabe ist der obige Dry-Run-Befehl für `2.0.0` zulässig. Slice 6b (Apply) und Slice 7 (Status) sind dafür **nicht** erforderlich. Bis 6a ist der Befehl hier nur als **Zielvertrag** dokumentiert.
 
 ### Bericht auswerten
 
@@ -312,13 +312,13 @@ php artisan dispo:import-master-data <PAKET_DIR> \
   --confirm-database=spn26jz7_dispo_staging
 ```
 
-### OFFEN (Slice 6)
+### OFFEN (Slice 6b; Status = Slice 7)
 
 Zusätzlich erwartete Parameter (noch nicht implementiert):
 
-- `--require-package-sha256=<HEX>`
-- `--require-backup-proof=<PFAD_ODER_TOKEN>` (oder gleichwertiger Gate-Nachweis)
-- explizite Trennung Inhalts-Apply vs. Status-Phase (Status **nicht** in diesem Befehl)
+- `--require-package-sha256=<HEX>` (Slice 6b)
+- `--require-backup-proof=<PFAD_ODER_TOKEN>` (Slice 6b; Gate-Nachweis)
+- explizite Trennung Inhalts-Apply vs. Status-Phase: Status ist **Slice 7**, nicht Teil von `--apply`
 
 ### Nachkontrolle
 
@@ -334,7 +334,13 @@ Zusätzlich erwartete Parameter (noch nicht implementiert):
 
 ## 12. Idempotenzprüfung
 
-Zweiten Dry-Run (oder Apply laut GO) gegen **dasselbe unveränderte Paket**:
+Ziel: Nachweis, dass dasselbe unveränderte Paket keine zusätzlichen Creates/Updates erzeugt.
+
+**Operativ (Staging):** Der Idempotenz-Recheck darf **keinen zweiten** Staging-Dry-Run und **keinen zweiten** Apply auslösen, ohne dass dafür ein **separates PO-GO** vorliegt. Schritt 8 (genau ein Dry-Run) und Schritt 10/11 (Apply) bleiben die einzigen freigegebenen operativen Läufe, bis ein neues GO etwas anderes erlaubt.
+
+**Synthetische Tests:** Automatische Idempotenzprüfungen in Feature-/Unit-Tests (isolierte Test-DB, keine Staging-Verbindung) sind davon unabhängig und weiterhin vorgesehen.
+
+Wenn ein operatives Idempotenz-GO erteilt wird, gilt gegen dasselbe unveränderte Paket:
 
 - keine zusätzlichen Creates
 - keine Updates
@@ -361,7 +367,7 @@ Nicht erlaubt:
 - anderes oder verändertes Paket
 - Inhaltsänderungen in der Status-Phase
 
-### OFFEN (Slice 6)
+### OFFEN (Slice 7)
 
 ```bash
 # OFFEN – Beispielvertrag, Parameter noch nicht implementiert:
@@ -371,7 +377,7 @@ php artisan dispo:import-master-data <PAKET_DIR> \
   --require-package-sha256=<HEX>
 ```
 
-Ohne separates PO-GO → **STOP**.
+Ohne separates PO-GO → **STOP**. Slice 7 ist keine Voraussetzung für Dry-Run (6a) oder Inhalts-Apply (6b).
 
 ---
 
