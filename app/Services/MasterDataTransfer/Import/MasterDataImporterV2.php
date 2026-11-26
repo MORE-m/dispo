@@ -43,6 +43,7 @@ use App\Models\ProductionPriceList;
 use App\Models\User;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataApplyReceiptV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofV2;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
@@ -50,12 +51,15 @@ use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2
 use App\Services\MasterDataTransfer\Support\MasterDataOperationalDryRunReadGuardV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use App\Services\MasterDataTransfer\Support\MasterDataPlannedWriteV2;
+use App\Services\MasterDataTransfer\Support\MasterDataPriceListIndexV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPriceListPinGuardV2;
+use App\Services\MasterDataTransfer\Support\MasterDataProofSignerV2;
 use App\Services\MasterDataTransfer\Support\MasterDataProtectedStateSnapshotV2;
 use App\Services\MasterDataTransfer\Support\MasterDataWriteWhitelistGuardV2;
 use App\Services\MasterDataTransfer\Support\PriceListFingerprint;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PDO;
 use Throwable;
 
@@ -75,6 +79,7 @@ final class MasterDataImporterV2
         private readonly MasterDataOperationalDatabaseGuardV2 $operationalDatabaseGuard = new MasterDataOperationalDatabaseGuardV2,
         private readonly MasterDataOperationalDryRunReadGuardV2 $operationalReadGuard = new MasterDataOperationalDryRunReadGuardV2,
         private readonly MasterDataBackupProofV2 $backupProof = new MasterDataBackupProofV2,
+        private readonly MasterDataApplyReceiptV2 $receipts = new MasterDataApplyReceiptV2,
     ) {}
 
     /**
@@ -170,7 +175,6 @@ final class MasterDataImporterV2
     ): array {
         $normalizedRequired = $this->assertValidPackageSha256Option($requirePackageSha256);
         $activeDatabase = $this->operationalDatabaseGuard->assertApplyAllowed($confirmDatabase);
-        $proof = $this->backupProof->assertValid($requireBackupProof);
 
         $digestBefore = strtolower($this->packages->computePackageSha256($packagePath));
         if (! hash_equals($digestBefore, $normalizedRequired)) {
@@ -180,6 +184,14 @@ final class MasterDataImporterV2
                 $digestBefore,
             ));
         }
+
+        // Backup A (Integrität + Provenienz, an DB/Umgebung/Paket gebunden) VOR dem ersten Schreibzugriff.
+        $proof = $this->backupProof->assertValid(
+            $requireBackupProof,
+            $activeDatabase,
+            $digestBefore,
+            MasterDataBackupProofV2::PHASE_PRE_CONTENT_APPLY,
+        );
 
         $report = $this->executePhases(
             $packagePath,
@@ -208,6 +220,39 @@ final class MasterDataImporterV2
                 'Paket-SHA256 nach Apply weicht von --require-package-sha256 ab — Abbruch.',
             );
         }
+
+        // Receipt erst NACH erfolgreichem Commit und konsistenten Paket-Prüfungen (S7-PO-03).
+        // Fehler/Rollback erreichen diese Stelle nie und erzeugen daher kein Erfolgs-Receipt.
+        $package = $this->packages->load($packagePath);
+        try {
+            $receipt = $this->receipts->writeContentReceipt([
+                'run_id' => 'run-'.Str::uuid()->toString(),
+                'package_sha256' => $digestBefore,
+                'database_name' => $activeDatabase,
+                'result' => 'PASS',
+                'report_hash' => hash('sha256', MasterDataProofSignerV2::canonicalJson($report)),
+                'content_fingerprints_summary' => MasterDataPriceListIndexV2::packageFingerprintSummary($package['data']),
+                'backup_proof' => [
+                    'backup_run_id' => $proof['backup_run_id'],
+                    'meta_sha256' => $proof['meta_sha256'],
+                    'dump_sha256' => $proof['dump_sha256'],
+                    'phase' => $proof['phase'],
+                ],
+            ]);
+        } catch (MasterDataTransferException $e) {
+            throw new MasterDataTransferException(
+                'Inhalts-Apply wurde committet, aber das Apply-Receipt konnte nicht geschrieben werden: '.$e->getMessage()
+                .' Ein erneuter --apply desselben Pakets ist idempotent und erzeugt das Receipt nach.',
+                $e->errors,
+            );
+        }
+
+        $report['receipt'] = [
+            'receipt_id' => $receipt['receipt_id'],
+            'receipt_path' => $receipt['receipt_path'],
+            'completed_at' => $receipt['completed_at'],
+            'signature' => $receipt['signature'],
+        ];
 
         return $report;
     }

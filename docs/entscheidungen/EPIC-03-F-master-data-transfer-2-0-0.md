@@ -1,7 +1,7 @@
 # EPIC-03-F – Technischer Importvertrag 2.0.0
 
 - **Status:** Technisch abgenommen mit bedingtem Dokumentations-GO. Nach den drei Präzisierungen unten freigegeben für Merge. **STOP** vor Implementierung, Export, Dry-Run, Apply und Aktivierung.
-- **Datum:** 2026-11-23
+- **Datum:** 2026-11-23 (Verarbeitungsvertrag-Erweiterung 2.1.0 / Slice 7: 2026-11-26, siehe Abschnitt 16)
 - **PO-Umfang:** genehmigt laut Readiness vom 23.11.2026
 - **Basis:** `docs/readiness/EPIC-03-F-full-master-data-readiness-2026-11-23.md`
 - **Vorgänger:** EPIC-03-B Schema `1.0.0` bleibt historisch gültig für das ausgeführte Radio-Hamburg-Paket. Dieser Vertrag ersetzt ihn nicht stillschweigend.
@@ -259,7 +259,7 @@ Das schließt die drei Radio-Hamburg-Testvorgänge ein und gilt ebenso für jede
 
 ### 5.4 Status-Phase
 
-Eigener PO-Schritt nach Apply.
+Eigener PO-Schritt nach Apply. **Präzisiert und verbindlich ausgestaltet in Abschnitt 16 (Verarbeitungsvertrag 2.1.0, S7-PO-01…05).**
 
 Die Status-Phase arbeitet ausschließlich mit demselben unveränderten Paket, das bereits Manifest- und SHA256-validiert wurde. Vor jedem Statuswechsel erneut prüfen:
 
@@ -580,3 +580,95 @@ Technisch durch diesen Vertrag festgelegt und nicht mehr offen:
 - Schreib-Whitelist und Schutz-Snapshots
 - Status-Phase nur gegen dasselbe SHA256-Paket
 - abweichende Preislisteninhalte als Konflikt
+
+## 16. Verarbeitungsvertrag 2.1.0 – Slice 6b-Härtung und Slice 7 (Preisstatus)
+
+**Datum:** 2026-11-26 · **Status:** PO-Entscheidungen S7-PO-01…05 verbindlich; Implementierung auf Feature-Branch `feat/epic-03-f-slice7-price-status-apply`. **STOP** für operative Läufe bleibt (kein Staging-Apply, keine Status-Phase ohne separates PO-GO).
+
+### 16.1 Versionierung – Paketschema bleibt 2.0.0
+
+| Ebene | Version | Änderung |
+|---|---|---|
+| Paketschema (`manifest.schema_version`) | **2.0.0** (unverändert) | keine neue/geänderte Datendatei, kein neues Manifestfeld, Prüfsummen und SHA256-Berechnung unverändert |
+| Verarbeitungsvertrag (`MasterDataTransferContractV2::PROCESSING_CONTRACT_VERSION`) | **2.1.0** (neu) | Backup-Proof v2, Apply-Receipts, Preisstatus-Plan/-Apply |
+
+**Begründung (keine Schema-Anhebung):** Slice 7 ist *paketgetrieben* und nutzt ausschließlich bereits vorhandene Paketfelder (`source_status`, `import_status`, Fachschlüssel, Items, Fingerabdruckfelder). Es werden keine zusätzlichen Daten gebraucht. Ein Bump auf `2.1.0`/`3.0.0` des Paketschemas würde bereits exportierte, SHA256-gebundene 2.0.0-Pakete grundlos entwerten und zwei Importer-Zweige erzwingen. Alte und neue 2.0.0-Pakete bleiben byte-identisch kompatibel; Export (Slice 2), Paketladen (Slice 1), Dry-Run (6a) und Content-Apply (6b) bleiben im Paketformat unverändert.
+
+**Was sich verhaltensmäßig ändert (kein stiller Bruch):**
+
+- `--apply` verlangt jetzt einen **Backup-Proof Version 2** (Provenienz, Signatur, Paketbindung); Proofs im alten Format werden abgelehnt (bewusste Verschärfung gemäß Slice-6b-Härtung, kein Datenformatbruch).
+- `--apply` schreibt nach erfolgreichem Commit zusätzlich ein **Apply-Receipt** (Datei, keine DB-Tabelle).
+- `--apply-price-status` ist freigeschaltet (Vorher: gesperrt) und neu: `--dry-run-price-status`.
+
+Alle Receipts und Pläne tragen `processing_contract_version=2.1.0` und `schema_version=2.0.0`; ein Importer lehnt Receipts mit abweichender Version ab.
+
+### 16.2 PO-Entscheidungen Slice 7
+
+| ID | Entscheidung | Technische Umsetzung |
+|---|---|---|
+| **S7-PO-01** | `activate_with_archive_predecessor` nur für **gleiche Slot-Identität** (Spot: Inventar+Jahr; Produktion: Inventar+Produktionsart+Jahr; OA-TKP: Jahr), **ungepinnten/ungeschützten** Vorgänger, **atomar** mit der Aktivierung, One-Active-Constraints erzwungen; **fail-closed bei Pin**. | Vorgänger wird mit der Aktivierung in derselben Transaktion archiviert (Vorgänger zuerst, dann Aktivierung, danach Prüfung „genau eine aktive Liste je Slot“). Pin am Vorgänger → `blocked`. Mehr als ein aktiver Vorgänger im Slot → `blocked` (kein PO-Regelwerk dafür, siehe 16.9). |
+| **S7-PO-02** | Nach dem Inhalts-Apply ist ein **neues verifiziertes Backup B** Pflicht vor der Status-Phase; Backup A (vor Inhalts-Apply) genügt nicht; B muss beweisbar **nach** dem Inhalts-Apply erstellt sein (Zeitstempel/Receipt-Verknüpfung). | Backup-Proof Phase `post_content_apply`: gebunden an Receipt-ID + Receipt-Signatur; `created_at ≥ receipt.completed_at`; Phase `pre_content_apply` wird für B abgelehnt. |
+| **S7-PO-03** | **Persistentes, verifizierbares Apply-Receipt** mit Paket-SHA256; kein frei editierbares Flag. | Datei unter `storage/app/master-data-transfer/receipts/` (Modus 0600, Verzeichnis 0700), HMAC-signiert (kanonisches JSON); nur **nach Commit** geschrieben; Fehler/Rollback erzeugen **kein** Erfolgs-Receipt. |
+| **S7-PO-04** | Unvollständige Preislisten **fail-closed** bei Aktivierung; bestehende Vollständigkeitsregeln wiederverwenden; keine Preise erfinden. | Spot: `PriceListItemContract::assertActivationCoverage` (mindestens ein gültiger Basispreis). Produktion: Produktionsart + gültiger Betrag. OA-TKP: `OaTkpPriceListActivationService::assertActivatable` (vollständige Medium×Inventar-Matrix gegen aktive OA-Regeln). Verstoß → `blocked`, nie Auto-Ergänzung. |
+| **S7-PO-05** | Quell-Draft bleibt Draft (`keep_draft`); kein Auto-Aktivieren/-Archivieren. | `source_status=draft` ⇒ Aktion `keep_draft`, kein Statusschreiben. |
+
+### 16.3 Erlaubte und verbotene Übergänge
+
+Erlaubt:
+
+| Staging-Status | `source_status` | Aktion |
+|---|---|---|
+| `draft` | `active` | `activate` (kein aktiver Vorgänger im Slot) oder `activate_with_archive_predecessor` (genau ein aktiver, ungepinnter Vorgänger) |
+| `draft` | `archived` | `archive` |
+| `draft` | `draft` | `keep_draft` |
+| = Ziel (`active`/`archived`) | gleich | `unchanged` (No-op) |
+| `active` | `archived` | **nur** als Vorgänger im Rahmen von `activate_with_archive_predecessor` |
+
+Verboten (immer `blocked`, nie schreiben): beliebige Statuswechsel an `active`/`archived`; Reaktivieren `archived`→`active`; `active`→`draft`; jede Änderung an gepinnten Listen; Inhalts-/Item-Änderungen; Anlegen/Löschen von Listen in Slice 7; Status als Nebeneffekt von Slice 6b; falsches Paket / abweichende Fingerabdrücke oder Metadaten; Nicht-Staging-DBs; fehlende Staging-Liste (kein Create).
+
+Betroffene Familien: Spot (`price_lists`), Produktion (`production_price_lists`), OA-TKP (`oa_tkp_price_lists`). Es gibt keine Social-/Events-/Barter-Preisfamilien.
+
+### 16.4 Gate-Reihenfolge Preisstatus (Dry-Run und Apply)
+
+1. Genau ein Modus; `--confirm-database` + operative DB-Allowlist (gleicher Guard wie Slice 6a/6b)
+2. Paket-SHA256 (`--require-package-sha256`) vor und nach dem Lauf
+3. Content-Apply-Receipt (`--require-content-apply-receipt`): Signatur, Paket-SHA256, DB, Umgebung, Verarbeitungsvertrag, `result=PASS`
+4. Backup B (`--require-backup-proof`, Phase `post_content_apply`, an das Receipt gebunden, nach dessen Abschluss erstellt)
+5. Planung schreibfrei (Read-only-Guard): Fingerabdruck- und Metadatenabgleich je Liste, Pins, Vollständigkeit, Slot-Prüfung → Plan + `plan_hash`
+6. Nur Apply: `--require-price-status-plan-hash` muss dem frisch berechneten Plan entsprechen; jede Abweichung = Drift = STOP
+7. Nur Apply: eine Transaktion mit Zeilensperren (und OA-Jahres-Sperre); Plan **innerhalb** der Transaktion erneut berechnet und gegen den Hash geprüft; Compare-and-Set je Zeile; Nachprüfung (Status wie geplant, Inhalte/Fingerabdrücke unverändert, One-Active, Pins/Schutzsnapshots unverändert, ausschließlich `UPDATE` auf die drei Preislistentabellen)
+8. Nach Commit: Status-Apply-Receipt
+
+### 16.5 Backup-Nachweis – Ebenen und Proof-Format
+
+Ebene **A Integrität** (Dump vollständig), **B Provenienz** (richtige DB/Umgebung/Instanz/Zeit/Paket, prozessgeneriert, signiert), **C Restore-Verifikation** (manuell, nicht Teil des Codepfads). Details und Pflichtfelder: Runbook Abschnitt 4. Ein frei editierbarer DB-Name allein ist **kein** Nachweis; maßgeblich ist die HMAC-Signatur über kanonische Metadaten, die den zum Erstellzeitpunkt per `SELECT DATABASE()` erfassten Namen enthalten.
+
+### 16.6 Receipts – Dateiablage statt neuer DB-Tabelle
+
+Entscheidung: **dateibasierte, signierte Receipts** unter einem geschützten Storage-Pfad, **keine** neue Tabelle.
+
+Gründe: (a) Die geschlossene Schreib-Whitelist (25 Tabellen) und alle Schutz-Snapshots bleiben unangetastet — eine neue Meta-Tabelle würde den Vertrag und die Klassifikation aller Tabellen erweitern; (b) ein Receipt muss „nach Commit“ entstehen und darf bei Rollback nicht existieren — eine DB-Zeile in derselben Transaktion würde das Gegenteil erzwingen, außerhalb davon wäre sie eine nicht-whitelistete Schreiboperation; (c) das Backup B referenziert das Receipt per Signatur — Dateien lassen sich gemeinsam mit dem Backup-Proof archivieren; (d) analog zu den bestehenden Report-Dateien unter `storage/logs`.
+
+Nachteile (bewusst akzeptiert, siehe Risiken): Datei kann verloren gehen (Re-Apply ist idempotent und erzeugt ein neues Receipt); Integrität hängt am HMAC-Geheimnis. Receipt-Felder: `receipt_id`, `kind` (`content_apply`|`price_status_apply`), `processing_contract_version`, `schema_version`, `run_id`, `package_sha256`, `database_name`, `target_environment`, `completed_at`, `scope`, `result`, `report_hash`, `content_fingerprints_summary`, `backup_proof_ref` (`backup_run_id`, `meta_sha256`, `dump_sha256`, `phase`), optional `content_receipt_ref` und `plan_hash` (Status-Receipt), `signature`.
+
+Klassifikation: Receipts und Backup-Proof-Verzeichnisse sind **Meta-Artefakte (Dateien)**, keine DB-Tabellen; die Tabellenklassifikation bleibt unverändert, ein Hinweis wurde ergänzt.
+
+### 16.7 Plan-Hash
+
+`plan_hash = sha256(kanonisches JSON)` über: `processing_contract_version`, `schema_version`, `package_sha256`, Ziel-DB, je Liste (Familie, Fachschlüssel, Staging-ID, Ist-/Ziel-Status, Aktion, Staging-`lock_version`, Fingerabdruck, Metadaten, Gate-Ergebnisse, Vorgänger inkl. ID/`lock_version`/Fingerabdruck) sowie den Digest der Preislisten-Pins. Keine Zeitstempel. Jede Änderung am Staging-Zustand dieser Listen zwischen Dry-Run und Apply ändert den Hash.
+
+### 16.8 Schreib-Whitelist der Status-Phase
+
+Innerhalb der Whitelist darf die Status-Phase ausschließlich `UPDATE` auf `price_lists`, `production_price_lists`, `oa_tkp_price_lists` ausführen, und dort nur die Spalten `status`, `published_at`, `archived_at`, `lock_version`, `updated_at`. `INSERT`/`DELETE`, Item-Tabellen und alle anderen Tabellen sind STOP (Laufzeitprüfung am Query-Log innerhalb der Transaktion → Rollback).
+
+### 16.9 Offene fachliche Lücken (nicht erfunden, nicht blockierend)
+
+| # | Lücke | Behandlung im Code |
+|---|---|---|
+| G1 | Maximalalter eines Backup-Proofs ist nicht fachlich festgelegt | technischer Default 1440 min (`MASTER_DATA_TRANSFER_BACKUP_PROOF_MAX_AGE_MINUTES`), PO kann anpassen |
+| G2 | Mehrere aktive Listen im selben Produktions-Slot (kein DB-One-Active-Constraint) | `blocked`, manuelle Klärung |
+| G3 | „Ungeschützt“ über „ungepinnt“ hinaus | nur Pin-Bindungen (Kalkulation, Dispo) definieren Schutz |
+| G4 | Ablauf/Widerruf von Receipts | nicht definiert; Plan-Hash/Drift-Prüfung deckt Zustandsänderungen ab |
+| G5 | Restore-Verifikation (Ebene C) automatisieren | bewusst nicht; manuelle Trockenrestore-Prüfung dokumentiert |
+| G6 | Rotation des HMAC-Geheimnisses | nicht definiert; bei Rotation müssen Proofs/Receipts neu erzeugt werden |
+| G7 | OA-Aktivierung hängt vom aktiven Regelbestand der Ziel-DB ab | Aktivierung `blocked`, bis die OA-Regeln (Slice 6b) vollständig vorhanden sind |

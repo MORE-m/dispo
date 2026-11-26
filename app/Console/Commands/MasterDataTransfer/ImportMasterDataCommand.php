@@ -4,6 +4,7 @@ namespace App\Console\Commands\MasterDataTransfer;
 
 use App\Services\MasterDataTransfer\Import\MasterDataImporter;
 use App\Services\MasterDataTransfer\Import\MasterDataImporterV2;
+use App\Services\MasterDataTransfer\Import\MasterDataPriceStatusApplierV2;
 use App\Services\MasterDataTransfer\MasterDataTransferContract;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
@@ -11,7 +12,8 @@ use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Console\Command;
 
 /**
- * Stammdaten-Import: Schema 1.0.0 Dry-Run/Apply; Schema 2.0.0 Dry-Run (6a) und Apply (6b).
+ * Stammdaten-Import: Schema 1.0.0 Dry-Run/Apply; Schema 2.0.0 Dry-Run (6a), Apply (6b)
+ * sowie Preisstatus-Phase (Slice 7: --dry-run-price-status / --apply-price-status).
  */
 class ImportMasterDataCommand extends Command
 {
@@ -19,24 +21,29 @@ class ImportMasterDataCommand extends Command
         {path : Pfad zum Exportpaket}
         {--dry-run : Nur prüfen und berichten (schreibfrei)}
         {--apply : Schreibenden Import ausführen}
-        {--apply-price-status : Preisstatus-Phase (noch nicht freigegeben)}
+        {--dry-run-price-status : Preisstatus-Plan erzeugen (schreibfrei, liefert Plan-Hash)}
+        {--apply-price-status : Preisstatus-Phase ausführen (Slice 7; braucht Plan-Hash aus dem Dry-Run)}
         {--confirm-database= : Muss exakt dem aktiven DB-Namen entsprechen}
         {--require-package-sha256= : Pflicht für Schema 2.0.0 (64 Hex)}
-        {--require-backup-proof= : Pflicht für Schema 2.0.0 Apply (Proof-Verzeichnis)}';
+        {--require-backup-proof= : Pflicht für Schema 2.0.0 Apply (Backup A) und Preisstatus-Modi (Backup B)}
+        {--require-content-apply-receipt= : Pfad zum Content-Apply-Receipt (Preisstatus-Modi)}
+        {--require-price-status-plan-hash= : Plan-Hash aus --dry-run-price-status (nur --apply-price-status)}';
 
-    protected $description = 'Stammdaten/Preislisten-Paket importieren (fail-closed; V2 Dry-Run/Apply, kein Status)';
+    protected $description = 'Stammdaten/Preislisten-Paket importieren (fail-closed; V2 Dry-Run/Apply und Preisstatus-Phase)';
 
     public function handle(
         MasterDataImporter $importerV1,
         MasterDataImporterV2 $importerV2,
         MasterDataPackage $packages,
+        MasterDataPriceStatusApplierV2 $priceStatus,
     ): int {
         $dryRun = (bool) $this->option('dry-run');
         $apply = (bool) $this->option('apply');
+        $dryRunPriceStatus = (bool) $this->option('dry-run-price-status');
         $applyPriceStatus = (bool) $this->option('apply-price-status');
-        $actionCount = (int) $dryRun + (int) $apply + (int) $applyPriceStatus;
+        $actionCount = (int) $dryRun + (int) $apply + (int) $dryRunPriceStatus + (int) $applyPriceStatus;
         if ($actionCount !== 1) {
-            $this->error('Genau eine Option erforderlich: --dry-run, --apply oder --apply-price-status.');
+            $this->error('Genau eine Option erforderlich: --dry-run, --apply, --dry-run-price-status oder --apply-price-status.');
 
             return self::FAILURE;
         }
@@ -55,6 +62,10 @@ class ImportMasterDataCommand extends Command
         $requireSha = is_string($requireShaOption) ? $requireShaOption : '';
         $requireBackupOption = $this->option('require-backup-proof');
         $requireBackup = is_string($requireBackupOption) ? $requireBackupOption : '';
+        $requireReceiptOption = $this->option('require-content-apply-receipt');
+        $requireReceipt = is_string($requireReceiptOption) ? $requireReceiptOption : '';
+        $requirePlanHashOption = $this->option('require-price-status-plan-hash');
+        $requirePlanHash = is_string($requirePlanHashOption) ? $requirePlanHashOption : '';
 
         try {
             $schemaVersion = $packages->detectSchemaVersion($path);
@@ -62,13 +73,17 @@ class ImportMasterDataCommand extends Command
             if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
                 $report = $this->handleV2(
                     $importerV2,
+                    $priceStatus,
                     $path,
                     $dryRun,
                     $apply,
+                    $dryRunPriceStatus,
                     $applyPriceStatus,
                     $confirm,
                     $requireSha,
                     $requireBackup,
+                    $requireReceipt,
+                    $requirePlanHash,
                 );
             } elseif ($schemaVersion === MasterDataTransferContract::SCHEMA_VERSION) {
                 $report = $this->handleV1(
@@ -76,10 +91,11 @@ class ImportMasterDataCommand extends Command
                     $path,
                     $dryRun,
                     $apply,
-                    $applyPriceStatus,
+                    $dryRunPriceStatus || $applyPriceStatus,
                     $confirm,
                     $requireSha,
                     $requireBackup,
+                    $requireReceipt !== '' || $requirePlanHash !== '',
                 );
             } else {
                 throw new MasterDataTransferException(
@@ -92,7 +108,7 @@ class ImportMasterDataCommand extends Command
                 $this->line(' - '.$this->sanitizeReportText($error));
             }
 
-            $stopReport = $this->buildSanitizedStopReport($e, $dryRun);
+            $stopReport = $this->buildSanitizedStopReport($e, $dryRun || $dryRunPriceStatus);
             try {
                 $stopPath = $this->persistReport($stopReport);
                 $this->line('Report: '.$stopPath);
@@ -111,7 +127,32 @@ class ImportMasterDataCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info($dryRun ? 'Dry-Run OK' : 'Import Apply OK');
+        if ($dryRunPriceStatus || $applyPriceStatus) {
+            $statusStopped = ($report['security']['result'] ?? null) === 'STOP';
+            $label = $dryRunPriceStatus ? 'Preisstatus Dry-Run' : 'Preisstatus Apply';
+            if ($statusStopped) {
+                $this->warn($label.' STOP (blockierte Listen)');
+            } else {
+                $this->info($label.' OK');
+            }
+            $this->line('price_status_plan_hash='.($report['price_status']['plan_hash'] ?? ''));
+            foreach (($report['counts_by_action'] ?? []) as $action => $count) {
+                $this->line('price_status.'.$action.'='.$count);
+            }
+            foreach ($report['rows'] ?? [] as $row) {
+                $this->line(sprintf(
+                    ' - [%s] %s: %s%s',
+                    $row['entity'],
+                    $row['key'],
+                    $row['action'],
+                    $row['action'] === 'blocked' || str_starts_with((string) ($row['detail'] ?? ''), 'wird atomar')
+                        ? ' — '.$this->sanitizeReportText((string) ($row['detail'] ?? ''))
+                        : '',
+                ));
+            }
+        } else {
+            $this->info($dryRun ? 'Dry-Run OK' : 'Import Apply OK');
+        }
         $this->line('created='.$report['created'].' unchanged='.$report['unchanged']);
         if (($report['counts_by_action']['update'] ?? 0) > 0) {
             $this->line('updated='.$report['counts_by_action']['update']);
@@ -133,6 +174,10 @@ class ImportMasterDataCommand extends Command
                 $this->line('backup_proof='.$report['security']['backup_proof']);
             }
         }
+        if (isset($report['receipt']) && is_array($report['receipt'])) {
+            $this->line('receipt_id='.($report['receipt']['receipt_id'] ?? ''));
+            $this->line('receipt='.($report['receipt']['receipt_path'] ?? ''));
+        }
         $this->line('Report: '.$pathOut);
 
         $securityResult = is_array($report['security'] ?? null)
@@ -153,12 +198,13 @@ class ImportMasterDataCommand extends Command
         string $path,
         bool $dryRun,
         bool $apply,
-        bool $applyPriceStatus,
+        bool $priceStatusMode,
         string $confirm,
         string $requireSha,
         string $requireBackup,
+        bool $statusOnlyOptions,
     ): array {
-        if ($applyPriceStatus) {
+        if ($priceStatusMode || $statusOnlyOptions) {
             throw new MasterDataTransferException(
                 'Preisstatus-Phase ist für Schema 1.0.0 nicht vorgesehen.',
             );
@@ -182,17 +228,32 @@ class ImportMasterDataCommand extends Command
      */
     private function handleV2(
         MasterDataImporterV2 $importer,
+        MasterDataPriceStatusApplierV2 $priceStatus,
         string $path,
         bool $dryRun,
         bool $apply,
+        bool $dryRunPriceStatus,
         bool $applyPriceStatus,
         string $confirm,
         string $requireSha,
         string $requireBackup,
+        string $requireReceipt,
+        string $requirePlanHash,
     ): array {
-        if ($applyPriceStatus) {
+        if ($dryRunPriceStatus || $applyPriceStatus) {
+            if ($dryRunPriceStatus && $requirePlanHash !== '') {
+                throw new MasterDataTransferException(
+                    '--require-price-status-plan-hash gilt nur für --apply-price-status (der Dry-Run erzeugt den Plan-Hash).',
+                );
+            }
+
+            return $dryRunPriceStatus
+                ? $priceStatus->dryRun($path, $confirm, $requireSha, $requireBackup, $requireReceipt)
+                : $priceStatus->apply($path, $confirm, $requireSha, $requireBackup, $requireReceipt, $requirePlanHash);
+        }
+        if ($requireReceipt !== '' || $requirePlanHash !== '') {
             throw new MasterDataTransferException(
-                'Preisstatus-Phase für schema_version=2.0.0 ist nicht freigegeben (Slice 7 fehlt).',
+                '--require-content-apply-receipt/--require-price-status-plan-hash gelten nur für die Preisstatus-Modi.',
             );
         }
         if ($dryRun) {
@@ -206,7 +267,7 @@ class ImportMasterDataCommand extends Command
         }
         if (! $apply) {
             throw new MasterDataTransferException(
-                'Schema 2.0.0 erlaubt operativ --dry-run oder --apply (Slice 6a/6b).',
+                'Schema 2.0.0 erlaubt operativ --dry-run, --apply, --dry-run-price-status oder --apply-price-status.',
             );
         }
 

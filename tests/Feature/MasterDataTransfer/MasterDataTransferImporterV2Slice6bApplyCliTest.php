@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Services\MasterDataTransfer\Import\MasterDataImporterV2;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataBackupProofBuilderV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -65,7 +66,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
         User::factory()->create(['email' => 'slice6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
         $sha = app(MasterDataPackage::class)->computePackageSha256($package);
-        $proof = $this->writeValidBackupProof();
+        $proof = $this->writeValidBackupProof($sha);
         $usersBefore = (int) DB::table('users')->count();
 
         $exit = Artisan::call('dispo:import-master-data', [
@@ -95,7 +96,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
         User::factory()->create(['email' => 'idem6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
         $sha = app(MasterDataPackage::class)->computePackageSha256($package);
-        $proof = $this->writeValidBackupProof();
+        $proof = $this->writeValidBackupProof($sha);
 
         $firstExit = Artisan::call('dispo:import-master-data', [
             'path' => $package,
@@ -112,7 +113,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof('second'),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha, 'second'),
         ]);
         $output = Artisan::output();
         $this->assertSame(0, $secondExit, $output);
@@ -141,7 +142,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]);
         $this->assertSame(0, $applyExit, Artisan::output());
 
@@ -156,6 +157,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
     {
         User::factory()->create(['email' => 'hash6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
         $before = $this->captureWritableCounts();
 
         $exit = Artisan::call('dispo:import-master-data', [
@@ -163,7 +165,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => str_repeat('a', 64),
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]);
         $this->assertNotSame(0, $exit);
         $this->assertStringContainsString('Paket-SHA256 stimmt nicht', Artisan::output());
@@ -179,7 +181,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             'path' => $package,
             '--apply' => true,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]);
         $this->assertNotSame(0, $exit);
         $this->assertStringContainsString('--confirm-database', Artisan::output());
@@ -195,7 +197,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => 'dispo_mat_core',
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]);
         $this->assertNotSame(0, $exit);
         $output = Artisan::output();
@@ -231,7 +233,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
     {
         $package = $this->writeRichV2Package();
         $sha = app(MasterDataPackage::class)->computePackageSha256($package);
-        $proof = $this->writeValidBackupProof('fail-gate');
+        $proof = $this->writeValidBackupProof($sha, 'fail-gate');
         File::put($proof.DIRECTORY_SEPARATOR.MasterDataBackupProofV2::GATE_FILE, "FAIL\n");
 
         $exit = Artisan::call('dispo:import-master-data', [
@@ -376,7 +378,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]);
         $this->assertSame(0, $exit, Artisan::output());
 
@@ -400,7 +402,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]));
 
         $this->assertSame(0, PriceList::query()->where('status', PriceListStatus::Active)->count());
@@ -411,9 +413,81 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--apply-price-status' => true,
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
-            '--require-backup-proof' => $this->writeValidBackupProof(),
+            '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]));
-        $this->assertStringContainsString('Slice 7 fehlt', Artisan::output());
+        $this->assertStringContainsString('--require-price-status-plan-hash', Artisan::output());
+    }
+
+    #[Test]
+    public function apply_operational_rolls_back_all_writes_after_partial_failure_mid_transaction(): void
+    {
+        User::factory()->create(['email' => 'rollback6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+        $proof = $this->writeValidBackupProof($sha, 'rollback');
+        $before = $this->captureWritableCounts();
+        $usersDigestBefore = $this->tableDigest('users');
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+
+        /** @var list<string> $writesSeen */
+        $writesSeen = [];
+        $inventoryInsertSeen = false;
+        $threw = false;
+        DB::listen(function ($query) use (&$writesSeen, &$inventoryInsertSeen, &$threw): void {
+            $sql = strtolower((string) $query->sql);
+            if (preg_match('/^(insert|update|delete)\b/', trim($sql)) === 1) {
+                $writesSeen[] = $sql;
+            }
+            if (preg_match('/^insert into ["`]inventories["`]/', trim($sql)) === 1) {
+                $inventoryInsertSeen = true;
+            }
+            // Erst NACH nachweislich geschriebenen Inventories + Medien-Insert einen späten Schreibzugriff abbrechen.
+            if (
+                ! $threw
+                && $inventoryInsertSeen
+                && (str_contains($sql, 'update "field_definitions"') || str_contains($sql, 'update `field_definitions`'))
+            ) {
+                $threw = true;
+                throw new \RuntimeException('forced operational apply failure');
+            }
+        });
+
+        try {
+            app(MasterDataImporterV2::class)->applyOperational(
+                $package,
+                MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                $sha,
+                $proof,
+            );
+            $this->fail('Erwarteter Abbruch mitten in der Apply-Transaktion');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('forced operational apply failure', $e->getMessage());
+        }
+
+        // Beweis: es wurde tatsächlich geschrieben, bevor der Abbruch kam.
+        $this->assertTrue($threw, 'Abbruchpunkt wurde nicht erreicht');
+        $this->assertTrue($inventoryInsertSeen, 'Es wurde vor dem Abbruch kein Inventory geschrieben');
+        $this->assertGreaterThan(3, count($writesSeen));
+
+        // Vollständiger Rollback aller Whitelist-Tabellen und geschützten Bestände.
+        $this->assertSame($before, $this->captureWritableCounts());
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+        $this->assertSame(0, AdvertisingMedium::query()->where('code', 'spot_v2')->count());
+        $this->assertSame(0, PriceList::query()->count());
+        $this->assertSame(0, FieldDefinition::query()->where('key', 'campaign_title')->count());
+        $this->assertSame(0, Organization::query()->where('name', 'Fixture Org V2')->count());
+        $this->assertSame($usersDigestBefore, $this->tableDigest('users'));
+
+        // Ein anschließender sauberer Apply funktioniert wieder (kein halber Zustand).
+        $retryExit = Artisan::call('dispo:import-master-data', [
+            'path' => $package,
+            '--apply' => true,
+            '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            '--require-package-sha256' => $sha,
+            '--require-backup-proof' => $proof,
+        ]);
+        $this->assertSame(0, $retryExit, Artisan::output());
+        $this->assertSame(1, Inventory::query()->where('code', 'inv_v2_radio')->count());
     }
 
     #[Test]
@@ -431,7 +505,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
                 '--apply' => true,
                 '--confirm-database' => $forbidden,
                 '--require-package-sha256' => $sha,
-                '--require-backup-proof' => $this->writeValidBackupProof($forbidden),
+                '--require-backup-proof' => $this->writeValidBackupProof($sha, $forbidden),
             ]);
             $this->assertNotSame(0, $exit, $forbidden);
         }
@@ -449,7 +523,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
                 $package,
                 MasterDataTransferContractV2::OPERATIONAL_DATABASE,
                 $sha,
-                $this->writeValidBackupProof(),
+                $this->writeValidBackupProof($sha),
             );
             $this->fail('Apply ohne Testing-Override gegen Nicht-Staging muss STOP');
         } catch (MasterDataTransferException $e) {
@@ -468,7 +542,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
         User::factory()->create(['email' => 'badsha6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
         $sha = app(MasterDataPackage::class)->computePackageSha256($package);
-        $proof = $this->writeValidBackupProof('bad-dump-sha');
+        $proof = $this->writeValidBackupProof($sha, 'bad-dump-sha');
         $metaPath = $proof.DIRECTORY_SEPARATOR.MasterDataBackupProofV2::META_FILE;
         $meta = json_decode((string) File::get($metaPath), true, 32, JSON_THROW_ON_ERROR);
         $meta['dump_sha256'] = str_repeat('b', 64);
@@ -512,7 +586,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
                 '--apply' => true,
                 '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
                 '--require-package-sha256' => $validSha,
-                '--require-backup-proof' => $this->writeValidBackupProof('excl'),
+                '--require-backup-proof' => $this->writeValidBackupProof($validSha, 'excl'),
             ]);
             $this->assertNotSame(0, $exit);
             $output = Artisan::output();
@@ -527,28 +601,22 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
         $this->assertSame($before, $this->captureWritableCounts());
     }
 
-    private function writeValidBackupProof(string $suffix = 'ok'): string
+    private function writeValidBackupProof(string $packageSha, string $suffix = 'ok'): string
     {
         $dir = $this->tmp.'/proof-'.$suffix.'-'.uniqid('', true);
-        File::ensureDirectoryExists($dir);
-        $dumpName = 'pre-apply-dump.sql';
-        $dumpPath = $dir.DIRECTORY_SEPARATOR.$dumpName;
-        $payload = "-- synthetic staging backup proof dump\n".$suffix."\n".bin2hex(random_bytes(16))."\n";
-        File::put($dumpPath, $payload);
-        $sha = hash_file('sha256', $dumpPath);
-        $bytes = filesize($dumpPath);
-        File::put($dir.DIRECTORY_SEPARATOR.MasterDataBackupProofV2::GATE_FILE, "PASS\n");
-        File::put(
-            $dir.DIRECTORY_SEPARATOR.MasterDataBackupProofV2::META_FILE,
-            json_encode([
-                'dump_filename' => $dumpName,
-                'dump_sha256' => $sha,
-                'dump_bytes' => $bytes,
-                'restore_path' => 'same_db_import_verified',
-            ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT)."\n",
-        );
+        $dumpSource = $this->tmp.'/dump-src-'.uniqid('', true).'.sql';
+        File::put($dumpSource, "-- synthetic staging backup proof dump\n".$suffix."\n".bin2hex(random_bytes(16))."\n");
+        $built = (new MasterDataBackupProofBuilderV2)->build([
+            'dump_path' => $dumpSource,
+            'output_dir' => $dir,
+            'phase' => MasterDataBackupProofV2::PHASE_PRE_CONTENT_APPLY,
+            'package_sha256' => $packageSha,
+            'database_name' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            'restore_path' => 'same_db_import_verified',
+            'dump_filename' => 'pre-apply-dump.sql',
+        ]);
 
-        return $dir;
+        return $built['proof_dir'];
     }
 
     /**

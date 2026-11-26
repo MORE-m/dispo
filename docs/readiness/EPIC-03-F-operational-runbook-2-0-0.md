@@ -116,11 +116,66 @@ Historischer Pfad aus Pilot-Prep (Referenz, vor Ort bestätigen):
 - Gate-Datei: `BACKUP_GATE.txt` → muss **PASS** zeigen
 - Restore-Pfad historisch: `same_db_import_verified` (kein CREATE-DATABASE-Privileg für Temp-DB)
 
-### Verifizierte Sicherung – Mindestanforderungen
+### Drei getrennte Nachweisebenen: A Integrität / B Provenienz / C Restore
 
-1. Frischer Dump **vor** Apply (und idealerweise vor Dry-Run, falls Dry-Run jemals schreibend würde – aktuell muss Dry-Run schreibfrei sein).
-2. Dateiname, Größe, SHA256 des Dumps notiert.
-3. Restore-Ablauf schriftlich bestätigt (same-DB-Import oder anderer freigegebener Weg).
+| Ebene | Frage | Wer prüft | Stand |
+|---|---|---|---|
+| **A – Integrität** | Ist der Dump vollständig und unverändert? | Code (`MasterDataBackupProofV2`): `BACKUP_GATE.txt`=PASS, Dump vorhanden, Größe + SHA256 passen | VORHANDEN |
+| **B – Provenienz** | Stammt der Dump nachweislich von der richtigen DB/Umgebung/Instanz, zum richtigen Zeitpunkt, aus einem echten Backup-Prozess und passt er zu diesem Paket/Apply? | Code: signierte `DUMP_META.json` (Proof-Version 2, HMAC), siehe unten | VORHANDEN (Slice 6b-Härtung) |
+| **C – Restore-Verifikation** | Lässt sich der Dump tatsächlich wiederherstellen? | **MANUELL**, nie durch den Importer; siehe „Optionale Trockenrestore-Prüfung" | Dokumentiert, nicht automatisiert |
+
+A und B beweisen **nicht**, dass ein Restore funktioniert (C). Ohne C bleibt Restore-Fähigkeit eine dokumentierte Annahme, kein technischer Beweis.
+
+### Backup-Proof Version 2 (Pflichtformat)
+
+`--require-backup-proof=<PROOF_DIR>` (Apply) bzw. Backup B bei den Preisstatus-Modi zeigt auf ein Verzeichnis mit:
+
+- `BACKUP_GATE.txt` (erste nicht-leere Zeile exakt `PASS`)
+- `DUMP_META.json` mit **Pflichtfeldern**: `proof_version=2`, `backup_run_id`, `phase`, `created_at`, `database_name` (aus `SELECT DATABASE()` zum Erstellzeitpunkt, `database_name_source=select_database`), `target_environment`, `instance_identity` (optional; Pflichtabgleich wenn `MASTER_DATA_TRANSFER_INSTANCE_ID` gesetzt), `package_sha256`, `dump_filename`, `dump_sha256`, `dump_bytes`, `restore_path`, `backup_process_result=PASS`, `content_receipt_id` / `content_receipt_signature` (nur Backup B), `signature` (HMAC-SHA256 über kanonisches JSON)
+- die Dump-Datei
+
+Geprüft wird: Signatur gültig (nicht frei editierbar), `database_name` = aktive Staging-DB, `target_environment` = aktive `APP_ENV`, Instanz (falls konfiguriert), Paket-SHA256 identisch, Phase passt, `created_at` nicht in der Zukunft und nicht älter als `MASTER_DATA_TRANSFER_BACKUP_PROOF_MAX_AGE_MINUTES` (Default 1440). **Alte Proofs ohne Version 2 + Signatur werden abgelehnt.**
+
+Geheimnis: `MASTER_DATA_TRANSFER_PROOF_SECRET` (optional); leer = aus `APP_KEY` abgeleitet. Die Signatur schützt gegen freie/versehentliche Edits und Handbauten, **nicht** gegen einen kompromittierten Host.
+
+Phasen:
+
+| Phase | Zweck | Bindung |
+|---|---|---|
+| `pre_content_apply` (Backup A) | vor Inhalts-Apply (`--apply`) | an Paket-SHA256 |
+| `post_content_apply` (Backup B) | vor Preisstatus-Phase (Slice 7) | an Content-Apply-Receipt; `created_at` ≥ `completed_at` des Receipts |
+
+### Proof erzeugen (Staging-Ops-Helper, schreibt keine DB, führt keinen Dump aus)
+
+Dump wird extern erstellt (z. B. `mysqldump` des Hosts). Danach den Proof mit dem Helper erzeugen — er ermittelt die DB-Identität über dieselbe Guard-Kette wie Apply (`--confirm-database`, Allowlist, `SELECT DATABASE()`) und prüft einen ggf. vorhandenen `mysqldump`-Header (`Database:`) gegen die aktive DB:
+
+```bash
+# Backup A (vor Inhalts-Apply)
+php artisan dispo:master-data-backup-proof <DUMP_DATEI> \
+  --output-dir=<NEUES_PROOF_DIR> \
+  --phase=pre_content_apply \
+  --package-sha256=<HEX> \
+  --confirm-database=spn26jz7_dispo_staging \
+  --restore-path=same_db_import_verified
+```
+
+Backup B (`--phase=post_content_apply --content-receipt=<RECEIPT.json>`) wird mit dem Content-Apply-Receipt (Abschnitt 11/13) erzeugt; der Helper verifiziert das Receipt (Signatur, Paket, DB, Umgebung). Der Helper verweigert bestehende Proof-Verzeichnisse (kein Überschreiben). Tests synthetisieren Proofs ausschließlich über denselben Builder (`MasterDataBackupProofBuilderV2`).
+
+### Optionale Trockenrestore-Prüfung (Ebene C, MANUELL, NICHT gegen Staging)
+
+Nur auf einer **isolierten temporären Datenbank** (nicht `spn26jz7_dispo_staging`, nicht `dispo_mat_core`):
+
+1. Temporäre DB anlegen, z. B. `dispo_restore_check` (falls kein CREATE-Privileg: ein anderer Host/Instanz).
+2. `mysql dispo_restore_check < <DUMP_DATEI>`; Fehlerfrei = Mindestnachweis.
+3. Stichproben: Tabellenanzahl, Count der 25 Whitelist-Tabellen und Schutztabellen gegen das Ausgangsprotokoll (Abschnitt 3).
+4. Temp-DB wieder löschen; Ergebnis (Datum, Prüfer, Counts) im Betriebsprotokoll festhalten.
+5. **Kein** Restore auf Staging im Rahmen der Prüfung. Ein echter Staging-Restore ist ein eigener, separat freizugebender Recovery-Schritt (siehe Risiken/Recovery).
+
+### Mindestanforderungen an die Sicherung
+
+1. Frischer Dump **vor** Apply.
+2. Dateiname, Größe, SHA256 des Dumps im Proof.
+3. Restore-Weg schriftlich bestätigt (`restore_path`), Ebene C separat nachgewiesen oder bewusst als offenes Risiko akzeptiert.
 4. Keine Secrets im Ticket-Body; nur Pfad/Hash-Referenzen.
 
 ### PASS / STOP
@@ -269,8 +324,8 @@ Im aktuellen Stand (nach Slice 6a) gilt:
 
 - `ImportMasterDataCommand` erkennt `schema_version=2.0.0` und routet `--dry-run` an `MasterDataImporterV2::dryRunOperational()`.
 - Pflicht: `--confirm-database=spn26jz7_dispo_staging` und `--require-package-sha256=<64-hex>`.
-- `--apply` ist für `2.0.0` freigegeben (Slice 6b) mit Pflicht `--require-package-sha256` und `--require-backup-proof`.
-- `--apply-price-status` bleibt für `2.0.0` gesperrt (Slice 7).
+- `--apply` ist für `2.0.0` freigegeben (Slice 6b) mit Pflicht `--require-package-sha256` und `--require-backup-proof` (Proof-Version 2, Phase `pre_content_apply`).
+- `--dry-run-price-status` / `--apply-price-status` sind technisch implementiert (Verarbeitungsvertrag 2.1.0 / Slice 7); operativ weiterhin **STOP** ohne separates PO-GO (siehe Abschnitt 13).
 - Isolierte Test-Hooks (`executePhasesABCForIsolatedTests`) bleiben getrennt und unverändert fail-closed.
 
 Beispiel (nach Export und PO-GO; `<HEX>` = `MasterDataPackage::computePackageSha256`):
@@ -316,28 +371,26 @@ Ohne GO → **STOP**.
 
 ## 11. Apply und vollständige Nachkontrolle
 
-### VORHANDEN (Slice 6b; Status = Slice 7 weiterhin OFFEN)
+### VORHANDEN (Slice 6b Inhalts-Apply; Status-Phase = Abschnitt 13)
 
 ```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --apply \
   --confirm-database=spn26jz7_dispo_staging \
   --require-package-sha256=<HEX> \
-  --require-backup-proof=<PROOF_DIR>
+  --require-backup-proof=<PROOF_DIR_A>
 ```
 
-`--require-backup-proof` zeigt auf ein Verzeichnis mit:
+`--require-backup-proof` zeigt auf ein **Backup-Proof-Verzeichnis (Version 2, Phase `pre_content_apply`)** gemäß Abschnitt 4 (Gate, signierte `DUMP_META.json`, Dump). Proofs im alten Format (ohne Provenienz/Signatur), für eine andere DB/Umgebung/Instanz, ein anderes Paket oder älter als das Maximalalter werden **vor dem ersten Schreibzugriff** abgelehnt.
 
-- `BACKUP_GATE.txt` (erste nicht-leere Zeile exakt `PASS`)
-- `DUMP_META.json` (`dump_filename`, `dump_sha256`, `dump_bytes`, `restore_path`)
-- die referenzierte Dump-Datei (SHA256 und Größe müssen passen)
+Preise nur als `draft`. Status-Phase ist **nicht** Teil von `--apply`.
 
-Preise nur als `draft`. Status-Phase bleibt **Slice 7** und ist nicht Teil von `--apply`.
+Nach erfolgreichem Commit schreibt der Apply ein signiertes **Content-Apply-Receipt** unter `storage/app/master-data-transfer/receipts/` (CLI meldet den Pfad). Fehlgeschlagene/zurückgerollte Applies erzeugen **kein** Erfolgs-Receipt.
 
 ### Nachkontrolle
 
 1. Import-Report: creates/unchanged/conflicts
-2. Security-Report erneut PASS
+2. Security-Report erneut PASS; Content-Apply-Receipt vorhanden und signaturgültig
 3. Schutzmatrix C: Vorher/Nachher Digests und Stichproben
 4. Fachmatrix B: Stichproben Creates und Unchanged
 5. Neue Preise nur als `draft`
@@ -365,33 +418,71 @@ Abweichung → **STOP**, Recovery laut Teil D.
 
 ---
 
-## 13. Spätere Preisstatus-Phase (eigenes GO)
+## 13. Preisstatus-Phase (Slice 7; eigenes operatives PO-GO)
 
-Nicht Teil von Schritt 11.
+Nicht Teil von Schritt 11. Technisch implementiert (Verarbeitungsvertrag 2.1.0). Operativ **STOP** ohne separates PO-GO.
 
-Erlaubt laut Vertrag nur:
+Verbindliche Reihenfolge nach erfolgreichem Inhalts-Apply:
 
-- `draft` → `active`, wenn `source_status=active` und Fingerabdruck/Metadaten unverändert
-- `draft` → `archived`, wenn `source_status=archived` und Fingerabdruck/Metadaten unverändert
-
-Nicht erlaubt:
-
-- Statuswechsel an bereits active/archived Listen
-- Statuswechsel an gepinnten Listen
-- anderes oder verändertes Paket
-- Inhaltsänderungen in der Status-Phase
-
-### OFFEN (Slice 7)
+1. Content-Apply-Receipt prüfen (Signatur, Paket-SHA, DB, Umgebung).
+2. **Backup B** erzeugen (`post_content_apply`, an Content-Receipt gebunden):
 
 ```bash
-# OFFEN – Beispielvertrag, Parameter noch nicht implementiert:
+php artisan dispo:master-data-backup-proof <DUMP_DATEI> \
+  --output-dir=<PROOF_DIR_B> \
+  --phase=post_content_apply \
+  --package-sha256=<HEX> \
+  --confirm-database=spn26jz7_dispo_staging \
+  --restore-path=<DOKUMENTIERTER_RESTORE_WEG> \
+  --content-receipt=<RECEIPT.json>
+```
+
+3. Preisstatus-Dry-Run (schreibfrei; liefert `plan_hash`):
+
+```bash
+php artisan dispo:import-master-data <PAKET_DIR> \
+  --dry-run-price-status \
+  --confirm-database=spn26jz7_dispo_staging \
+  --require-package-sha256=<HEX> \
+  --require-backup-proof=<PROOF_DIR_B> \
+  --require-content-apply-receipt=<RECEIPT.json>
+```
+
+4. Konflikte / Blocker / Vollständigkeit auswerten; separates PO-GO.
+5. Preisstatus-Apply nur mit unverändertem Plan-Hash:
+
+```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --apply-price-status \
   --confirm-database=spn26jz7_dispo_staging \
-  --require-package-sha256=<HEX>
+  --require-package-sha256=<HEX> \
+  --require-backup-proof=<PROOF_DIR_B> \
+  --require-content-apply-receipt=<RECEIPT.json> \
+  --require-price-status-plan-hash=<PLAN_HASH>
 ```
 
-Ohne separates PO-GO → **STOP**. Slice 7 ist keine Voraussetzung für Dry-Run (6a) oder Inhalts-Apply (6b).
+Erlaubte Aktionen laut Vertrag 2.1.0 / S7-PO-01…05: `activate`, `archive`, `activate_with_archive_predecessor`, `unchanged`, `keep_draft`, `blocked`.
+
+Bei Drift zwischen Dry-Run und Apply, Pin am Vorgänger, unvollständiger Liste oder Gate-Fehler: **STOP**, keine Teilaktivierung. Erfolgreicher Commit schreibt ein Status-Apply-Receipt.
+
+Wiederholung desselben Pakets auf unverändertem Ziel: Idempotenz (No-op-Report), Gates bleiben aktiv.
+
+### Verhalten bei erfolgreichem Inhalts-Apply, aber blockiertem Status-Apply
+
+- Content-Apply bleibt committed; Content-Receipt bleibt gültig.
+- Keine Statuswrites.
+- Fachliche Konfliktlösung außerhalb des Importpfads; neuer Status-Dry-Run + neues Backup B + neues PO-GO erforderlich.
+- Kein „Weiterlaufen“ mit veraltetem Plan-Hash.
+
+### Restore-Nachweis (Konzept; kein realer Staging-Restore in diesem Auftrag)
+
+Unterscheide klar:
+
+| Ebene | Was | Automatisch? |
+|---|---|---|
+| A Integrität | Dump-Größe + SHA256 + Gate PASS | ja (Proof-Validierung) |
+| B Herkunft | Signierte Provenienz (`SELECT DATABASE()`, Phase, Receipt-Bindung, HMAC) | ja |
+| C Wiederherstellbarkeit | Restore in **isolierter Temp-DB**, Stichproben gegen Pre-Apply-Baseline | operativ vor erstem Stammdatentransfer; **nicht** allein durch Hash/Skript behauptet |
 
 ---
 
@@ -409,6 +500,6 @@ Zwischen Export-Host und Staging:
 
 - Keine echten Exporte/Imports
 - Keine DB-Verbindungen im Rahmen der Doku-Erstellung
-- Keine CLI-Implementierung
 - Keine automatische Korrektur von Konflikten
 - Keine Erfindung fehlender Produktionspreise 2027
+- Keinen realen Staging-Restore

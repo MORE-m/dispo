@@ -174,6 +174,19 @@ Schutzmechanismen (kurz):
 - Keine automatischen Deletes; fehlende Paketzeilen werden nicht gelöscht.
 - Natürliche Schlüssel / keine Quell-Primärschlüssel: Vertrag 2.0.0 + Importer V2.
 
+## Meta-Artefakte (Dateien, keine Tabellen) – Slice 6b-H / Slice 7
+
+Die Verarbeitungsvertrag-Erweiterung 2.1.0 führt **keine neue DB-Tabelle** ein. Die Whitelist (25 Tabellen) und die Ausschlussliste bleiben unverändert. Neue Meta-Artefakte liegen ausschließlich als Dateien vor:
+
+| Artefakt | Ort | Zweck | DB-Bezug |
+|---|---|---|---|
+| Backup-Proof (v2) | frei wählbares Proof-Verzeichnis außerhalb Webroot (`BACKUP_GATE.txt`, `DUMP_META.json`, Dump) | Integrität + Provenienz der Sicherung | keiner |
+| Content-Apply-Receipt | `storage/app/master-data-transfer/receipts/content-apply-<id>.json` | signierter Nachweis eines erfolgreichen Inhalts-Apply | keiner |
+| Status-Apply-Receipt | `storage/app/master-data-transfer/receipts/price-status-apply-<id>.json` | signierter Nachweis einer erfolgreichen Status-Phase | keiner |
+| Import-/Status-Report | `storage/logs/master-data-import-report-*.json` | Report (wie bisher) | keiner |
+
+Die Status-Phase darf innerhalb der Whitelist nur `status`, `published_at`, `archived_at`, `lock_version`, `updated_at` der Tabellen `price_lists`, `production_price_lists`, `oa_tkp_price_lists` per `UPDATE` ändern (Vertrag §16.8).
+
 ## Aktualisierung
 
 Bei neuen Migrationen diese Datei und `MasterDataTransferContractV2::{WRITE_WHITELIST_TABLES,EXCLUDED_TABLES}` synchron halten.

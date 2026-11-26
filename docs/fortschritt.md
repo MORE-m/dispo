@@ -1,16 +1,15 @@
 # Fortschritt V1
 
-Stand: 26. November 2026 – **EPIC-03-F Slice 6b Apply `VERIFIED` und auf `main` gemergt (PR #279).**
+Stand: 26. November 2026 – **EPIC-03-F Slice 7 + Slice-6b-Hardening auf Feature-Branch (Draft-PR).**
 
-Merge-SHA `171aad700ee2cd0a43e8e434a042fa16fcb28d09`; Feature-HEAD
-`7f5d32410e81ae717fafbd7406791a63f96fe233`; Feature-CI Run `45795039370` und
-Post-Merge-CI Run `45806036882` grün (`ci`/`mysql`/`e2e-spt008`). Operativer
-V2-Inhalts-Apply mit Allowlist, Pflicht-SHA256 und Backup-Proof; Preise nur
-Draft; Slice 7 noch nicht implementiert. Ergänzende Sicherheitsnachweise
-(Rollback-Test, Backup-Herkunft) noch ausstehend. Tabellenklassifikation:
-`docs/readiness/EPIC-03-F-table-classification-2-0-0.md`. Masterplan v1.2.1:
-Phase 1 weiter `IN_PROGRESS`; Staging-Apply/CRM/Slice 7 `OPEN`; kein
-`ACCEPTED`, kein operativer Apply, kein Deploy.
+Verarbeitungsvertrag `2.1.0` (Paketschema bleibt `2.0.0`): Backup-Proof v2 mit
+signierter Provenienz, Content-/Status-Apply-Receipts, Preisstatus-Dry-Run und
+`-Apply` (`--dry-run-price-status` / `--apply-price-status`), S7-PO-01…05,
+Rollback-Nachweis für `applyOperational`. Branch
+`feat/epic-03-f-slice7-price-status-apply`. Slice 6b weiterhin auf `main`
+gemergt (PR #279, Merge-SHA `171aad7…`). Masterplan aktualisiert: Phase 1
+`IN_PROGRESS`; operativer Inhalts-/Status-Apply und CRM weiter `OPEN`; kein
+`ACCEPTED`, kein Deploy, keine realen DB-Writes.
 
 Stand davor: 26. November 2026 – **PO-MASTER-AUDIT / GO-LIVE-MASTERPLAN v1.0.0.**
 

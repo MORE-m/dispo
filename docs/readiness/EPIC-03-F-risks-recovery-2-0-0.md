@@ -107,6 +107,22 @@ Aus Vertrag Abschnitt 15 / Readiness, weiterhin offen:
 
 Status-Phase nur gegen dasselbe SHA256-Paket; nur `draft→active/archived` gemäß `source_status`; nie Pins; nie bereits active/archived anfassen.
 
+## 9a. Slice 7 – Statusphase: Risiken und Recovery (Verarbeitungsvertrag 2.1.0)
+
+| Risiko | Mitigation |
+|---|---|
+| Status-Phase auf Basis eines veralteten Backups | **Backup B** (Phase `post_content_apply`) ist Pflicht, an das Content-Apply-Receipt gebunden und muss nach dessen `completed_at` erstellt sein (S7-PO-02) |
+| Receipt-Datei verloren / manipuliert | HMAC-Signatur; Verlust → Inhalts-Apply (idempotent) erneut mit PO-GO erzeugt neues Receipt; kein Handbau |
+| HMAC-Geheimnis kompromittiert | Signatur schützt nur gegen freie Edits, nicht gegen Host-Kompromittierung; Rotation = Proofs/Receipts neu erzeugen (Lücke G6) |
+| Status-Apply bricht mittendrin ab | eine Transaktion → vollständiger Rollback; kein Erfolgs-Receipt; Recovery nur über Backup B, falls Commit-Zustand unklar ist |
+| Drift zwischen Dry-Run und Apply | `--require-price-status-plan-hash`; Plan wird in der Transaktion neu berechnet; Abweichung = STOP |
+| Aktivierung unvollständiger Listen | S7-PO-04: Gate je Familie, `blocked` ohne Auto-Ergänzung |
+| Archivierung eines gepinnten Vorgängers | S7-PO-01: fail-closed bei Pin; Pins vor/in/nach Apply verglichen |
+| Mehrere aktive Produktions-Vorgänger | `blocked` (Lücke G2), manuelle Klärung |
+| Backup-Restore nie getestet | Ebene C ist manuell/optional dokumentiert (Trockenrestore auf isolierter Temp-DB); Restore-Fähigkeit bleibt ohne C eine Annahme |
+
+Recovery bei fehlgeschlagener oder zweifelhafter Status-Phase: **STOP**, kein Reparatur-Skript, Restore aus Backup B über den freigegebenen Restore-Pfad (separates PO-GO), danach Schutzmatrix C prüfen.
+
 ## 10. Weitere Risiken (kurz)
 
 | Risiko | Mitigation |
