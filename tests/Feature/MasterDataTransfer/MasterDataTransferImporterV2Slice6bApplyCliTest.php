@@ -415,7 +415,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
             '--require-package-sha256' => $sha,
             '--require-backup-proof' => $this->writeValidBackupProof($sha),
         ]));
-        $this->assertStringContainsString('Slice 7 fehlt', Artisan::output());
+        $this->assertStringContainsString('--require-price-status-plan-hash', Artisan::output());
     }
 
     #[Test]

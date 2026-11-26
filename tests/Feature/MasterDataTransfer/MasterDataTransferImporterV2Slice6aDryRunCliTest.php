@@ -571,7 +571,7 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
         ]));
-        $this->assertStringContainsString('Slice 7 fehlt', Artisan::output());
+        $this->assertStringContainsString('--require-price-status-plan-hash', Artisan::output());
     }
 
     #[Test]

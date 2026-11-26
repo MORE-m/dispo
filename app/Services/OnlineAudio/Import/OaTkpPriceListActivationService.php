@@ -190,7 +190,12 @@ final class OaTkpPriceListActivationService
         }
     }
 
-    private function assertActivatable(OaTkpPriceList $list): int
+    /**
+     * Vollständigkeits-/Gültigkeitsprüfung für die Aktivierung (auch vom Master-Data-Transfer Slice 7 genutzt).
+     *
+     * @throws OaTkpStammdatenImportException
+     */
+    public function assertActivatable(OaTkpPriceList $list): int
     {
         $required = OaTkpActiveMediumInventoryPairs::requiredPairKeySetForActivation();
 

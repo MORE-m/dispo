@@ -8,14 +8,19 @@ use App\Enums\FieldSetVersionStatus;
 use App\Enums\FieldType;
 use App\Enums\InventoryType;
 use App\Enums\Role;
+use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\FieldDefinition;
 use App\Models\Organization;
+use App\Models\PriceList;
 use App\Models\User;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofBuilderV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofV2;
 use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -106,6 +111,171 @@ trait OperationalV2Fixtures
     }
 
     /**
+     * @return array{receipt_id: string, signature: string}
+     */
+    protected function receiptRef(string $receiptPath): array
+    {
+        $raw = json_decode((string) File::get($receiptPath), true, 32, JSON_THROW_ON_ERROR);
+
+        return ['receipt_id' => $raw['receipt_id'], 'signature' => $raw['signature']];
+    }
+
+    /**
+     * Backup B (nach Inhalts-Apply) über den Produktions-Builder, an das Receipt gebunden.
+     */
+    protected function backupBFor(string $packageSha, string $receiptPath, ?string $createdAt = null): string
+    {
+        return $this->proofFor(
+            $packageSha,
+            MasterDataBackupProofV2::PHASE_POST_CONTENT_APPLY,
+            $this->receiptRef($receiptPath),
+            $createdAt,
+        );
+    }
+
+    /**
+     * Inhalts-Apply + Backup B in einem Schritt.
+     *
+     * @return array{package: string, sha: string, receipt: string, proof_b: string}
+     */
+    protected function contentAppliedPackage(array $overrides = []): array
+    {
+        $package = $this->writePackage($overrides);
+
+        return $this->applyAndPrepare($package);
+    }
+
+    /**
+     * @return array{package: string, sha: string, receipt: string, proof_b: string}
+     */
+    protected function applyAndPrepare(string $package): array
+    {
+        $sha = $this->packageSha($package);
+        $applied = $this->applyContent($package);
+        if ($applied['exit'] !== 0 || $applied['receipt_path'] === null) {
+            throw new \RuntimeException('Inhalts-Apply im Test fehlgeschlagen: '.$applied['output']);
+        }
+
+        return [
+            'package' => $package,
+            'sha' => $sha,
+            'receipt' => $applied['receipt_path'],
+            'proof_b' => $this->backupBFor($sha, $applied['receipt_path']),
+        ];
+    }
+
+    /**
+     * @param  array{package: string, sha: string, receipt: string, proof_b: string}  $ctx
+     * @return array{exit: int, output: string, plan_hash: ?string}
+     */
+    protected function runStatus(string $mode, array $ctx, ?string $planHash = null, array $options = []): array
+    {
+        $args = array_merge([
+            'path' => $ctx['package'],
+            '--'.$mode => true,
+            '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            '--require-package-sha256' => $ctx['sha'],
+            '--require-backup-proof' => $ctx['proof_b'],
+            '--require-content-apply-receipt' => $ctx['receipt'],
+        ], $options);
+        if ($planHash !== null) {
+            $args['--require-price-status-plan-hash'] = $planHash;
+        }
+        $exit = Artisan::call('dispo:import-master-data', $args);
+        $output = Artisan::output();
+        $hash = null;
+        if (preg_match('/^price_status_plan_hash=([a-f0-9]{64})$/m', $output, $m) === 1) {
+            $hash = $m[1];
+        }
+
+        return ['exit' => $exit, 'output' => $output, 'plan_hash' => $hash];
+    }
+
+    /**
+     * @param  array{package: string, sha: string, receipt: string, proof_b: string}  $ctx
+     */
+    protected function dryRunHash(array $ctx): string
+    {
+        $r = $this->runStatus('dry-run-price-status', $ctx);
+        if ($r['exit'] !== 0 || $r['plan_hash'] === null) {
+            throw new \RuntimeException('Preisstatus-Dry-Run im Test fehlgeschlagen: '.$r['output']);
+        }
+
+        return $r['plan_hash'];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function listStatuses(): array
+    {
+        $out = [];
+        foreach (DB::table('price_lists')->orderBy('id')->get(['id', 'year', 'revision_number', 'status']) as $r) {
+            $out['spot:'.$r->year.'r'.$r->revision_number] = (string) $r->status;
+        }
+        foreach (DB::table('production_price_lists')->orderBy('id')->get(['year', 'revision_number', 'status']) as $r) {
+            $out['production:'.$r->year.'r'.$r->revision_number] = (string) $r->status;
+        }
+        foreach (DB::table('oa_tkp_price_lists')->orderBy('id')->get(['year', 'revision_number', 'status']) as $r) {
+            $out['oa_tkp:'.$r->year.'r'.$r->revision_number] = (string) $r->status;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Digest aller Whitelist-Tabellen (Inhalt + Status) — Beweis „keine Schreibzugriffe“.
+     */
+    protected function whitelistDigest(): string
+    {
+        $all = [];
+        foreach (MasterDataTransferContractV2::WRITE_WHITELIST_TABLES as $table) {
+            $all[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
+        }
+
+        return hash('sha256', json_encode($all, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Digest nur der Inhalte (alles außer Statusfeldern der drei Preislistentabellen).
+     */
+    protected function contentDigestWithoutStatus(): string
+    {
+        $all = [];
+        foreach (MasterDataTransferContractV2::WRITE_WHITELIST_TABLES as $table) {
+            $rows = DB::table($table)->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
+            if (in_array($table, ['price_lists', 'production_price_lists', 'oa_tkp_price_lists'], true)) {
+                $rows = array_map(function (array $r): array {
+                    unset($r['status'], $r['published_at'], $r['archived_at'], $r['lock_version'], $r['updated_at']);
+
+                    return $r;
+                }, $rows);
+            }
+            $all[$table] = $rows;
+        }
+
+        return hash('sha256', json_encode($all, JSON_THROW_ON_ERROR));
+    }
+
+    protected function pinSpotList(PriceList $list): void
+    {
+        $user = User::query()->first();
+        $calc = Calculation::factory()->create(['advisor_id' => $user->id]);
+        $medium = AdvertisingMedium::query()->first() ?? AdvertisingMedium::factory()->create();
+        CalculationPosition::factory()->create([
+            'calculation_id' => $calc->id,
+            'inventory_id' => $list->inventory_id,
+            'advertising_medium_id' => $medium->id,
+            'price_list_id' => $list->id,
+        ]);
+    }
+
+    protected function setListStatus(string $table, int $year, int $revision, string $status): void
+    {
+        DB::table($table)->where('year', $year)->where('revision_number', $revision)->update(['status' => $status]);
+    }
+
+    /**
      * @return list<string>
      */
     protected function receiptFiles(): array
@@ -133,7 +303,7 @@ trait OperationalV2Fixtures
     /**
      * @return array<string, mixed>
      */
-    protected function spotList(string $inventory, int $year, int $revision, string $sourceStatus, string $price = '12.5000'): array
+    protected function spotList(string $inventory, int $year, int $revision, string $sourceStatus, string $price = '12.0000'): array
     {
         return [
             'inventory_code' => $inventory, 'year' => $year, 'revision_number' => $revision,
