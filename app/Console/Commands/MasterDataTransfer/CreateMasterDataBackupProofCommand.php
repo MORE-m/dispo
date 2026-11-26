@@ -3,6 +3,7 @@
 namespace App\Console\Commands\MasterDataTransfer;
 
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataApplyReceiptV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofBuilderV2;
 use App\Services\MasterDataTransfer\Support\MasterDataBackupProofV2;
 use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2;
@@ -32,6 +33,7 @@ class CreateMasterDataBackupProofCommand extends Command
     public function handle(
         MasterDataOperationalDatabaseGuardV2 $guard,
         MasterDataBackupProofBuilderV2 $builder,
+        MasterDataApplyReceiptV2 $receipts,
     ): int {
         try {
             $dump = $this->argument('dump');
@@ -57,11 +59,12 @@ class CreateMasterDataBackupProofCommand extends Command
 
             $receiptRef = null;
             if ($phase === MasterDataBackupProofV2::PHASE_POST_CONTENT_APPLY) {
-                throw new MasterDataTransferException(
-                    'post_content_apply-Proofs (Backup B) folgen mit dem Apply-Receipt (Slice 7).',
-                );
-            }
-            if ($receiptPath !== '') {
+                if ($receiptPath === '') {
+                    throw new MasterDataTransferException('--content-receipt ist bei post_content_apply Pflicht.');
+                }
+                $receipt = $receipts->assertValidContentReceipt($receiptPath, $packageSha, $database);
+                $receiptRef = ['receipt_id' => $receipt['receipt_id'], 'signature' => $receipt['signature']];
+            } elseif ($receiptPath !== '') {
                 throw new MasterDataTransferException('--content-receipt gilt nur für post_content_apply.');
             }
 

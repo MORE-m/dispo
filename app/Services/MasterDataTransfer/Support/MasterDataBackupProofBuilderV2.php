@@ -128,7 +128,7 @@ final class MasterDataBackupProofBuilderV2
             'proof_version' => MasterDataBackupProofV2::PROOF_VERSION,
             'backup_run_id' => $runId,
             'phase' => $phase,
-            'created_at' => $createdAt->toIso8601String(),
+            'created_at' => $createdAt->format('Y-m-d\TH:i:s.uP'),
             'database_name' => $database,
             'database_name_source' => 'select_database',
             'target_environment' => $params['target_environment'] ?? app()->environment(),
@@ -159,7 +159,7 @@ final class MasterDataBackupProofBuilderV2
             'meta_sha256' => $this->signer->documentSha256($meta),
             'signature' => (string) $meta[MasterDataProofSignerV2::SIGNATURE_FIELD],
             'dump_sha256' => strtolower($dumpSha),
-            'created_at' => $createdAt->toIso8601String(),
+            'created_at' => $createdAt->format('Y-m-d\TH:i:s.uP'),
         ];
     }
 }

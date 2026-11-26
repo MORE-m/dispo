@@ -159,7 +159,7 @@ php artisan dispo:master-data-backup-proof <DUMP_DATEI> \
   --restore-path=same_db_import_verified
 ```
 
-Backup B (`--phase=post_content_apply --content-receipt=<RECEIPT.json>`) wird mit dem Apply-Receipt (Slice 7, Abschnitt 13) genutzt. Der Helper verweigert bestehende Proof-Verzeichnisse (kein Überschreiben). Tests synthetisieren Proofs ausschließlich über denselben Builder (`MasterDataBackupProofBuilderV2`).
+Backup B (`--phase=post_content_apply --content-receipt=<RECEIPT.json>`) wird mit dem Content-Apply-Receipt (Abschnitt 11/13) erzeugt; der Helper verifiziert das Receipt (Signatur, Paket, DB, Umgebung). Der Helper verweigert bestehende Proof-Verzeichnisse (kein Überschreiben). Tests synthetisieren Proofs ausschließlich über denselben Builder (`MasterDataBackupProofBuilderV2`).
 
 ### Optionale Trockenrestore-Prüfung (Ebene C, MANUELL, NICHT gegen Staging)
 

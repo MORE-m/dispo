@@ -133,6 +133,10 @@ class ImportMasterDataCommand extends Command
                 $this->line('backup_proof='.$report['security']['backup_proof']);
             }
         }
+        if (isset($report['receipt']) && is_array($report['receipt'])) {
+            $this->line('receipt_id='.($report['receipt']['receipt_id'] ?? ''));
+            $this->line('receipt='.($report['receipt']['receipt_path'] ?? ''));
+        }
         $this->line('Report: '.$pathOut);
 
         $securityResult = is_array($report['security'] ?? null)
