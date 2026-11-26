@@ -1,13 +1,14 @@
 # Fortschritt V1
 
-Stand: 26. November 2026 – **EPIC-03-F Slice 6b Apply `IMPLEMENTED` (Draft-PR #279).**
+Stand: 26. November 2026 – **EPIC-03-F Slice 6b Apply `VERIFIED` (Draft-PR #279).**
 
-Operativer V2-Inhalts-Apply mit Allowlist, Pflicht-SHA256 und verifiziertem
-Backup-Proof; Preise nur Draft; Slice 7 gesperrt. Vollständige
+Feature-HEAD `7f5d32410e81ae717fafbd7406791a63f96fe233`; CI Run `45795039370`
+grün (`ci`/`mysql`/`e2e-spt008`). Operativer V2-Inhalts-Apply mit Allowlist,
+Pflicht-SHA256 und Backup-Proof; Preise nur Draft; Slice 7 gesperrt.
 Tabellenklassifikation:
-`docs/readiness/EPIC-03-F-table-classification-2-0-0.md`. Masterplan v1.1.0:
-Phase 1 weiter `IN_PROGRESS`; Staging-Apply/CRM/Slice 7 `OPEN`. Kein Merge,
-kein operativer Apply, kein Deploy, keine realen DB-Writes.
+`docs/readiness/EPIC-03-F-table-classification-2-0-0.md`. Masterplan v1.2.0:
+Phase 1 weiter `IN_PROGRESS`; Staging-Apply/CRM/Slice 7 `OPEN`; kein
+`ACCEPTED`, kein Merge, kein operativer Apply, kein Deploy.
 
 Stand davor: 26. November 2026 – **PO-MASTER-AUDIT / GO-LIVE-MASTERPLAN v1.0.0.**
 
