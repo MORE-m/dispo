@@ -417,6 +417,78 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
     }
 
     #[Test]
+    public function apply_operational_rolls_back_all_writes_after_partial_failure_mid_transaction(): void
+    {
+        User::factory()->create(['email' => 'rollback6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+        $proof = $this->writeValidBackupProof('rollback');
+        $before = $this->captureWritableCounts();
+        $usersDigestBefore = $this->tableDigest('users');
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+
+        /** @var list<string> $writesSeen */
+        $writesSeen = [];
+        $inventoryInsertSeen = false;
+        $threw = false;
+        DB::listen(function ($query) use (&$writesSeen, &$inventoryInsertSeen, &$threw): void {
+            $sql = strtolower((string) $query->sql);
+            if (preg_match('/^(insert|update|delete)\b/', trim($sql)) === 1) {
+                $writesSeen[] = $sql;
+            }
+            if (preg_match('/^insert into ["`]inventories["`]/', trim($sql)) === 1) {
+                $inventoryInsertSeen = true;
+            }
+            // Erst NACH nachweislich geschriebenen Inventories + Medien-Insert einen späten Schreibzugriff abbrechen.
+            if (
+                ! $threw
+                && $inventoryInsertSeen
+                && (str_contains($sql, 'update "field_definitions"') || str_contains($sql, 'update `field_definitions`'))
+            ) {
+                $threw = true;
+                throw new \RuntimeException('forced operational apply failure');
+            }
+        });
+
+        try {
+            app(MasterDataImporterV2::class)->applyOperational(
+                $package,
+                MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                $sha,
+                $proof,
+            );
+            $this->fail('Erwarteter Abbruch mitten in der Apply-Transaktion');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('forced operational apply failure', $e->getMessage());
+        }
+
+        // Beweis: es wurde tatsächlich geschrieben, bevor der Abbruch kam.
+        $this->assertTrue($threw, 'Abbruchpunkt wurde nicht erreicht');
+        $this->assertTrue($inventoryInsertSeen, 'Es wurde vor dem Abbruch kein Inventory geschrieben');
+        $this->assertGreaterThan(3, count($writesSeen));
+
+        // Vollständiger Rollback aller Whitelist-Tabellen und geschützten Bestände.
+        $this->assertSame($before, $this->captureWritableCounts());
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_v2_radio')->count());
+        $this->assertSame(0, AdvertisingMedium::query()->where('code', 'spot_v2')->count());
+        $this->assertSame(0, PriceList::query()->count());
+        $this->assertSame(0, FieldDefinition::query()->where('key', 'campaign_title')->count());
+        $this->assertSame(0, Organization::query()->where('name', 'Fixture Org V2')->count());
+        $this->assertSame($usersDigestBefore, $this->tableDigest('users'));
+
+        // Ein anschließender sauberer Apply funktioniert wieder (kein halber Zustand).
+        $retryExit = Artisan::call('dispo:import-master-data', [
+            'path' => $package,
+            '--apply' => true,
+            '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            '--require-package-sha256' => $sha,
+            '--require-backup-proof' => $proof,
+        ]);
+        $this->assertSame(0, $retryExit, Artisan::output());
+        $this->assertSame(1, Inventory::query()->where('code', 'inv_v2_radio')->count());
+    }
+
+    #[Test]
     public function cli_exposes_backup_proof_option_and_rejects_allowlist_aliases(): void
     {
         $definition = (new ImportMasterDataCommand)->getDefinition();
