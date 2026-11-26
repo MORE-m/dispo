@@ -170,7 +170,6 @@ final class MasterDataImporterV2
     ): array {
         $normalizedRequired = $this->assertValidPackageSha256Option($requirePackageSha256);
         $activeDatabase = $this->operationalDatabaseGuard->assertApplyAllowed($confirmDatabase);
-        $proof = $this->backupProof->assertValid($requireBackupProof);
 
         $digestBefore = strtolower($this->packages->computePackageSha256($packagePath));
         if (! hash_equals($digestBefore, $normalizedRequired)) {
@@ -180,6 +179,14 @@ final class MasterDataImporterV2
                 $digestBefore,
             ));
         }
+
+        // Backup A (Integrität + Provenienz, an DB/Umgebung/Paket gebunden) VOR dem ersten Schreibzugriff.
+        $proof = $this->backupProof->assertValid(
+            $requireBackupProof,
+            $activeDatabase,
+            $digestBefore,
+            MasterDataBackupProofV2::PHASE_PRE_CONTENT_APPLY,
+        );
 
         $report = $this->executePhases(
             $packagePath,

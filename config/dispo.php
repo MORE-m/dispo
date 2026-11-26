@@ -65,4 +65,28 @@ return [
 
     'master_data_transfer_testing_operational_database' => null,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Master-Data-Transfer – Proof-/Receipt-Signatur (EPIC-03-F Slice 6b-H / 7)
+    |--------------------------------------------------------------------------
+    |
+    | HMAC-Geheimnis für Backup-Proofs und Apply-Receipts. Leer = abgeleitet aus
+    | APP_KEY (HMAC-Domain-Separation). Schutz gegen versehentliche/freie Edits,
+    | nicht gegen einen kompromittierten Host.
+    |
+    | master_data_transfer_instance_id: optionale Instanzidentität; wenn gesetzt,
+    | muss sie im Backup-Proof identisch sein.
+    | master_data_transfer_backup_proof_max_age_minutes: maximales Alter eines Proofs.
+    | master_data_transfer_receipt_dir: Ablageort der Receipts (null = storage/app/master-data-transfer/receipts).
+    |
+    */
+
+    'master_data_transfer_proof_secret' => env('MASTER_DATA_TRANSFER_PROOF_SECRET'),
+
+    'master_data_transfer_instance_id' => env('MASTER_DATA_TRANSFER_INSTANCE_ID'),
+
+    'master_data_transfer_backup_proof_max_age_minutes' => (int) env('MASTER_DATA_TRANSFER_BACKUP_PROOF_MAX_AGE_MINUTES', 1440),
+
+    'master_data_transfer_receipt_dir' => null,
+
 ];
