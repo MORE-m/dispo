@@ -428,12 +428,13 @@ Verbindliche Reihenfolge nach erfolgreichem Inhalts-Apply:
 2. **Backup B** erzeugen (`post_content_apply`, an Content-Receipt gebunden):
 
 ```bash
-php artisan dispo:create-master-data-backup-proof \
+php artisan dispo:master-data-backup-proof <DUMP_DATEI> \
+  --output-dir=<PROOF_DIR_B> \
   --phase=post_content_apply \
   --package-sha256=<HEX> \
-  --content-receipt=<RECEIPT.json> \
-  --output-dir=<PROOF_DIR_B> \
-  --restore-path=<DOKUMENTIERTER_RESTORE_WEG>
+  --confirm-database=spn26jz7_dispo_staging \
+  --restore-path=<DOKUMENTIERTER_RESTORE_WEG> \
+  --content-receipt=<RECEIPT.json>
 ```
 
 3. Preisstatus-Dry-Run (schreibfrei; liefert `plan_hash`):
