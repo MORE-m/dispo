@@ -269,7 +269,8 @@ Im aktuellen Stand (nach Slice 6a) gilt:
 
 - `ImportMasterDataCommand` erkennt `schema_version=2.0.0` und routet `--dry-run` an `MasterDataImporterV2::dryRunOperational()`.
 - Pflicht: `--confirm-database=spn26jz7_dispo_staging` und `--require-package-sha256=<64-hex>`.
-- `--apply` und `--apply-price-status` bleiben für `2.0.0` gesperrt (Slice 6b / 7).
+- `--apply` ist für `2.0.0` freigegeben (Slice 6b) mit Pflicht `--require-package-sha256` und `--require-backup-proof`.
+- `--apply-price-status` bleibt für `2.0.0` gesperrt (Slice 7).
 - Isolierte Test-Hooks (`executePhasesABCForIsolatedTests`) bleiben getrennt und unverändert fail-closed.
 
 Beispiel (nach Export und PO-GO; `<HEX>` = `MasterDataPackage::computePackageSha256`):
@@ -315,21 +316,23 @@ Ohne GO → **STOP**.
 
 ## 11. Apply und vollständige Nachkontrolle
 
-### Zielbefehl (nach Slice-6-Freigabe)
+### VORHANDEN (Slice 6b; Status = Slice 7 weiterhin OFFEN)
 
 ```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --apply \
-  --confirm-database=spn26jz7_dispo_staging
+  --confirm-database=spn26jz7_dispo_staging \
+  --require-package-sha256=<HEX> \
+  --require-backup-proof=<PROOF_DIR>
 ```
 
-### OFFEN (Slice 6b; Status = Slice 7)
+`--require-backup-proof` zeigt auf ein Verzeichnis mit:
 
-Zusätzlich erwartete Parameter (noch nicht implementiert):
+- `BACKUP_GATE.txt` (erste nicht-leere Zeile exakt `PASS`)
+- `DUMP_META.json` (`dump_filename`, `dump_sha256`, `dump_bytes`, `restore_path`)
+- die referenzierte Dump-Datei (SHA256 und Größe müssen passen)
 
-- `--require-package-sha256=<HEX>` (Slice 6b)
-- `--require-backup-proof=<PFAD_ODER_TOKEN>` (Slice 6b; Gate-Nachweis)
-- explizite Trennung Inhalts-Apply vs. Status-Phase: Status ist **Slice 7**, nicht Teil von `--apply`
+Preise nur als `draft`. Status-Phase bleibt **Slice 7** und ist nicht Teil von `--apply`.
 
 ### Nachkontrolle
 

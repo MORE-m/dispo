@@ -11,19 +11,20 @@ use App\Services\MasterDataTransfer\Support\MasterDataPackage;
 use Illuminate\Console\Command;
 
 /**
- * Stammdaten-Import: Schema 1.0.0 Dry-Run/Apply; Schema 2.0.0 nur Slice-6a-Dry-Run.
+ * Stammdaten-Import: Schema 1.0.0 Dry-Run/Apply; Schema 2.0.0 Dry-Run (6a) und Apply (6b).
  */
 class ImportMasterDataCommand extends Command
 {
     protected $signature = 'dispo:import-master-data
         {path : Pfad zum Exportpaket}
         {--dry-run : Nur prüfen und berichten (schreibfrei)}
-        {--apply : Schreibenden Import ausführen (nur Schema 1.0.0)}
+        {--apply : Schreibenden Import ausführen}
         {--apply-price-status : Preisstatus-Phase (noch nicht freigegeben)}
         {--confirm-database= : Muss exakt dem aktiven DB-Namen entsprechen}
-        {--require-package-sha256= : Pflicht für Schema 2.0.0 Dry-Run (64 Hex)}';
+        {--require-package-sha256= : Pflicht für Schema 2.0.0 (64 Hex)}
+        {--require-backup-proof= : Pflicht für Schema 2.0.0 Apply (Proof-Verzeichnis)}';
 
-    protected $description = 'Stammdaten/Preislisten-Paket importieren (fail-closed; V2 nur Dry-Run)';
+    protected $description = 'Stammdaten/Preislisten-Paket importieren (fail-closed; V2 Dry-Run/Apply, kein Status)';
 
     public function handle(
         MasterDataImporter $importerV1,
@@ -52,14 +53,34 @@ class ImportMasterDataCommand extends Command
 
         $requireShaOption = $this->option('require-package-sha256');
         $requireSha = is_string($requireShaOption) ? $requireShaOption : '';
+        $requireBackupOption = $this->option('require-backup-proof');
+        $requireBackup = is_string($requireBackupOption) ? $requireBackupOption : '';
 
         try {
             $schemaVersion = $packages->detectSchemaVersion($path);
 
             if ($schemaVersion === MasterDataTransferContractV2::SCHEMA_VERSION) {
-                $report = $this->handleV2($importerV2, $path, $dryRun, $apply, $applyPriceStatus, $confirm, $requireSha);
+                $report = $this->handleV2(
+                    $importerV2,
+                    $path,
+                    $dryRun,
+                    $apply,
+                    $applyPriceStatus,
+                    $confirm,
+                    $requireSha,
+                    $requireBackup,
+                );
             } elseif ($schemaVersion === MasterDataTransferContract::SCHEMA_VERSION) {
-                $report = $this->handleV1($importerV1, $path, $dryRun, $apply, $applyPriceStatus, $confirm, $requireSha);
+                $report = $this->handleV1(
+                    $importerV1,
+                    $path,
+                    $dryRun,
+                    $apply,
+                    $applyPriceStatus,
+                    $confirm,
+                    $requireSha,
+                    $requireBackup,
+                );
             } else {
                 throw new MasterDataTransferException(
                     'Unbekannte oder nicht freigegebene schema_version: '.$schemaVersion,
@@ -95,8 +116,10 @@ class ImportMasterDataCommand extends Command
         if (($report['counts_by_action']['update'] ?? 0) > 0) {
             $this->line('updated='.$report['counts_by_action']['update']);
         }
-        if ($report['conflicts'] !== []) {
-            $this->warn('conflicts='.count($report['conflicts']));
+        $blocked = count($report['conflicts'] ?? []);
+        if ($blocked > 0) {
+            $this->warn('blocked='.$blocked);
+            $this->warn('conflicts='.$blocked);
         }
         if ($report['skipped'] !== []) {
             $this->line('skipped='.count($report['skipped']));
@@ -105,6 +128,9 @@ class ImportMasterDataCommand extends Command
             $this->line('security.result='.($report['security']['result'] ?? 'unknown'));
             if (isset($report['security']['package_sha256']) && is_string($report['security']['package_sha256'])) {
                 $this->line('package_sha256='.$report['security']['package_sha256']);
+            }
+            if (isset($report['security']['backup_proof']) && is_string($report['security']['backup_proof'])) {
+                $this->line('backup_proof='.$report['security']['backup_proof']);
             }
         }
         $this->line('Report: '.$pathOut);
@@ -130,6 +156,7 @@ class ImportMasterDataCommand extends Command
         bool $applyPriceStatus,
         string $confirm,
         string $requireSha,
+        string $requireBackup,
     ): array {
         if ($applyPriceStatus) {
             throw new MasterDataTransferException(
@@ -139,6 +166,11 @@ class ImportMasterDataCommand extends Command
         if ($requireSha !== '') {
             throw new MasterDataTransferException(
                 '--require-package-sha256 gilt nur für Schema 2.0.0.',
+            );
+        }
+        if ($requireBackup !== '') {
+            throw new MasterDataTransferException(
+                '--require-backup-proof gilt nur für Schema 2.0.0 Apply.',
             );
         }
 
@@ -156,24 +188,29 @@ class ImportMasterDataCommand extends Command
         bool $applyPriceStatus,
         string $confirm,
         string $requireSha,
+        string $requireBackup,
     ): array {
         if ($applyPriceStatus) {
             throw new MasterDataTransferException(
                 'Preisstatus-Phase für schema_version=2.0.0 ist nicht freigegeben (Slice 7 fehlt).',
             );
         }
-        if ($apply) {
-            throw new MasterDataTransferException(
-                'Apply für schema_version=2.0.0 ist operativ nicht freigegeben (Slice 6b fehlt).',
-            );
+        if ($dryRun) {
+            if ($requireBackup !== '') {
+                throw new MasterDataTransferException(
+                    '--require-backup-proof gilt nur für Schema 2.0.0 Apply (nicht für Dry-Run).',
+                );
+            }
+
+            return $importer->dryRunOperational($path, $confirm, $requireSha);
         }
-        if (! $dryRun) {
+        if (! $apply) {
             throw new MasterDataTransferException(
-                'Schema 2.0.0 erlaubt operativ nur --dry-run (Slice 6a).',
+                'Schema 2.0.0 erlaubt operativ --dry-run oder --apply (Slice 6a/6b).',
             );
         }
 
-        return $importer->dryRunOperational($path, $confirm, $requireSha);
+        return $importer->applyOperational($path, $confirm, $requireSha, $requireBackup);
     }
 
     /**
@@ -253,6 +290,8 @@ class ImportMasterDataCommand extends Command
                 'price_list_pin_count' => 0,
                 'whitelist' => 'stop',
                 'referential_integrity' => 'stop',
+                'backup_proof' => 'stop',
+                'backup_proof_dump_sha256' => null,
                 'result' => 'STOP',
                 'abort_reason' => $this->sanitizeReportText($e->getMessage()),
             ],

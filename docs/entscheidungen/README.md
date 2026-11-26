@@ -34,7 +34,8 @@ ohne die Entscheidung zu ersetzen.
 | [EPIC-03-B](EPIC-03-B-master-data-transfer.md) | Selektiver Stammdaten-/Preislisten-Transfer | Historisch Schema `1.0.0` auf `main` (PR #263); RH-Pilot abgenommen |
 | [EPIC-03-C/D](../readiness/EPIC-03-CD-staging-pilot-abschluss-2026-11-23.md) | Radio-Hamburg Staging-Pilot bis Dispo-Entwurf | **PASS** bis Entwurf; Status nach Entwurf nicht abgenommen |
 | [EPIC-03-F Readiness](../readiness/EPIC-03-F-full-master-data-readiness-2026-11-23.md) | Vollständiger Fachdatenbestand nach Staging | Fachumfang genehmigt; Transfer **STOP** |
-| [EPIC-03-F Vertrag 2.0.0](EPIC-03-F-master-data-transfer-2-0-0.md) | Technischer Importvertrag Gesamtbestand | Technisch abgenommen; Implementierung/Export/Apply **STOP** |
+| [EPIC-03-F Vertrag 2.0.0](EPIC-03-F-master-data-transfer-2-0-0.md) | Technischer Importvertrag Gesamtbestand | Technisch abgenommen; Export/Dry-Run/Apply-Code (6a/6b) auf Feature-Pfad; operativer Staging-Apply weiter **STOP** bis PO-GO |
+| [EPIC-03-F Slice 6 CLI](EPIC-03-F-slice6-operational-cli-requirements.md) | Operative CLI 6a/6b/7 | **6a+6b implementiert**; Slice 7 offen |
 | [PO-AUTH-RIGHTS-1](PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | Rechtekonflikte Sonderfreigabe / PM / Draft / Force-Complete | **Akzeptiert** |
 | [PO-APPROVAL-NOTIFY-1](PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md) | Freigabe erteilt/abgelehnt per Outbox/SMTP | **Akzeptiert** |
 | [PO-NOT002-ADMIN-1](PO-NOT002-ADMIN-1-admin-outbox-sicht.md) | Admin-Outbox-Sicht lesend | **Akzeptiert** (`main` PR #122) |
@@ -47,9 +48,11 @@ ohne die Entscheidung zu ersetzen.
 | [PO-BLP502-1-datenlieferung](PO-BLP502-1-datenlieferung.md) | Operative Spotproduktionspreise je Inventar | **Lokal umgesetzt** (`dispo_mat_core`; Deploy offen) |
 | [PO-BLP203-1](PO-BLP203-1-crm-salesforce-meridian.md) | CRM Salesforce/Meridian Erst-Slice (`BL-P2-03a`) | **Akzeptiert** (A1…H1 + **D1**; `main` PR #133/#134) |
 | [PO-BLP203-1-datenlieferung](PO-BLP203-1-datenlieferung.md) | Lokale CRM-Einrichtung (Export/Migration/Import) | **A/B/C lokal erledigt** (`dispo_mat_core`; Deploy offen) |
-| [PO-GOLIVE-CUT-1-DEC](PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung | **Akzeptiert für Projektpriorisierung**; Fachparameter bleiben Umsetzungsvoraussetzungen |
-| [PO-OA-BUDGET-V2](PO-OA-BUDGET-V2.md) | OA-/Free-/Mixed-Budget vollständig V2; V1 Spot-only | **Akzeptiert / verbindlich** (15.11.2026; Docs-only) |
-| [PO-V1-CLOSURE-1](PO-V1-CLOSURE-1-backlog-status.md) | V1-Backlogstatus gegen released Capabilities | **Akzeptiert / Docs-only** (15.11.2026; keine neue Fachscope-Entscheidung) |
+| [GO-LIVE-MASTERPLAN](../roadmap/GO-LIVE-MASTERPLAN.md) | Zentraler Go-live-Fahrplan + PO-01…PO-07 (PO-MASTER-AUDIT) | **Verbindlich ab 26.11.2026**; führend für Readiness/Implementierung/Review/Deploy |
+| [EPIC-03-F Tabellenklassifikation](../readiness/EPIC-03-F-table-classification-2-0-0.md) | Alle DB-Tabellen: Klasse, Transferfähigkeit, Schutz, Arbeitspaket | Slice 6b; CRM = PO-01 separat |
+| [PO-GOLIVE-CUT-1-DEC](PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung | **Historisch**; widersprechende Go-live-Abgrenzungen abgelöst durch GO-LIVE-MASTERPLAN |
+| [PO-OA-BUDGET-V2](PO-OA-BUDGET-V2.md) | OA-/Free-/Mixed-Budget vollständig V2; V1 Spot-only | **Akzeptiert / verbindlich** (15.11.2026; Docs-only; gilt bis neue PO-Entscheidung) |
+| [PO-V1-CLOSURE-1](PO-V1-CLOSURE-1-backlog-status.md) | V1-Backlogstatus gegen released Capabilities | **Historisch** (15.11.2026); Scope-Abgrenzungen zu Social/Events/Contest abgelöst durch GO-LIVE-MASTERPLAN |
 | [PO-CALC-DISPO-UX-1](PO-CALC-DISPO-UX-1.md) | Calc→Dispo UX: operative Felder + Wizard-Werbeelemente | **Akzeptiert** (17.11.2026; PR1 Wizard-UX) |
 | [SEC-NPM-AUDIT-PICOMATCH](SEC-NPM-AUDIT-PICOMATCH-GHSA-fc5q-39xc-vjpf.md) | Befristete Ausnahme GHSA-fc5q-39xc-vjpf (picomatch ReDoS) | **Draft zur PO-/Security-Freigabe** (Ablauf 2026-12-18) |
 | [PO-SPOT-SURCHARGE-1 Auftrag](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Erst/Letzt auf `main` (PR #160) | umgesetzt |
