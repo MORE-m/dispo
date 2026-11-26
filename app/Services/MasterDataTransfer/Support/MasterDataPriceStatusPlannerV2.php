@@ -121,7 +121,7 @@ final class MasterDataPriceStatusPlannerV2
     }
 
     /**
-     * @param  array<string, mixed>  $entry
+     * @param  array{family: string, key: string, slot: string, source_status: string, fingerprint: string, metadata: array<string, mixed>, year: int, revision: int, inventory_code: ?string, production_type: ?string}  $entry
      * @param  array{lists: array<string, array<string, mixed>>}  $pins
      * @param  array<string, list<string>>  $sourceActivePerSlot
      * @return array<string, mixed>
@@ -293,8 +293,8 @@ final class MasterDataPriceStatusPlannerV2
                 return null;
 
             case MasterDataPriceListIndexV2::FAMILY_OA_TKP:
-                $model = OaTkpPriceList::query()->find($staging['id']);
-                if ($model === null) {
+                $model = OaTkpPriceList::query()->find((int) $staging['id']);
+                if (! $model instanceof OaTkpPriceList) {
                     return 'OA-TKP-Liste nicht gefunden.';
                 }
                 try {

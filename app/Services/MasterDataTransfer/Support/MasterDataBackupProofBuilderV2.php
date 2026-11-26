@@ -31,9 +31,9 @@ final class MasterDataBackupProofBuilderV2
      *     database_name: string,
      *     restore_path: string,
      *     target_environment?: string,
-     *     instance_identity?: ?string,
-     *     backup_run_id?: ?string,
-     *     created_at?: ?string,
+     *     instance_identity?: string|null,
+     *     backup_run_id?: string,
+     *     created_at?: string,
      *     content_receipt?: array{receipt_id: string, signature: string}|null,
      *     dump_filename?: string
      * }  $params
@@ -111,11 +111,13 @@ final class MasterDataBackupProofBuilderV2
         }
         @chmod($dumpTarget, 0600);
 
-        $createdAt = isset($params['created_at']) && $params['created_at'] !== null && $params['created_at'] !== ''
-            ? CarbonImmutable::parse($params['created_at'])
+        $createdAtRaw = $params['created_at'] ?? '';
+        $createdAt = $createdAtRaw !== ''
+            ? CarbonImmutable::parse($createdAtRaw)
             : CarbonImmutable::now();
-        $runId = isset($params['backup_run_id']) && is_string($params['backup_run_id']) && trim($params['backup_run_id']) !== ''
-            ? trim($params['backup_run_id'])
+        $runIdRaw = trim($params['backup_run_id'] ?? '');
+        $runId = $runIdRaw !== ''
+            ? $runIdRaw
             : 'bk-'.Str::uuid()->toString();
 
         $instance = $params['instance_identity'] ?? null;
