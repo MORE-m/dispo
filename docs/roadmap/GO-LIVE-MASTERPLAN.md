@@ -216,16 +216,17 @@ Acceptance-Gate:
 
 | Arbeitspaket | Status | Hinweise / Belege |
 |---|---|---|
-| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `OPEN` / freigegeben | **Aktuell freigegebener nächster Schritt.** CRM nicht in Scope. Kein Staging-Apply. |
-| EPIC-03-F Slice 7 | `OPEN` | nach Slice 6b; eigener PO-GO |
-| CRM-Transfermechanismus (PO-01) | `READINESS` | eigenständig; vor ungeprüftem Staging-CRM-Apply |
+| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `IMPLEMENTED` → CI-Nachweis → Ziel `VERIFIED` | Draft-PR #279; Code Apply mit SHA/Backup/Allowlist. **Kein** Staging-Apply. CRM nicht in Scope. Tabellenklassifikation: [`../readiness/EPIC-03-F-table-classification-2-0-0.md`](../readiness/EPIC-03-F-table-classification-2-0-0.md). |
+| EPIC-03-F Slice 7 | `OPEN` | Preisstatus-Phase; eigener PO-GO |
+| CRM-Transfermechanismus (PO-01) | `OPEN` / `READINESS` | eigenständig; vor ungeprüftem Staging-CRM-Apply |
 
 Acceptance-Gate Phase 1:
 
-- [ ] Slice 6b implementiert, reviewed, gemergt (`IMPLEMENTED` → später `ACCEPTED` nach PO)
+- [x] Slice 6b technisch implementiert (`IMPLEMENTED`; `VERIFIED` nach grünen CI-Gates; `ACCEPTED` erst nach PO)
+- [ ] Slice 6b gemergt (kein eigenmächtiger Merge)
 - [ ] Slice 7 abgeschlossen bzw. freigegeben
 - [ ] CRM-Transfervertrag/-mechanismus readynessseitig geklärt und freigegeben (ohne ungeprüfte Integration in 6b)
-- [ ] Kein operativer Staging-Apply ohne gesondertes PO-GO
+- [x] Kein operativer Staging-Apply ohne gesondertes PO-GO (weiterhin STOP)
 
 ### Phase 2 – Fachliche Vollständigkeit lokal
 
@@ -335,9 +336,9 @@ Acceptance-Gate:
 
 | Prio | Aufgabe | Phase | Status |
 |---:|---|---|---|
-| 1 | **EPIC-03-F Slice 6b – Apply 2.0.0** (Implementierungsauftrag bleibt; Scope nicht um CRM/Social/Events/Barter erweitern) | 1 | `OPEN` |
-| 2 | EPIC-03-F Slice 7 | 1 | `OPEN` |
-| 3 | CRM-Transfer Readiness + Mechanismus (PO-01) | 1 | `READINESS` |
+| 1 | EPIC-03-F Slice 6b – CI grün + Review/Merge-Entscheidung (kein Auto-Merge) | 1 | `IMPLEMENTED` |
+| 2 | EPIC-03-F Slice 7 – Preisstatus (nach PO-GO) | 1 | `OPEN` |
+| 3 | CRM-Transfer Readiness + Mechanismus (PO-01) | 1 | `OPEN` |
 | 4 | Buchbarkeitsmatrix (PO-06) | 2 | `OPEN` |
 | 5 | Contest / Social / Events / Barter Readiness-Pakete (PO-05) | 2 | `READINESS` |
 | 6 | Fehlende Preise 2027 listen und pflegen (PO-04) | 3 | `OPEN` |
@@ -350,7 +351,7 @@ Acceptance-Gate:
 
 | ID | Risiko / Blocker | Schwere | Status | Bemerkung |
 |---|---|---|---|---|
-| GLB-01 | Transfer Apply 2.0.0 noch nicht implementiert/abgenommen | hoch | offen | Phase 1 / Slice 6b |
+| GLB-01 | Transfer Apply 2.0.0: Code `IMPLEMENTED`, fachlich/operativ noch nicht `ACCEPTED`; Staging-Apply offen | hoch | teilweise entschärft | Draft-PR #279; operativer Apply = eigenes GO |
 | GLB-02 | CRM-Transfer fehlt (eigenständig) | hoch | offen | PO-01; nicht in 6b |
 | GLB-03 | Social / Events / Barter fachlich unvollständig | hoch | offen | PO-05; Readiness zuerst |
 | GLB-04 | Contest Go-live-Vollständigkeit ungeprüft | mittel–hoch | offen | Code vorhanden; Readiness/Abnahme offen |
@@ -380,9 +381,10 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 | Bezug | PR / SHA | Anmerkung |
 |---|---|---|
 | Dokumentationsbasis Masterplan | `2283d5fc0c836998e2c59253d24a821373762f79` | `main` nach PR #278 |
-| EPIC-03-F Vertrag 2.0.0 | Docs auf `main` (u. a. PR #276 Operational Readiness) | Apply noch ausstehend |
+| EPIC-03-F Vertrag 2.0.0 | Docs auf `main` (u. a. PR #276 Operational Readiness) | technisch abgenommen |
 | Slice 6a Dry-Run CLI | PR #277 / Merge in Basislinie | Voraussetzung für operativen Dry-Run |
-| Slice 6b Apply | Branch `feat/epic-03-f-slice6b-importer-v2-apply` | Draft-PR ausstehend; Masterplan darf dort docs-only mitlaufen |
+| Slice 6b Apply | Draft-PR [#279](https://github.com/MORE-m/dispo/pull/279) / Branch `feat/epic-03-f-slice6b-importer-v2-apply` | Feature-HEAD wird nach Push aktualisiert; Staging-Apply weiter STOP |
+| Tabellenklassifikation | `docs/readiness/EPIC-03-F-table-classification-2-0-0.md` | alle Tabellen; CRM = PO-01 separat |
 | Historische CUT/Closure | siehe Abschnitt 4 | abgelöst bzgl. Scope-Abgrenzung |
 
 *(Tabelle bei jedem abgeschlossenen Arbeitspaket aktualisieren.)*
@@ -392,9 +394,10 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 ## 10. Aktuelle Phase und nächster freigegebener Arbeitsschritt
 
 - **Aktuelle Phase:** **Phase 1 – Transfermechanismus vervollständigen** (`IN_PROGRESS`)
-- **Nächster freigegebener Arbeitsschritt:** **EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply**
-- Slice-6b-Umfang wird durch PO-01…07 **nicht** automatisch erweitert
-- Danach: STOP und PO-GO für den nächsten Schritt (typisch Slice 7 bzw. CRM-Readiness – laut dann aktuellem Masterplan)
+- **Slice 6b:** `IMPLEMENTED` (Code/Docs im Draft-PR #279); `VERIFIED` nach grünen CI-Gates `ci`/`mysql`/`e2e-spt008`; **nicht** `ACCEPTED`
+- **Operativer Staging-Apply:** weiterhin `OPEN` / STOP ohne gesondertes PO-GO
+- **Empfohlener nächster PO-Schritt nach VERIFIED/Merge-Entscheidung:** Slice 7 Readiness/Implementierung **oder** CRM-Transfer-Readiness (PO-01) – explizites PO-GO erforderlich
+- Slice 7 und CRM bleiben `OPEN`
 
 ---
 
@@ -403,3 +406,4 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 | Version | Datum | Änderung |
 |---|---|---|
 | `1.0.0` | 2026-11-26 | Erste verbindliche Fassung nach PO-MASTER-AUDIT; Ablösung widersprechender Go-live-Abgrenzungen dokumentiert |
+| `1.1.0` | 2026-11-26 | Slice 6b auf `IMPLEMENTED` gesetzt (Draft-PR #279); Tabellenklassifikation verlinkt; Staging-Apply weiter STOP; Phase 1 weiter `IN_PROGRESS` |

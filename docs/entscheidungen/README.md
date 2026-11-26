@@ -49,6 +49,7 @@ ohne die Entscheidung zu ersetzen.
 | [PO-BLP203-1](PO-BLP203-1-crm-salesforce-meridian.md) | CRM Salesforce/Meridian Erst-Slice (`BL-P2-03a`) | **Akzeptiert** (A1…H1 + **D1**; `main` PR #133/#134) |
 | [PO-BLP203-1-datenlieferung](PO-BLP203-1-datenlieferung.md) | Lokale CRM-Einrichtung (Export/Migration/Import) | **A/B/C lokal erledigt** (`dispo_mat_core`; Deploy offen) |
 | [GO-LIVE-MASTERPLAN](../roadmap/GO-LIVE-MASTERPLAN.md) | Zentraler Go-live-Fahrplan + PO-01…PO-07 (PO-MASTER-AUDIT) | **Verbindlich ab 26.11.2026**; führend für Readiness/Implementierung/Review/Deploy |
+| [EPIC-03-F Tabellenklassifikation](../readiness/EPIC-03-F-table-classification-2-0-0.md) | Alle DB-Tabellen: Klasse, Transferfähigkeit, Schutz, Arbeitspaket | Slice 6b; CRM = PO-01 separat |
 | [PO-GOLIVE-CUT-1-DEC](PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung | **Historisch**; widersprechende Go-live-Abgrenzungen abgelöst durch GO-LIVE-MASTERPLAN |
 | [PO-OA-BUDGET-V2](PO-OA-BUDGET-V2.md) | OA-/Free-/Mixed-Budget vollständig V2; V1 Spot-only | **Akzeptiert / verbindlich** (15.11.2026; Docs-only; gilt bis neue PO-Entscheidung) |
 | [PO-V1-CLOSURE-1](PO-V1-CLOSURE-1-backlog-status.md) | V1-Backlogstatus gegen released Capabilities | **Historisch** (15.11.2026); Scope-Abgrenzungen zu Social/Events/Contest abgelöst durch GO-LIVE-MASTERPLAN |

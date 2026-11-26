@@ -1,6 +1,15 @@
 # Fortschritt V1
 
-Stand: 26. November 2026 – **PO-MASTER-AUDIT / GO-LIVE-MASTERPLAN v1.0.0.**
+Stand: 26. November 2026 – **EPIC-03-F Slice 6b Apply `IMPLEMENTED` (Draft-PR #279).**
+
+Operativer V2-Inhalts-Apply mit Allowlist, Pflicht-SHA256 und verifiziertem
+Backup-Proof; Preise nur Draft; Slice 7 gesperrt. Vollständige
+Tabellenklassifikation:
+`docs/readiness/EPIC-03-F-table-classification-2-0-0.md`. Masterplan v1.1.0:
+Phase 1 weiter `IN_PROGRESS`; Staging-Apply/CRM/Slice 7 `OPEN`. Kein Merge,
+kein operativer Apply, kein Deploy, keine realen DB-Writes.
+
+Stand davor: 26. November 2026 – **PO-MASTER-AUDIT / GO-LIVE-MASTERPLAN v1.0.0.**
 
 Verbindliche PO-Entscheidungen PO-01…PO-07 und zentraler Go-live-Fahrplan
 (Phase 0–9) dokumentiert. Führendes Dokument:
