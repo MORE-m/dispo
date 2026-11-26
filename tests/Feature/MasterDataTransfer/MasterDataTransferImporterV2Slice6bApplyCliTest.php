@@ -438,7 +438,7 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
     }
 
     #[Test]
-    public function applyOperational_rejects_without_testing_override_on_forbidden_db_name(): void
+    public function apply_operational_rejects_without_testing_override_on_forbidden_db_name(): void
     {
         config(['dispo.master_data_transfer_testing_operational_database' => null]);
         $package = $this->writeRichV2Package();
@@ -460,6 +460,71 @@ class MasterDataTransferImporterV2Slice6bApplyCliTest extends TestCase
                 $e->getMessage(),
             );
         }
+    }
+
+    #[Test]
+    public function invalid_backup_dump_sha_stops_before_writes(): void
+    {
+        User::factory()->create(['email' => 'badsha6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $sha = app(MasterDataPackage::class)->computePackageSha256($package);
+        $proof = $this->writeValidBackupProof('bad-dump-sha');
+        $metaPath = $proof.DIRECTORY_SEPARATOR.MasterDataBackupProofV2::META_FILE;
+        $meta = json_decode((string) File::get($metaPath), true, 32, JSON_THROW_ON_ERROR);
+        $meta['dump_sha256'] = str_repeat('b', 64);
+        File::put($metaPath, json_encode($meta, JSON_THROW_ON_ERROR));
+        $before = $this->captureWritableCounts();
+
+        $exit = Artisan::call('dispo:import-master-data', [
+            'path' => $package,
+            '--apply' => true,
+            '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+            '--require-package-sha256' => $sha,
+            '--require-backup-proof' => $proof,
+        ]);
+        $this->assertNotSame(0, $exit);
+        $this->assertStringContainsString('Dump-SHA256 stimmt nicht', Artisan::output());
+        $this->assertSame($before, $this->captureWritableCounts());
+    }
+
+    #[Test]
+    public function package_with_excluded_users_payload_is_rejected(): void
+    {
+        User::factory()->create(['email' => 'excl6b@example.test', 'role' => Role::Admin, 'is_active' => true]);
+        $package = $this->writeRichV2Package();
+        $validSha = app(MasterDataPackage::class)->computePackageSha256($package);
+        File::put($package.'/data/users.json', json_encode([
+            ['email' => 'evil@example.test', 'role' => 'admin'],
+        ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
+        $before = $this->captureWritableCounts();
+
+        $rejectedAtPackageLoad = false;
+        try {
+            app(MasterDataPackage::class)->computePackageSha256($package);
+        } catch (MasterDataTransferException $e) {
+            $rejectedAtPackageLoad = true;
+            $this->assertStringContainsString('unzulässige', $e->getMessage());
+        }
+
+        if (! $rejectedAtPackageLoad) {
+            $exit = Artisan::call('dispo:import-master-data', [
+                'path' => $package,
+                '--apply' => true,
+                '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                '--require-package-sha256' => $validSha,
+                '--require-backup-proof' => $this->writeValidBackupProof('excl'),
+            ]);
+            $this->assertNotSame(0, $exit);
+            $output = Artisan::output();
+            $this->assertTrue(
+                str_contains($output, 'unzulässige')
+                || str_contains($output, 'SHA256')
+                || str_contains($output, 'users'),
+                $output,
+            );
+        }
+
+        $this->assertSame($before, $this->captureWritableCounts());
     }
 
     private function writeValidBackupProof(string $suffix = 'ok'): string
