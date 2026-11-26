@@ -246,7 +246,17 @@ trait OperationalV2Fixtures
             $rows = DB::table($table)->orderBy('id')->get()->map(fn ($r) => (array) $r)->all();
             if (in_array($table, ['price_lists', 'production_price_lists', 'oa_tkp_price_lists'], true)) {
                 $rows = array_map(function (array $r): array {
-                    unset($r['status'], $r['published_at'], $r['archived_at'], $r['lock_version'], $r['updated_at']);
+                    // Statusfelder + MySQL-STORED-Generated-Spalten der One-Active-Unique
+                    // (active_inventory_id/active_year folgen status, sind kein Inhaltsfeld).
+                    unset(
+                        $r['status'],
+                        $r['published_at'],
+                        $r['archived_at'],
+                        $r['lock_version'],
+                        $r['updated_at'],
+                        $r['active_inventory_id'],
+                        $r['active_year'],
+                    );
 
                     return $r;
                 }, $rows);

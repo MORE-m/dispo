@@ -354,8 +354,11 @@ class MasterDataTransferPriceStatusDryRunV2Test extends TestCase
 
         $r = $this->runStatus('dry-run-price-status', $ctx);
         $this->assertNotSame(0, $r['exit']);
+        // SQLite: Treiber-Gate. MySQL/dispo_test: Confirm-Mismatch oder Allowlist („nur gegen“).
         $this->assertTrue(
-            str_contains($r['output'], 'nur mit MySQL/MariaDB') || str_contains($r['output'], 'nur gegen'),
+            str_contains($r['output'], 'nur mit MySQL/MariaDB')
+            || str_contains($r['output'], 'nur gegen')
+            || str_contains($r['output'], '--confirm-database muss exakt'),
             $r['output'],
         );
     }
