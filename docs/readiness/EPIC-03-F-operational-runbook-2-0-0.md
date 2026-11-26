@@ -316,14 +316,6 @@ Ohne GO → **STOP**.
 
 ## 11. Apply und vollständige Nachkontrolle
 
-### Zielbefehl (nach Slice-6-Freigabe)
-
-```bash
-php artisan dispo:import-master-data <PAKET_DIR> \
-  --apply \
-  --confirm-database=spn26jz7_dispo_staging
-```
-
 ### VORHANDEN (Slice 6b; Status = Slice 7 weiterhin OFFEN)
 
 ```bash
