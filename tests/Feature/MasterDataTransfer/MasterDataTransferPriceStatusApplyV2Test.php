@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\MasterDataTransfer;
 
+use App\Services\MasterDataTransfer\Import\MasterDataPriceStatusApplierV2;
+use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\Support\MasterDataApplyReceiptV2;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -182,5 +184,83 @@ class MasterDataTransferPriceStatusApplyV2Test extends TestCase
         $this->assertStringContainsString('Plan enthält blockierte Listen', $apply['output']);
         $this->assertSame(['spot:2026r1' => 'draft', 'production:2026r1' => 'draft', 'oa_tkp:2026r1' => 'draft'], $this->listStatuses());
         $this->assertCount(1, $this->receiptFiles(), 'nur das Content-Receipt, kein Status-Receipt');
+    }
+
+    #[Test]
+    public function apply_rolls_back_after_predecessor_archive_before_successor_activation(): void
+    {
+        $this->contentAppliedPackage();
+        $this->setListStatus('price_lists', 2026, 1, 'active');
+
+        $files = [
+            'data/price_lists.json' => [
+                $this->spotList('inv_v2_radio', 2026, 1, 'archived'),
+                $this->spotList('inv_v2_radio', 2026, 2, 'active', '13.0000'),
+            ],
+        ];
+        $ctx = $this->contentAppliedPackage($files);
+        $hash = $this->dryRunHash($ctx);
+        $before = $this->listStatuses();
+        $digestBefore = $this->whitelistDigest();
+        $receiptsBefore = count($this->receiptFiles());
+
+        $predecessorId = (int) DB::table('price_lists')->where('year', 2026)->where('revision_number', 1)->value('id');
+        $successorId = (int) DB::table('price_lists')->where('year', 2026)->where('revision_number', 2)->value('id');
+        $this->assertGreaterThan(0, $predecessorId);
+        $this->assertGreaterThan(0, $successorId);
+
+        $archiveSeen = false;
+        $threw = false;
+        DB::listen(function ($query) use (&$archiveSeen, &$threw, $predecessorId, $successorId): void {
+            $sql = strtolower((string) $query->sql);
+            $bindings = $query->bindings;
+            if (
+                ! $archiveSeen
+                && str_starts_with(trim($sql), 'update')
+                && str_contains($sql, 'price_lists')
+                && in_array('archived', $bindings, true)
+                && in_array($predecessorId, $bindings, true)
+            ) {
+                $archiveSeen = true;
+
+                return;
+            }
+            // Nach nachweislicher Vorgänger-Archivierung den Nachfolger-Activate abbrechen.
+            if (
+                $archiveSeen
+                && ! $threw
+                && str_starts_with(trim($sql), 'update')
+                && str_contains($sql, 'price_lists')
+                && in_array('active', $bindings, true)
+                && in_array($successorId, $bindings, true)
+            ) {
+                $threw = true;
+                throw new \RuntimeException('forced status apply failure after predecessor archive');
+            }
+        });
+
+        try {
+            app(MasterDataPriceStatusApplierV2::class)->apply(
+                $ctx['package'],
+                MasterDataTransferContractV2::OPERATIONAL_DATABASE,
+                $ctx['sha'],
+                $ctx['proof_b'],
+                $ctx['receipt'],
+                $hash,
+            );
+            $this->fail('Erwarteter Abbruch nach Vorgänger-Archivierung');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('forced status apply failure after predecessor archive', $e->getMessage());
+        }
+
+        $this->assertTrue($archiveSeen, 'Vorgänger-Archivierung muss vor dem Abbruch erfolgt sein');
+        $this->assertTrue($threw, 'Abbruchpunkt nach Archivierung wurde nicht erreicht');
+
+        // Vollständiger Rollback: Vorgänger wieder active, Nachfolger draft; kein Status-Receipt.
+        $this->assertSame($before, $this->listStatuses());
+        $this->assertSame('active', $before['spot:2026r1']);
+        $this->assertSame('draft', $before['spot:2026r2']);
+        $this->assertSame($digestBefore, $this->whitelistDigest());
+        $this->assertCount($receiptsBefore, $this->receiptFiles());
     }
 }
