@@ -324,8 +324,8 @@ Im aktuellen Stand (nach Slice 6a) gilt:
 
 - `ImportMasterDataCommand` erkennt `schema_version=2.0.0` und routet `--dry-run` an `MasterDataImporterV2::dryRunOperational()`.
 - Pflicht: `--confirm-database=spn26jz7_dispo_staging` und `--require-package-sha256=<64-hex>`.
-- `--apply` ist für `2.0.0` freigegeben (Slice 6b) mit Pflicht `--require-package-sha256` und `--require-backup-proof`.
-- `--apply-price-status` bleibt für `2.0.0` gesperrt (Slice 7).
+- `--apply` ist für `2.0.0` freigegeben (Slice 6b) mit Pflicht `--require-package-sha256` und `--require-backup-proof` (Proof-Version 2, Phase `pre_content_apply`).
+- `--dry-run-price-status` / `--apply-price-status` sind technisch implementiert (Verarbeitungsvertrag 2.1.0 / Slice 7); operativ weiterhin **STOP** ohne separates PO-GO (siehe Abschnitt 13).
 - Isolierte Test-Hooks (`executePhasesABCForIsolatedTests`) bleiben getrennt und unverändert fail-closed.
 
 Beispiel (nach Export und PO-GO; `<HEX>` = `MasterDataPackage::computePackageSha256`):
@@ -371,24 +371,26 @@ Ohne GO → **STOP**.
 
 ## 11. Apply und vollständige Nachkontrolle
 
-### VORHANDEN (Slice 6b; Status = Slice 7 weiterhin OFFEN)
+### VORHANDEN (Slice 6b Inhalts-Apply; Status-Phase = Abschnitt 13)
 
 ```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --apply \
   --confirm-database=spn26jz7_dispo_staging \
   --require-package-sha256=<HEX> \
-  --require-backup-proof=<PROOF_DIR>
+  --require-backup-proof=<PROOF_DIR_A>
 ```
 
 `--require-backup-proof` zeigt auf ein **Backup-Proof-Verzeichnis (Version 2, Phase `pre_content_apply`)** gemäß Abschnitt 4 (Gate, signierte `DUMP_META.json`, Dump). Proofs im alten Format (ohne Provenienz/Signatur), für eine andere DB/Umgebung/Instanz, ein anderes Paket oder älter als das Maximalalter werden **vor dem ersten Schreibzugriff** abgelehnt.
 
-Preise nur als `draft`. Status-Phase bleibt **Slice 7** und ist nicht Teil von `--apply`.
+Preise nur als `draft`. Status-Phase ist **nicht** Teil von `--apply`.
+
+Nach erfolgreichem Commit schreibt der Apply ein signiertes **Content-Apply-Receipt** unter `storage/app/master-data-transfer/receipts/` (CLI meldet den Pfad). Fehlgeschlagene/zurückgerollte Applies erzeugen **kein** Erfolgs-Receipt.
 
 ### Nachkontrolle
 
 1. Import-Report: creates/unchanged/conflicts
-2. Security-Report erneut PASS
+2. Security-Report erneut PASS; Content-Apply-Receipt vorhanden und signaturgültig
 3. Schutzmatrix C: Vorher/Nachher Digests und Stichproben
 4. Fachmatrix B: Stichproben Creates und Unchanged
 5. Neue Preise nur als `draft`
@@ -416,33 +418,70 @@ Abweichung → **STOP**, Recovery laut Teil D.
 
 ---
 
-## 13. Spätere Preisstatus-Phase (eigenes GO)
+## 13. Preisstatus-Phase (Slice 7; eigenes operatives PO-GO)
 
-Nicht Teil von Schritt 11.
+Nicht Teil von Schritt 11. Technisch implementiert (Verarbeitungsvertrag 2.1.0). Operativ **STOP** ohne separates PO-GO.
 
-Erlaubt laut Vertrag nur:
+Verbindliche Reihenfolge nach erfolgreichem Inhalts-Apply:
 
-- `draft` → `active`, wenn `source_status=active` und Fingerabdruck/Metadaten unverändert
-- `draft` → `archived`, wenn `source_status=archived` und Fingerabdruck/Metadaten unverändert
-
-Nicht erlaubt:
-
-- Statuswechsel an bereits active/archived Listen
-- Statuswechsel an gepinnten Listen
-- anderes oder verändertes Paket
-- Inhaltsänderungen in der Status-Phase
-
-### OFFEN (Slice 7)
+1. Content-Apply-Receipt prüfen (Signatur, Paket-SHA, DB, Umgebung).
+2. **Backup B** erzeugen (`post_content_apply`, an Content-Receipt gebunden):
 
 ```bash
-# OFFEN – Beispielvertrag, Parameter noch nicht implementiert:
+php artisan dispo:create-master-data-backup-proof \
+  --phase=post_content_apply \
+  --package-sha256=<HEX> \
+  --content-receipt=<RECEIPT.json> \
+  --output-dir=<PROOF_DIR_B> \
+  --restore-path=<DOKUMENTIERTER_RESTORE_WEG>
+```
+
+3. Preisstatus-Dry-Run (schreibfrei; liefert `plan_hash`):
+
+```bash
+php artisan dispo:import-master-data <PAKET_DIR> \
+  --dry-run-price-status \
+  --confirm-database=spn26jz7_dispo_staging \
+  --require-package-sha256=<HEX> \
+  --require-backup-proof=<PROOF_DIR_B> \
+  --require-content-apply-receipt=<RECEIPT.json>
+```
+
+4. Konflikte / Blocker / Vollständigkeit auswerten; separates PO-GO.
+5. Preisstatus-Apply nur mit unverändertem Plan-Hash:
+
+```bash
 php artisan dispo:import-master-data <PAKET_DIR> \
   --apply-price-status \
   --confirm-database=spn26jz7_dispo_staging \
-  --require-package-sha256=<HEX>
+  --require-package-sha256=<HEX> \
+  --require-backup-proof=<PROOF_DIR_B> \
+  --require-content-apply-receipt=<RECEIPT.json> \
+  --require-price-status-plan-hash=<PLAN_HASH>
 ```
 
-Ohne separates PO-GO → **STOP**. Slice 7 ist keine Voraussetzung für Dry-Run (6a) oder Inhalts-Apply (6b).
+Erlaubte Aktionen laut Vertrag 2.1.0 / S7-PO-01…05: `activate`, `archive`, `activate_with_archive_predecessor`, `unchanged`, `keep_draft`, `blocked`.
+
+Bei Drift zwischen Dry-Run und Apply, Pin am Vorgänger, unvollständiger Liste oder Gate-Fehler: **STOP**, keine Teilaktivierung. Erfolgreicher Commit schreibt ein Status-Apply-Receipt.
+
+Wiederholung desselben Pakets auf unverändertem Ziel: Idempotenz (No-op-Report), Gates bleiben aktiv.
+
+### Verhalten bei erfolgreichem Inhalts-Apply, aber blockiertem Status-Apply
+
+- Content-Apply bleibt committed; Content-Receipt bleibt gültig.
+- Keine Statuswrites.
+- Fachliche Konfliktlösung außerhalb des Importpfads; neuer Status-Dry-Run + neues Backup B + neues PO-GO erforderlich.
+- Kein „Weiterlaufen“ mit veraltetem Plan-Hash.
+
+### Restore-Nachweis (Konzept; kein realer Staging-Restore in diesem Auftrag)
+
+Unterscheide klar:
+
+| Ebene | Was | Automatisch? |
+|---|---|---|
+| A Integrität | Dump-Größe + SHA256 + Gate PASS | ja (Proof-Validierung) |
+| B Herkunft | Signierte Provenienz (`SELECT DATABASE()`, Phase, Receipt-Bindung, HMAC) | ja |
+| C Wiederherstellbarkeit | Restore in **isolierter Temp-DB**, Stichproben gegen Pre-Apply-Baseline | operativ vor erstem Stammdatentransfer; **nicht** allein durch Hash/Skript behauptet |
 
 ---
 
@@ -460,6 +499,6 @@ Zwischen Export-Host und Staging:
 
 - Keine echten Exporte/Imports
 - Keine DB-Verbindungen im Rahmen der Doku-Erstellung
-- Keine CLI-Implementierung
 - Keine automatische Korrektur von Konflikten
 - Keine Erfindung fehlender Produktionspreise 2027
+- Keinen realen Staging-Restore

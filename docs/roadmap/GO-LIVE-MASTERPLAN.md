@@ -216,15 +216,15 @@ Acceptance-Gate:
 
 | Arbeitspaket | Status | Hinweise / Belege |
 |---|---|---|
-| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `VERIFIED` (Code gemergt) | PR [#279](https://github.com/MORE-m/dispo/pull/279) **MERGED**; Merge-SHA `171aad700ee2cd0a43e8e434a042fa16fcb28d09`; Feature-HEAD `7f5d32410e81ae717fafbd7406791a63f96fe233`; Feature-CI Run `45795039370` und Post-Merge-CI Run `45806036882` grün (`ci`/`mysql`/`e2e-spt008`). **Kein** Staging-Apply. Ergänzende Sicherheitsnachweise (Rollback-Test, Backup-Herkunft) noch ausstehend. CRM nicht in Scope. Tabellenklassifikation: [`../readiness/EPIC-03-F-table-classification-2-0-0.md`](../readiness/EPIC-03-F-table-classification-2-0-0.md). |
-| EPIC-03-F Slice 7 | `OPEN` | Preisstatus-Phase; Implementierung nach PO-GO; noch nicht implementiert |
+| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `VERIFIED` (Code gemergt); Hardening im Slice-7-PR | PR [#279](https://github.com/MORE-m/dispo/pull/279) **MERGED**; Merge-SHA `171aad700ee2cd0a43e8e434a042fa16fcb28d09`; Feature-/Post-Merge-CI grün. Hardening (Rollback-Test, Backup-Proof v2) im Branch `feat/epic-03-f-slice7-price-status-apply` – Merge-Status separat. **Kein** Staging-Apply. CRM nicht in Scope. |
+| EPIC-03-F Slice 7 – Preisstatus Apply | `IMPLEMENTED` → CI → Ziel `VERIFIED` | Feature-Branch `feat/epic-03-f-slice7-price-status-apply`; Verarbeitungsvertrag 2.1.0; S7-PO-01…05; CLI `--dry-run-price-status` / `--apply-price-status`. **Kein** operativer Status-Apply. |
 | CRM-Transfermechanismus (PO-01) | `OPEN` / `READINESS` | eigenständig; vor ungeprüftem Staging-CRM-Apply |
 
 Acceptance-Gate Phase 1:
 
 - [x] Slice 6b technisch implementiert und CI-verifiziert (`VERIFIED`; `ACCEPTED` erst nach PO)
 - [x] Slice 6b gemergt (PR #279 → `171aad700ee2cd0a43e8e434a042fa16fcb28d09`)
-- [ ] Slice 7 abgeschlossen bzw. freigegeben
+- [ ] Slice 7 CI-verifiziert und gemergt (`VERIFIED`; operativ weiter STOP)
 - [ ] CRM-Transfervertrag/-mechanismus readynessseitig geklärt und freigegeben (ohne ungeprüfte Integration in 6b)
 - [x] Kein operativer Staging-Apply ohne gesondertes PO-GO (weiterhin STOP)
 
@@ -336,7 +336,7 @@ Acceptance-Gate:
 
 | Prio | Aufgabe | Phase | Status |
 |---:|---|---|---|
-| 1 | EPIC-03-F Slice 7 – Preisstatus + Slice-6b-Hardening (nach PO-GO) | 1 | `OPEN` |
+| 1 | EPIC-03-F Slice 7 + Slice-6b-Hardening – CI/Review/Merge (kein Auto-Merge; kein operativer Apply) | 1 | `IMPLEMENTED` |
 | 2 | CRM-Transfer Readiness + Mechanismus (PO-01) | 1 | `OPEN` |
 | 3 | Buchbarkeitsmatrix (PO-06) | 2 | `OPEN` |
 | 4 | Contest / Social / Events / Barter Readiness-Pakete (PO-05) | 2 | `READINESS` |
@@ -350,7 +350,7 @@ Acceptance-Gate:
 
 | ID | Risiko / Blocker | Schwere | Status | Bemerkung |
 |---|---|---|---|---|
-| GLB-01 | Transfer Apply 2.0.0: Code gemergt/`VERIFIED`, fachlich/operativ noch nicht `ACCEPTED`; Staging-Apply offen; Hardening-Nachweise ausstehend | hoch | teilweise entschärft | PR #279 MERGED (`171aad7…`); operativer Apply = eigenes GO |
+| GLB-01 | Transfer Apply 2.0.0 + Status-Phase: Code/Hardening/`Slice 7` im Feature-PR; fachlich/operativ nicht `ACCEPTED`; Inhalts- und Status-Apply offen | hoch | teilweise entschärft | PR #279 MERGED; Slice-7-PR Draft; operativer Apply = eigenes GO |
 | GLB-02 | CRM-Transfer fehlt (eigenständig) | hoch | offen | PO-01; nicht in 6b |
 | GLB-03 | Social / Events / Barter fachlich unvollständig | hoch | offen | PO-05; Readiness zuerst |
 | GLB-04 | Contest Go-live-Vollständigkeit ungeprüft | mittel–hoch | offen | Code vorhanden; Readiness/Abnahme offen |
@@ -382,7 +382,8 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 | Dokumentationsbasis Masterplan | `2283d5fc0c836998e2c59253d24a821373762f79` | `main` nach PR #278 |
 | EPIC-03-F Vertrag 2.0.0 | Docs auf `main` (u. a. PR #276 Operational Readiness) | technisch abgenommen |
 | Slice 6a Dry-Run CLI | PR #277 / Merge in Basislinie | Voraussetzung für operativen Dry-Run |
-| Slice 6b Apply | PR [#279](https://github.com/MORE-m/dispo/pull/279) MERGED / Merge-SHA `171aad700ee2cd0a43e8e434a042fa16fcb28d09` / Feature-HEAD `7f5d32410e81ae717fafbd7406791a63f96fe233` | Feature-CI `45795039370` und Post-Merge-CI `45806036882` pass; Staging-Apply weiter STOP; Hardening-Nachweise ausstehend |
+| Slice 6b Apply | PR [#279](https://github.com/MORE-m/dispo/pull/279) MERGED / Merge-SHA `171aad700ee2cd0a43e8e434a042fa16fcb28d09` | Feature-/Post-Merge-CI pass; Staging-Apply weiter STOP |
+| Slice 6b Hardening + Slice 7 | Branch `feat/epic-03-f-slice7-price-status-apply` / Verarbeitungsvertrag 2.1.0 | Draft-PR; CI ausstehend/zu prüfen; kein Auto-Merge; kein operativer Apply |
 | Tabellenklassifikation | `docs/readiness/EPIC-03-F-table-classification-2-0-0.md` | alle Tabellen; CRM = PO-01 separat |
 | Historische CUT/Closure | siehe Abschnitt 4 | abgelöst bzgl. Scope-Abgrenzung |
 
@@ -393,10 +394,11 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 ## 10. Aktuelle Phase und nächster freigegebener Arbeitsschritt
 
 - **Aktuelle Phase:** **Phase 1 – Transfermechanismus vervollständigen** (`IN_PROGRESS`)
-- **Slice 6b:** Code gemergt und `VERIFIED` (PR #279, Merge-SHA `171aad7…`, Feature-HEAD `7f5d324…`, Feature-CI `45795039370` und Post-Merge-CI `45806036882` grün); **nicht** `ACCEPTED`; ergänzende Sicherheitsnachweise noch ausstehend
-- **Operativer Staging-Apply:** weiterhin `OPEN` / STOP ohne gesondertes PO-GO
-- **Empfohlener nächster PO-Schritt:** Slice 7 Implementierung inkl. Slice-6b-Hardening (nach explizitem PO-GO) **oder** CRM-Transfer-Readiness (PO-01)
-- Slice 7 und CRM bleiben `OPEN` (Slice 7 technisch noch nicht implementiert)
+- **Slice 6b:** Code gemergt und `VERIFIED` (PR #279); Hardening im Slice-7-Feature-PR; **nicht** `ACCEPTED`
+- **Slice 7:** `IMPLEMENTED` auf Feature-Branch (Verarbeitungsvertrag 2.1.0, S7-PO-01…05); Ziel `VERIFIED` nach CI; **kein** operativer Status-Apply
+- **Operativer Inhalts-Apply / Preisstatus-Apply:** weiterhin `OPEN` / STOP ohne gesondertes PO-GO
+- **Empfohlener nächster PO-Schritt nach Merge/CI von Slice 7:** CRM-Transfer-Readiness (PO-01) – explizites PO-GO; noch nicht starten
+- CRM bleibt `OPEN`
 
 ---
 
@@ -408,3 +410,4 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 | `1.1.0` | 2026-11-26 | Slice 6b auf `IMPLEMENTED` gesetzt (Draft-PR #279); Tabellenklassifikation verlinkt; Staging-Apply weiter STOP; Phase 1 weiter `IN_PROGRESS` |
 | `1.2.0` | 2026-11-26 | Slice 6b auf `VERIFIED` nach CI `ci`/`mysql`/`e2e-spt008` grün (Run `45795039370`); Staging-Apply/Slice 7/CRM weiter OPEN; kein ACCEPTED |
 | `1.2.1` | 2026-11-26 | Slice 6b Merge-Status nachgezogen: PR #279 MERGED (`171aad7…`); Post-Merge-CI `45806036882` grün; Staging-Apply/Slice 7/CRM weiter OPEN; Hardening-Nachweise ausstehend; kein ACCEPTED |
+| `1.3.0` | 2026-11-26 | Slice 7 + Slice-6b-Hardening `IMPLEMENTED` (Feature-Branch; Verarbeitungsvertrag 2.1.0; S7-PO-01…05); operativer Inhalts-/Status-Apply und CRM weiter OPEN; kein ACCEPTED |
