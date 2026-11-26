@@ -216,13 +216,13 @@ Acceptance-Gate:
 
 | Arbeitspaket | Status | Hinweise / Belege |
 |---|---|---|
-| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `IMPLEMENTED` → CI-Nachweis → Ziel `VERIFIED` | Draft-PR #279; Code Apply mit SHA/Backup/Allowlist. **Kein** Staging-Apply. CRM nicht in Scope. Tabellenklassifikation: [`../readiness/EPIC-03-F-table-classification-2-0-0.md`](../readiness/EPIC-03-F-table-classification-2-0-0.md). |
+| EPIC-03-F Slice 6b – Master Data Transfer 2.0.0 Apply | `VERIFIED` | Draft-PR [#279](https://github.com/MORE-m/dispo/pull/279); Feature-HEAD `7f5d32410e81ae717fafbd7406791a63f96fe233`; CI `ci`/`mysql`/`e2e-spt008` grün (Run `45795039370`). **Kein** Staging-Apply. CRM nicht in Scope. Tabellenklassifikation: [`../readiness/EPIC-03-F-table-classification-2-0-0.md`](../readiness/EPIC-03-F-table-classification-2-0-0.md). |
 | EPIC-03-F Slice 7 | `OPEN` | Preisstatus-Phase; eigener PO-GO |
 | CRM-Transfermechanismus (PO-01) | `OPEN` / `READINESS` | eigenständig; vor ungeprüftem Staging-CRM-Apply |
 
 Acceptance-Gate Phase 1:
 
-- [x] Slice 6b technisch implementiert (`IMPLEMENTED`; `VERIFIED` nach grünen CI-Gates; `ACCEPTED` erst nach PO)
+- [x] Slice 6b technisch implementiert und CI-verifiziert (`VERIFIED`; `ACCEPTED` erst nach PO; Merge offen)
 - [ ] Slice 6b gemergt (kein eigenmächtiger Merge)
 - [ ] Slice 7 abgeschlossen bzw. freigegeben
 - [ ] CRM-Transfervertrag/-mechanismus readynessseitig geklärt und freigegeben (ohne ungeprüfte Integration in 6b)
@@ -336,7 +336,7 @@ Acceptance-Gate:
 
 | Prio | Aufgabe | Phase | Status |
 |---:|---|---|---|
-| 1 | EPIC-03-F Slice 6b – CI grün + Review/Merge-Entscheidung (kein Auto-Merge) | 1 | `IMPLEMENTED` |
+| 1 | EPIC-03-F Slice 6b – Review/Merge-Entscheidung (kein Auto-Merge) | 1 | `VERIFIED` |
 | 2 | EPIC-03-F Slice 7 – Preisstatus (nach PO-GO) | 1 | `OPEN` |
 | 3 | CRM-Transfer Readiness + Mechanismus (PO-01) | 1 | `OPEN` |
 | 4 | Buchbarkeitsmatrix (PO-06) | 2 | `OPEN` |
@@ -383,7 +383,7 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 | Dokumentationsbasis Masterplan | `2283d5fc0c836998e2c59253d24a821373762f79` | `main` nach PR #278 |
 | EPIC-03-F Vertrag 2.0.0 | Docs auf `main` (u. a. PR #276 Operational Readiness) | technisch abgenommen |
 | Slice 6a Dry-Run CLI | PR #277 / Merge in Basislinie | Voraussetzung für operativen Dry-Run |
-| Slice 6b Apply | Draft-PR [#279](https://github.com/MORE-m/dispo/pull/279) / Branch `feat/epic-03-f-slice6b-importer-v2-apply` | Feature-HEAD wird nach Push aktualisiert; Staging-Apply weiter STOP |
+| Slice 6b Apply | Draft-PR [#279](https://github.com/MORE-m/dispo/pull/279) / HEAD `7f5d32410e81ae717fafbd7406791a63f96fe233` | CI Run `45795039370` pass (`ci`/`mysql`/`e2e-spt008`); Staging-Apply weiter STOP |
 | Tabellenklassifikation | `docs/readiness/EPIC-03-F-table-classification-2-0-0.md` | alle Tabellen; CRM = PO-01 separat |
 | Historische CUT/Closure | siehe Abschnitt 4 | abgelöst bzgl. Scope-Abgrenzung |
 
@@ -394,9 +394,9 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 ## 10. Aktuelle Phase und nächster freigegebener Arbeitsschritt
 
 - **Aktuelle Phase:** **Phase 1 – Transfermechanismus vervollständigen** (`IN_PROGRESS`)
-- **Slice 6b:** `IMPLEMENTED` (Code/Docs im Draft-PR #279); `VERIFIED` nach grünen CI-Gates `ci`/`mysql`/`e2e-spt008`; **nicht** `ACCEPTED`
+- **Slice 6b:** `VERIFIED` (Draft-PR #279, HEAD `7f5d324…`, CI Run `45795039370` grün); **nicht** `ACCEPTED`; kein Merge
 - **Operativer Staging-Apply:** weiterhin `OPEN` / STOP ohne gesondertes PO-GO
-- **Empfohlener nächster PO-Schritt nach VERIFIED/Merge-Entscheidung:** Slice 7 Readiness/Implementierung **oder** CRM-Transfer-Readiness (PO-01) – explizites PO-GO erforderlich
+- **Empfohlener nächster PO-Schritt:** Merge-Entscheidung zu #279, danach Slice 7 Readiness/Implementierung **oder** CRM-Transfer-Readiness (PO-01) – explizites PO-GO erforderlich
 - Slice 7 und CRM bleiben `OPEN`
 
 ---
@@ -407,3 +407,4 @@ Noch **nicht** durch PO-MASTER-AUDIT abschließend entschieden bzw. nachzureiche
 |---|---|---|
 | `1.0.0` | 2026-11-26 | Erste verbindliche Fassung nach PO-MASTER-AUDIT; Ablösung widersprechender Go-live-Abgrenzungen dokumentiert |
 | `1.1.0` | 2026-11-26 | Slice 6b auf `IMPLEMENTED` gesetzt (Draft-PR #279); Tabellenklassifikation verlinkt; Staging-Apply weiter STOP; Phase 1 weiter `IN_PROGRESS` |
+| `1.2.0` | 2026-11-26 | Slice 6b auf `VERIFIED` nach CI `ci`/`mysql`/`e2e-spt008` grün (Run `45795039370`); Staging-Apply/Slice 7/CRM weiter OPEN; kein ACCEPTED |
