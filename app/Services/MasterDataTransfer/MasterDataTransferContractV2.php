@@ -15,6 +15,12 @@ final class MasterDataTransferContractV2
 
     public const EPIC = 'EPIC-03-F';
 
+    /**
+     * Verarbeitungsvertrag (Backup-Proof v2, Apply-Receipts, Preisstatus-Phase).
+     * Unabhängig vom Paketschema: SCHEMA_VERSION bleibt 2.0.0 (keine neuen Paketdaten).
+     */
+    public const PROCESSING_CONTRACT_VERSION = '2.1.0';
+
     public const MANIFEST_FILE = 'manifest.json';
 
     public const CHECKSUMS_FILE = 'checksums.sha256';
