@@ -1,9 +1,9 @@
 # EPIC-03-F – Operative CLI-Anforderungen (Slice 6a / 6b / 7)
 
-**Status:** Slice **6a** implementiert (schreibfreier V2-Dry-Run). Slice 6b/7 weiterhin Anforderung.
-**Datum:** 2026-11-25
+**Status:** Slice **6a** und **6b** implementiert. Slice 7 weiterhin Anforderung.
+**Datum:** 2026-11-26
 **Vertrag:** [`EPIC-03-F-master-data-transfer-2-0-0.md`](EPIC-03-F-master-data-transfer-2-0-0.md)
-**Ist-Code:** Export V2 CLI vorhanden; Import V2 A–C in Tests; **Slice 6a:** operativer Dry-Run CLI mit Allowlist + `--require-package-sha256`. Apply/Status weiterhin gesperrt.
+**Ist-Code:** Export V2 CLI vorhanden; Import V2 A–C in Tests; **Slice 6a:** operativer Dry-Run CLI; **Slice 6b:** operativer Inhalts-Apply mit Allowlist, `--require-package-sha256` und `--require-backup-proof`. Status (Slice 7) weiterhin gesperrt.
 
 ## 1. Ist-Zustand (verbindlich ablesen)
 
@@ -17,19 +17,23 @@ php artisan dispo:export-master-data
   --git-sha=
 ```
 
-### Import – VORHANDEN für 1.0.0, GESPERRT für 2.0.0
+### Import – VORHANDEN für 1.0.0 und 2.0.0 (Dry-Run + Apply)
 
 ```text
 php artisan dispo:import-master-data {path}
-  --dry-run | --apply      (genau eine Option)
+  --dry-run | --apply | --apply-price-status   (genau eine Option)
   --confirm-database=
+  --require-package-sha256=     (Pflicht für Schema 2.0.0)
+  --require-backup-proof=       (Pflicht für Schema 2.0.0 Apply)
 ```
 
 Aktuelles Verhalten bei `schema_version=2.0.0`:
 
-- Command und `MasterDataImporterV2::import()` werfen:
-  `Import für schema_version=2.0.0 ist operativ nicht freigegeben (Status-Phase und Staging-GO fehlen).`
-- Phasen A–C laufen nur über isolierte Test-Hooks (`executePhasesABCForIsolatedTests` u. a.).
+- `--dry-run` → `MasterDataImporterV2::dryRunOperational()` (Slice 6a)
+- `--apply` → `MasterDataImporterV2::applyOperational()` (Slice 6b; Draft-Preise)
+- `--apply-price-status` → gesperrt (Slice 7 fehlt)
+- Generisches `import()` bleibt gesperrt und verweist auf die dedizierten Methoden
+- Phasen A–C laufen auch über isolierte Test-Hooks (`executePhasesABCForIsolatedTests` u. a.)
 
 ### Bereits im Service (nicht operativ verdrahtet)
 
@@ -96,7 +100,7 @@ Slice 6a und 6b bilden zusammen die frühere „Slice-6“-CLI-Linie ohne Status
 | CLI-11 | `--apply` = nur Inhaltsphasen A–C (Schutz), Preise nur `draft`; **kein** Statuswechsel | muss |
 | CLI-13 | Status-Phase nie implizit nach Apply | muss |
 | CLI-20b | `--apply` verlangt Nachweis einer frischen Staging-Sicherung | muss |
-| CLI-21 | Form offen, z. B. `--require-backup-proof=<path-or-token>` prüft Gate-PASS + Dump-Metadaten | muss |
+| CLI-21 | `--require-backup-proof=<dir>`: Verzeichnis mit `BACKUP_GATE.txt` (PASS), `DUMP_META.json` (dump_filename/sha256/bytes/restore_path) und Dump-Datei; SHA256+Größe müssen passen | muss |
 | CLI-22 | Ohne gültigen Nachweis → STOP vor Schreibbeginn | muss |
 | CLI-31b | `--require-package-sha256=<hex>` Pflicht für Apply | muss |
 | CLI-52 | Apply in einer Transaktion; Rollback bei Fehler | muss |
@@ -173,10 +177,10 @@ Parameternamen sind Vorschläge; verbindlich ist die Semantik.
 
 ### Slice 6b
 
-1. Feature-Tests: Apply 2.0.0 mit Allowlist/Confirm/Backup/SHA Gates.
-2. Negativtests: Quelle/Prod Apply, fehlendes Backup, Whitelist-Verstoß, Pin-Konflikt.
-3. Idempotenz in synthetischen Tests.
-4. Docs/Runbook: Apply-Befehl von „OFFEN“ auf „VORHANDEN“ (6b).
+1. Feature-Tests: Apply 2.0.0 mit Allowlist/Confirm/Backup/SHA Gates. (**VORHANDEN**)
+2. Negativtests: Quelle/Prod Apply, fehlendes Backup, Whitelist-Verstoß, Pin-Konflikt. (**VORHANDEN**)
+3. Idempotenz in synthetischen Tests. (**VORHANDEN**)
+4. Docs/Runbook: Apply-Befehl von „OFFEN“ auf „VORHANDEN“ (6b). (**VORHANDEN**)
 
 ### Slice 7
 

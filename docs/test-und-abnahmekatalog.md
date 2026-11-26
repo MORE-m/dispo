@@ -513,11 +513,13 @@ test_VER_005_new_fieldset_version_does_not_mutate_existing_snapshot
 
 ## Definition der Fachabnahme
 
-> **PO-V1-CLOSURE-1 / PO-GOLIVE-CUT-1-DEC:** Tag-1 richtet sich nach der
-> operativen Stufenpriorisierung, nicht nach dem vollständigen Katalogumfang.
-> STD = V2/Regression; OA-Budget = V2; Reports/PDF = Stufe 4 (Interim:
-> Dispo-Detail + SPT-008); Social/Events = Stufe 3; manuelle Abnahme ≠
-> fehlender Runtime-Code; Betrieb (BL-P11-01) separat.
+> **Historisch PO-V1-CLOSURE-1 / PO-GOLIVE-CUT-1-DEC:** Tag-1 richtete sich nach
+> der operativen Stufenpriorisierung. **Ab 26.11.2026 verbindlich:**
+> [`docs/roadmap/GO-LIVE-MASTERPLAN.md`](roadmap/GO-LIVE-MASTERPLAN.md)
+> (PO-MASTER-AUDIT). Social Media, Events, Barter und Contest sind Go-live-Scope
+> (je eigene Readiness). STD = V2/Regression und OA-Budget = V2 bleiben, bis der
+> PO neu entscheidet. Reports/PDF = Stufe 4 (Interim: Dispo-Detail + SPT-008);
+> manuelle Abnahme ≠ fehlender Runtime-Code; Betrieb (BL-P11-01) separat.
 
 V1 ist fachlich abnahmefähig, wenn:
 
@@ -525,9 +527,10 @@ V1 ist fachlich abnahmefähig, wenn:
   nicht-STD-Fälle); `AT-28`–`AT-31` sind **Regression** für vorhandene
   Standardoffer-Funktionalität, nicht Voraussetzung für einen vollständigen
   V1-Produktumfang Standardangebote (**V2**, PO-STD-V2),
-- alle **operativ freigegebenen** V1-MUSS-Anforderungen des Tag-1-Scopes
-  tracebar abgedeckt sind (`STD-*` = V2; OA-Budget = V2; Social/Events =
-  Stufe 3; REP-PDF = Stufe 4),
+- alle **operativ freigegebenen** MUSS-Anforderungen des Go-live-Scopes
+  tracebar abgedeckt sind (`STD-*` = V2 bis neue PO-Entscheidung; OA-Budget = V2
+  bis neue PO-Entscheidung; Social/Events/Barter/Contest = Go-live laut
+  GO-LIVE-MASTERPLAN mit je eigener Readiness; REP-PDF = Stufe 4),
 - keine offenen Fehler der Schwere kritisch/hoch bestehen,
 - Preislisten- und Kombinationsinitialdaten für den operativen Tag-1-Katalog
   abgenommen wurden (Vollkatalog/MAT-003-Vollabnahme = Abnahme-Track),

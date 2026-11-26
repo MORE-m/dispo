@@ -43,6 +43,7 @@ use App\Models\ProductionPriceList;
 use App\Models\User;
 use App\Services\MasterDataTransfer\MasterDataTransferContractV2;
 use App\Services\MasterDataTransfer\MasterDataTransferException;
+use App\Services\MasterDataTransfer\Support\MasterDataBackupProofV2;
 use App\Services\MasterDataTransfer\Support\MasterDataExportDecimal;
 use App\Services\MasterDataTransfer\Support\MasterDataImportRecordValidatorV2;
 use App\Services\MasterDataTransfer\Support\MasterDataOperationalDatabaseGuardV2;
@@ -59,8 +60,10 @@ use PDO;
 use Throwable;
 
 /**
- * EPIC-03-F Slice 5+6a: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots, Pins, Whitelist.
- * Slice 6a: operativer schreibfreier Dry-Run. Apply und Status bleiben gesperrt.
+ * EPIC-03-F Slice 5+6a+6b: Inhaltsimport 2.0.0 inkl. Schutz-Snapshots, Pins, Whitelist.
+ * Slice 6a: operativer schreibfreier Dry-Run.
+ * Slice 6b: operativer Inhalts-Apply (Draft-Preise) mit Backup-Nachweis.
+ * Slice 7 (Preisstatus) bleibt gesperrt.
  */
 final class MasterDataImporterV2
 {
@@ -71,11 +74,13 @@ final class MasterDataImporterV2
         private readonly MasterDataWriteWhitelistGuardV2 $writeGuard = new MasterDataWriteWhitelistGuardV2,
         private readonly MasterDataOperationalDatabaseGuardV2 $operationalDatabaseGuard = new MasterDataOperationalDatabaseGuardV2,
         private readonly MasterDataOperationalDryRunReadGuardV2 $operationalReadGuard = new MasterDataOperationalDryRunReadGuardV2,
+        private readonly MasterDataBackupProofV2 $backupProof = new MasterDataBackupProofV2,
     ) {}
 
     /**
-     * Generischer Import-Einstieg bleibt für Apply/Status gesperrt.
+     * Generischer Import-Einstieg bleibt gesperrt.
      * Operativer Dry-Run: {@see dryRunOperational()}.
+     * Operativer Apply: {@see applyOperational()}.
      *
      * @return array<string, mixed>
      */
@@ -88,7 +93,7 @@ final class MasterDataImporterV2
         }
 
         throw new MasterDataTransferException(
-            'Apply für schema_version=2.0.0 ist operativ nicht freigegeben (Slice 6b fehlt).',
+            'Operativer V2-Apply nur über applyOperational() mit --require-package-sha256 und --require-backup-proof (Slice 6b).',
         );
     }
 
@@ -149,6 +154,62 @@ final class MasterDataImporterV2
         } finally {
             $this->operationalReadGuard->leave();
         }
+    }
+
+    /**
+     * Slice 6b: operativer Inhalts-Apply gegen die Staging-Allowlist.
+     * Preise nur als draft; keine Status-Phase. Backup-Nachweis Pflicht vor Schreibbeginn.
+     *
+     * @return array<string, mixed> MasterDataImportReport::toArray
+     */
+    public function applyOperational(
+        string $packagePath,
+        string $confirmDatabase,
+        string $requirePackageSha256,
+        string $requireBackupProof,
+    ): array {
+        $normalizedRequired = $this->assertValidPackageSha256Option($requirePackageSha256);
+        $activeDatabase = $this->operationalDatabaseGuard->assertApplyAllowed($confirmDatabase);
+        $proof = $this->backupProof->assertValid($requireBackupProof);
+
+        $digestBefore = strtolower($this->packages->computePackageSha256($packagePath));
+        if (! hash_equals($digestBefore, $normalizedRequired)) {
+            throw new MasterDataTransferException(sprintf(
+                'Paket-SHA256 stimmt nicht (--require-package-sha256). erwartet=%s berechnet=%s',
+                $normalizedRequired,
+                $digestBefore,
+            ));
+        }
+
+        $report = $this->executePhases(
+            $packagePath,
+            dryRun: false,
+            includePhaseB: true,
+            includePhaseC: true,
+            requireIsolatedTestGuard: false,
+            packageSha256: $digestBefore,
+            operationalDatabase: $activeDatabase,
+            operationalApply: true,
+            backupProofDumpSha256: $proof['dump_sha256'],
+        );
+
+        $digestAfter = strtolower($this->packages->computePackageSha256($packagePath));
+        if (! hash_equals($digestBefore, $digestAfter)) {
+            throw new MasterDataTransferException(
+                'Paket wurde während des Applys verändert (SHA256-Drift) — Abbruch.',
+                [
+                    'before='.$digestBefore,
+                    'after='.$digestAfter,
+                ],
+            );
+        }
+        if (! hash_equals($digestAfter, $normalizedRequired)) {
+            throw new MasterDataTransferException(
+                'Paket-SHA256 nach Apply weicht von --require-package-sha256 ab — Abbruch.',
+            );
+        }
+
+        return $report;
     }
 
     private function assertValidPackageSha256Option(string $requirePackageSha256): string
@@ -235,12 +296,18 @@ final class MasterDataImporterV2
         bool $requireIsolatedTestGuard,
         ?string $packageSha256 = null,
         ?string $operationalDatabase = null,
+        bool $operationalApply = false,
+        ?string $backupProofDumpSha256 = null,
     ): array {
         if ($requireIsolatedTestGuard) {
             $this->assertIsolatedTestExecutionAllowed();
-        } elseif (! $dryRun) {
+        } elseif (! $dryRun && ! $operationalApply) {
             throw new MasterDataTransferException(
-                'Operativer V2-Pfad ohne Isolations-Guard darf nur schreibfreien Dry-Run ausführen.',
+                'Operativer V2-Pfad ohne Isolations-Guard darf nur schreibfreien Dry-Run oder applyOperational() ausführen.',
+            );
+        } elseif ($dryRun && $operationalApply) {
+            throw new MasterDataTransferException(
+                'Interner Konflikt: Dry-Run und operationalApply gleichzeitig gesetzt.',
             );
         }
 
@@ -263,6 +330,12 @@ final class MasterDataImporterV2
         }
         if ($operationalDatabase !== null) {
             $report->setOperationalDatabase($operationalDatabase);
+        }
+        if ($operationalApply) {
+            $report->setBackupProof('pass');
+            if ($backupProofDumpSha256 !== null) {
+                $report->setBackupProofDumpSha256($backupProofDumpSha256);
+            }
         }
         $context = new MasterDataImportPlanContext($package['data']);
 

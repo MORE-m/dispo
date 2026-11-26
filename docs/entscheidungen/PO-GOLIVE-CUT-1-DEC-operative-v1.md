@@ -1,6 +1,6 @@
 # PO-GOLIVE-CUT-1-DEC – Operative V1 (Projektpriorisierung)
 
-Status: **Akzeptiert für die hier festgelegte Projektpriorisierung; einzelne Fachparameter bleiben explizite Umsetzungsvoraussetzungen.**  
+Status: **Historisch akzeptiert (18.10.2026).** Ab 26.11.2026 sind widersprechende Go-live-Abgrenzungen durch [`../roadmap/GO-LIVE-MASTERPLAN.md`](../roadmap/GO-LIVE-MASTERPLAN.md) (PO-MASTER-AUDIT / PO-01…PO-07) abgelöst – insbesondere die Einstufung von Social/Events und verwandtem Katalog als Stufe 3 / nicht Tag-1. Dieses Dokument bleibt als historische Priorisierungsentscheidung erhalten und wird nicht rückwirkend gelöscht.  
 Stand: 18. Oktober 2026  
 Basis: `origin/main` @ `01c5e71201f283eaf5a4369e7679ae84b48e49a3` (nach PR #158; #158 ändert keine Fachlogik)  
 IDs: `PO-GOLIVE-CUT-1`, `PO-GOLIVE-CUT-1-DEC`, `SPT-011`, `MAT-003`, `SWF-*`, `REP-007`, `AUTH-*`, Kapitel 27  

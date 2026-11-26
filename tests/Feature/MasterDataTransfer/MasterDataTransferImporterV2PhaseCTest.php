@@ -330,7 +330,7 @@ class MasterDataTransferImporterV2PhaseCTest extends TestCase
     }
 
     #[Test]
-    public function repeated_abc_import_is_idempotent_and_v2_cli_stays_blocked(): void
+    public function repeated_abc_import_is_idempotent_and_generic_apply_entry_stays_blocked(): void
     {
         User::factory()->create(['email' => 'idem@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
@@ -343,9 +343,9 @@ class MasterDataTransferImporterV2PhaseCTest extends TestCase
 
         try {
             app(MasterDataImporterV2::class)->import($package, dryRun: false, confirmDatabase: 'ignored');
-            $this->fail('Operativer Apply muss gesperrt bleiben');
+            $this->fail('Generischer Apply-Einstieg muss gesperrt bleiben');
         } catch (MasterDataTransferException $e) {
-            $this->assertStringContainsString('Slice 6b fehlt', $e->getMessage());
+            $this->assertStringContainsString('applyOperational()', $e->getMessage());
         }
 
         $db = (string) config('database.connections.'.config('database.default').'.database');
@@ -354,7 +354,12 @@ class MasterDataTransferImporterV2PhaseCTest extends TestCase
             '--apply' => true,
             '--confirm-database' => $db,
         ]));
-        $this->assertStringContainsString('Slice 6b fehlt', Artisan::output());
+        $output = Artisan::output();
+        $this->assertTrue(
+            str_contains($output, '--require-backup-proof')
+            || str_contains($output, '--require-package-sha256'),
+            $output,
+        );
     }
 
     #[Test]

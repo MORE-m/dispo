@@ -59,12 +59,17 @@ Siehe Runbook Abschnitt „Operative Checkliste“. Die 13 Schritte sind:
 12. Idempotenzprüfung
 13. Preisstatus-Phase nur nach eigenem GO (separater Schritt)
 
+## CLI-Stand (Nachzug 26.11.2026)
+
+- **Slice 6a:** schreibfreier V2-Dry-Run über CLI – **VORHANDEN**
+- **Slice 6b:** Inhalts-Apply mit Backup-Nachweis – **VORHANDEN** (Code; kein operatives Staging-GO)
+- **Slice 7:** Preisstatus – weiterhin **OFFEN**
+
 ## Was für den ersten kontrollierten Staging-Dry-Run noch fehlt
 
 Kurzfassung; Details in Teil E (Phasen Slice 6a / 6b / 7):
 
-- **Slice 6a:** schreibfreier V2-Dry-Run über CLI (aktuell Import `2.0.0` gesperrt) – Voraussetzung für den ersten Dry-Run
 - Separates PO-GO für Export und danach für genau einen Dry-Run
 - Aktuelle Ausgangszählung (Readiness-Zahlen vom 23.11. sind historische Referenz)
-- **Nicht** Voraussetzung für den ersten Dry-Run: Slice 6b (Apply inkl. Backup-Nachweis), Slice 7 (Preisstatus)
+- **Nicht** Voraussetzung für den ersten Dry-Run: Slice 6b Apply-Lauf, Slice 7 (Preisstatus)
 - Frische, verifizierte Staging-Sicherung wird für Apply (6b) und Status (7) verlangt, nicht als Blocker für den schreibfreien Dry-Run

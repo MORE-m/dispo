@@ -344,7 +344,12 @@ class MasterDataTransferImporterV2PhaseBTest extends TestCase
             '--apply' => true,
             '--confirm-database' => $db,
         ]));
-        $this->assertStringContainsString('Slice 6b fehlt', Artisan::output());
+        $output = Artisan::output();
+        $this->assertTrue(
+            str_contains($output, '--require-backup-proof')
+            || str_contains($output, '--require-package-sha256'),
+            $output,
+        );
     }
 
     #[Test]

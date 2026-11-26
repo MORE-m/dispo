@@ -26,9 +26,13 @@ final class MasterDataImportReport
 
     private string $referentialIntegrity = 'pass';
 
+    private string $backupProof = 'pass';
+
     private ?string $packageSha256 = null;
 
     private ?string $operationalDatabase = null;
+
+    private ?string $backupProofDumpSha256 = null;
 
     /** @var array<string, int> */
     private array $protectedTableCounts = [];
@@ -96,6 +100,16 @@ final class MasterDataImportReport
         $this->referentialIntegrity = $status;
     }
 
+    public function setBackupProof(string $status): void
+    {
+        $this->backupProof = $status;
+    }
+
+    public function setBackupProofDumpSha256(string $sha256): void
+    {
+        $this->backupProofDumpSha256 = strtolower($sha256);
+    }
+
     public function setPackageSha256(string $sha256): void
     {
         $this->packageSha256 = strtolower($sha256);
@@ -147,6 +161,8 @@ final class MasterDataImportReport
      *         price_list_pin_count: int,
      *         whitelist: string,
      *         referential_integrity: string,
+     *         backup_proof: string,
+     *         backup_proof_dump_sha256: ?string,
      *         result: string
      *     }
      * }
@@ -164,7 +180,8 @@ final class MasterDataImportReport
             || $this->protectionSnapshots === 'stop'
             || $this->priceListPins === 'stop'
             || $this->whitelist === 'stop'
-            || $this->referentialIntegrity === 'stop';
+            || $this->referentialIntegrity === 'stop'
+            || $this->backupProof === 'stop';
 
         return [
             'dry_run' => $dryRun,
@@ -186,6 +203,8 @@ final class MasterDataImportReport
                 'price_list_pin_count' => $this->priceListPinCount,
                 'whitelist' => $this->whitelist,
                 'referential_integrity' => $this->referentialIntegrity,
+                'backup_proof' => $this->backupProof,
+                'backup_proof_dump_sha256' => $this->backupProofDumpSha256,
                 'result' => $stopped ? 'STOP' : 'PASS',
             ],
         ];

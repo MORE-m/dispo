@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Slice 6a: Operative DB-Allowlist und --confirm-database-Bindung.
+ * Slice 6a/6b: Operative DB-Allowlist und --confirm-database-Bindung.
  *
  * Kein CLI-Override der Allowlist. Tests dürfen die Zielidentität nur über
  * config('dispo.master_data_transfer_testing_operational_database') simulieren,
@@ -20,6 +20,24 @@ final class MasterDataOperationalDatabaseGuardV2
      * @return string operative DB-Identität (Allowlist-Name)
      */
     public function assertDryRunAllowed(string $confirmDatabase): string
+    {
+        return $this->assertOperationalAllowed($confirmDatabase, 'Dry-Run');
+    }
+
+    /**
+     * Slice 6b: dieselbe Allowlist/Confirm-Semantik wie Dry-Run, andere Fehlermeldungen.
+     *
+     * @return string operative DB-Identität (Allowlist-Name)
+     */
+    public function assertApplyAllowed(string $confirmDatabase): string
+    {
+        return $this->assertOperationalAllowed($confirmDatabase, 'Apply');
+    }
+
+    /**
+     * @return string operative DB-Identität (Allowlist-Name)
+     */
+    private function assertOperationalAllowed(string $confirmDatabase, string $actionLabel): string
     {
         if ($confirmDatabase === '') {
             throw new MasterDataTransferException(
@@ -34,7 +52,7 @@ final class MasterDataOperationalDatabaseGuardV2
             }
         }
 
-        return $this->assertOperationalConnectionAllowed($confirmDatabase);
+        return $this->assertOperationalConnectionAllowed($confirmDatabase, $actionLabel);
     }
 
     private function assertTestingOverrideAllowed(string $confirmDatabase, string $override): string
@@ -64,19 +82,19 @@ final class MasterDataOperationalDatabaseGuardV2
         return $override;
     }
 
-    private function assertOperationalConnectionAllowed(string $confirmDatabase): string
+    private function assertOperationalConnectionAllowed(string $confirmDatabase, string $actionLabel): string
     {
         $connectionName = (string) config('database.default');
         if ($connectionName === '') {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run abgebrochen: Datenbankverbindung unbestimmt.',
+                'Operativer V2-'.$actionLabel.' abgebrochen: Datenbankverbindung unbestimmt.',
             );
         }
 
         $driver = (string) config('database.connections.'.$connectionName.'.driver');
         if (! in_array($driver, ['mysql', 'mariadb'], true)) {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run nur mit MySQL/MariaDB erlaubt (Treiber: '
+                'Operativer V2-'.$actionLabel.' nur mit MySQL/MariaDB erlaubt (Treiber: '
                 .($driver === '' ? '(leer)' : $driver).').',
             );
         }
@@ -84,14 +102,14 @@ final class MasterDataOperationalDatabaseGuardV2
         $configured = $this->configuredDatabaseName($connectionName);
         if ($configured === '') {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run abgebrochen: konfigurierter DB-Name fehlt.',
+                'Operativer V2-'.$actionLabel.' abgebrochen: konfigurierter DB-Name fehlt.',
             );
         }
 
         $actual = $this->actualDatabaseNameFromConnection();
         if ($actual === '') {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run abgebrochen: tatsächliche DB-Identität (SELECT DATABASE()) fehlt.',
+                'Operativer V2-'.$actionLabel.' abgebrochen: tatsächliche DB-Identität (SELECT DATABASE()) fehlt.',
             );
         }
 
@@ -113,7 +131,7 @@ final class MasterDataOperationalDatabaseGuardV2
 
         if ($configured !== MasterDataTransferContractV2::OPERATIONAL_DATABASE) {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run nur gegen '
+                'Operativer V2-'.$actionLabel.' nur gegen '
                 .MasterDataTransferContractV2::OPERATIONAL_DATABASE
                 .' erlaubt (aktiv: '.$configured.').',
             );
@@ -121,7 +139,7 @@ final class MasterDataOperationalDatabaseGuardV2
 
         if ($this->isExplicitlyForbiddenName($configured)) {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run gegen geschützte Datenbank gesperrt: '.$configured,
+                'Operativer V2-'.$actionLabel.' gegen geschützte Datenbank gesperrt: '.$configured,
             );
         }
 
@@ -145,7 +163,7 @@ final class MasterDataOperationalDatabaseGuardV2
             $value = DB::selectOne('SELECT DATABASE() AS db_name');
         } catch (Throwable $e) {
             throw new MasterDataTransferException(
-                'Operativer V2-Dry-Run abgebrochen: SELECT DATABASE() fehlgeschlagen.',
+                'Operativer V2-Lauf abgebrochen: SELECT DATABASE() fehlgeschlagen.',
                 [$e->getMessage()],
             );
         }

@@ -552,7 +552,7 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
     }
 
     #[Test]
-    public function v2_apply_and_price_status_remain_blocked(): void
+    public function v2_apply_without_backup_proof_and_price_status_remain_blocked(): void
     {
         $package = $this->writeRichV2Package();
         $sha = app(MasterDataPackage::class)->computePackageSha256($package);
@@ -563,7 +563,7 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
             '--confirm-database' => MasterDataTransferContractV2::OPERATIONAL_DATABASE,
             '--require-package-sha256' => $sha,
         ]));
-        $this->assertStringContainsString('Slice 6b fehlt', Artisan::output());
+        $this->assertStringContainsString('--require-backup-proof', Artisan::output());
 
         $this->assertNotSame(0, Artisan::call('dispo:import-master-data', [
             'path' => $package,
@@ -575,17 +575,16 @@ class MasterDataTransferImporterV2Slice6aDryRunCliTest extends TestCase
     }
 
     #[Test]
-    public function isolated_test_guard_still_blocks_non_testing_style_apply_path(): void
+    public function generic_import_entry_still_redirects_to_dedicated_operational_methods(): void
     {
         User::factory()->create(['email' => 'iso@example.test', 'role' => Role::Admin, 'is_active' => true]);
         $package = $this->writeRichV2Package();
 
-        // Operational dry-run must not call isolated apply.
         try {
             app(MasterDataImporterV2::class)->import($package, dryRun: false, confirmDatabase: MasterDataTransferContractV2::OPERATIONAL_DATABASE);
-            $this->fail('Apply muss gesperrt bleiben');
+            $this->fail('Generischer Apply-Einstieg muss gesperrt bleiben');
         } catch (MasterDataTransferException $e) {
-            $this->assertStringContainsString('Slice 6b fehlt', $e->getMessage());
+            $this->assertStringContainsString('applyOperational()', $e->getMessage());
         }
     }
 

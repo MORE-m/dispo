@@ -1,6 +1,6 @@
 # PO-V1-CLOSURE-1 – V1-Backlogstatus konsolidieren
 
-Status: **Akzeptiert / Docs-only** (15. November 2026)  
+Status: **Historisch akzeptiert / Docs-only** (15. November 2026). Ab 26.11.2026 gelten für den weiteren Go-live-Verlauf die verbindlichen Entscheidungen in [`../roadmap/GO-LIVE-MASTERPLAN.md`](../roadmap/GO-LIVE-MASTERPLAN.md) (PO-MASTER-AUDIT). Widersprechende Scope-Abgrenzungen hierin – insbesondere Social/Events als Stufe 3 / kein Tag-1 sowie Contest nicht als Go-live-Pflicht – sind für die weitere Arbeit abgelöst. Der Closure-Stand vom 15.11.2026 bleibt als historische Statuskonsolidierung erhalten.  
 Stand: 15. November 2026  
 Basis: `origin/main` @ `f193c4b092c8ee1a56a7792b34894182d0a3dc99`  
 IDs: `PO-V1-CLOSURE-1`  
